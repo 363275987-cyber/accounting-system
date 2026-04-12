@@ -1,0 +1,8 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NETLIFY = "true"
+  VITE_SUPABASE_URL = "https://cmswoyiuoeqzeassubvw.supabase.co"
+  VITE_SUPABASE_ANON_KEY = "sb_publishable_kyhsOoWxO8YEBczAIJsUxQ_9KUmxFV2"

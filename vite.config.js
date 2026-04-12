@@ -3,7 +3,7 @@ import vue from '@vitejs/plugin-vue'
 import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
-  base: (process.env.VERCEL || process.env.COS_DEPLOY) ? '/' : '/billiard-ledger/',
+  base: (process.env.VERCEL || process.env.COS_DEPLOY || process.env.NETLIFY) ? '/' : '/billiard-ledger/',
   plugins: [vue(), tailwindcss()],
   server: {
     host: '0.0.0.0',
