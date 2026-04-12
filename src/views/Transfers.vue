@@ -1,10 +1,9 @@
 <template>
   <div>
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-xl font-bold text-gray-800">🔄 账户转账</h1>
-      <div class="flex items-center gap-2">
-        <!-- 随机测试数据 -->
-        <div v-if="canDeleteTransfers" class="inline-flex items-center gap-1">
+      <h1 class="text-xl font-bold text-gray-800 truncate">🔄 账户转账</h1>
+      <div class="flex items-center gap-2 shrink-0">
+        <div v-if="canDeleteTransfers" class="hidden md:inline-flex items-center gap-1">
           <select v-model="testCount" class="text-xs border border-dashed border-gray-300 rounded px-2 py-1 text-gray-500 bg-transparent outline-none cursor-pointer">
             <option :value="1">1条</option>
             <option :value="5">5条</option>
@@ -17,13 +16,22 @@
         </div>
         <button
           @click="showTextMode = !showTextMode"
-          class="px-4 py-2 rounded-lg text-sm transition cursor-pointer whitespace-nowrap"
+          class="hidden md:inline-flex px-4 py-2 rounded-lg text-sm transition cursor-pointer whitespace-nowrap"
           :class="showTextMode ? 'bg-purple-600 text-white hover:bg-purple-700' : 'bg-purple-50 text-purple-700 hover:bg-purple-100'"
         >
           📋 文本模式
         </button>
+        <!-- 移动端更多菜单 -->
+        <div class="relative md:hidden">
+          <button @click="showMobileMenu = !showMobileMenu" class="px-2.5 py-2 rounded-lg text-sm border border-gray-200 text-gray-600 hover:bg-gray-50 cursor-pointer">⋯</button>
+          <div v-if="showMobileMenu" class="absolute right-0 top-full mt-1 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50 min-w-[140px]">
+            <button @click="showTextMode = !showTextMode; showMobileMenu = false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer">📋 文本模式</button>
+            <button v-if="canDeleteTransfers" @click="generateTestData(testCount); showMobileMenu = false" class="w-full text-left px-4 py-2.5 text-sm text-gray-400 hover:bg-gray-50 cursor-pointer">🎲 随机测试</button>
+          </div>
+        </div>
+        <div v-if="showMobileMenu" class="fixed inset-0 z-40 md:hidden" @click="showMobileMenu = false"></div>
         <button v-if="auth.isFinance" @click="showTransferModal = true"
-          class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition cursor-pointer">
+          class="bg-blue-600 text-white px-3 md:px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition cursor-pointer whitespace-nowrap">
           + 新建转账
         </button>
       </div>
@@ -380,6 +388,7 @@ const transfers = ref([])
 const accounts = ref([])
 const showTransferModal = ref(false)
 const showTextMode = ref(false)
+const showMobileMenu = ref(false)
 const selectedIds = ref([])
 
 // --- Text Mode State ---

@@ -2,15 +2,26 @@
   <div>
     <!-- 顶部标题 -->
     <div class="flex items-center justify-between mb-4">
-      <h1 class="text-xl font-bold text-gray-800">📦 产品库</h1>
-      <div class="flex gap-2">
-        <button @click="exportType='single'; showExportModal=true" class="bg-green-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-green-700 transition cursor-pointer">🎱 导出单品+赠品</button>
-        <button @click="exportType='bundle'; showExportModal=true" class="bg-orange-500 text-white px-3 py-2 rounded-lg text-sm hover:bg-orange-600 transition cursor-pointer">📦 导出套装+赠品</button>
-        <button v-if="canEdit" @click="showImportModal=true" class="bg-blue-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-blue-700 transition cursor-pointer">📥 导入</button>
-        <button v-if="canEdit" @click="openProductModal('single')" class="bg-blue-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-blue-700 transition cursor-pointer">+ 单品</button>
-        <button v-if="canEdit" @click="openProductModal('bundle')" class="bg-orange-500 text-white px-3 py-2 rounded-lg text-sm hover:bg-orange-600 transition cursor-pointer">+ 套装</button>
+      <h1 class="text-xl font-bold text-gray-800 truncate">📦 产品库</h1>
+      <div class="flex items-center gap-2 shrink-0">
+        <button @click="exportType='single'; showExportModal=true" class="hidden md:inline-flex bg-green-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-green-700 transition cursor-pointer whitespace-nowrap">🎱 导出单品+赠品</button>
+        <button @click="exportType='bundle'; showExportModal=true" class="hidden md:inline-flex bg-orange-500 text-white px-3 py-2 rounded-lg text-sm hover:bg-orange-600 transition cursor-pointer whitespace-nowrap">📦 导出套装+赠品</button>
+        <button v-if="canEdit" @click="showImportModal=true" class="hidden md:inline-flex bg-blue-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-blue-700 transition cursor-pointer whitespace-nowrap">📥 导入</button>
+        <!-- 移动端更多菜单 -->
+        <div class="relative md:hidden">
+          <button @click="showMobileMenu = !showMobileMenu" class="px-2.5 py-2 rounded-lg text-sm border border-gray-200 text-gray-600 hover:bg-gray-50 cursor-pointer">⋯</button>
+          <div v-if="showMobileMenu" class="absolute right-0 top-full mt-1 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50 min-w-[160px]">
+            <button @click="exportType='single'; showExportModal=true; showMobileMenu=false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer">🎱 导出单品+赠品</button>
+            <button @click="exportType='bundle'; showExportModal=true; showMobileMenu=false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer">📦 导出套装+赠品</button>
+            <button v-if="canEdit" @click="showImportModal=true; showMobileMenu=false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer">📥 导入</button>
+            <button v-if="canEdit" @click="openProductModal('bundle'); showMobileMenu=false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer">+ 套装</button>
+          </div>
+        </div>
+        <button v-if="canEdit" @click="openProductModal('single')" class="bg-blue-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-blue-700 transition cursor-pointer whitespace-nowrap">+ 单品</button>
+        <button v-if="canEdit" @click="openProductModal('bundle')" class="hidden md:inline-flex bg-orange-500 text-white px-3 py-2 rounded-lg text-sm hover:bg-orange-600 transition cursor-pointer whitespace-nowrap">+ 套装</button>
       </div>
     </div>
+    <div v-if="showMobileMenu" class="fixed inset-0 z-40 md:hidden" @click="showMobileMenu = false"></div>
 
     <!-- 统计卡片 -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
@@ -966,6 +977,7 @@ async function onGiftConfirmed({ gifts, saveAsDefault }) {
 
 const showExportModal = ref(false)
 const showImportModal = ref(false)
+const showMobileMenu = ref(false)
 const exportType = ref('single') // single | bundle
 const exportColumns = ref([
   { key: 'sku_code', label: 'SKU编码', checked: true },

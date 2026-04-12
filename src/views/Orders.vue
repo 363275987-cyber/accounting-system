@@ -2,10 +2,10 @@
   <div>
     <!-- Header -->
     <div class="flex items-center justify-between mb-4 md:mb-6">
-      <h1 class="text-lg md:text-xl font-bold text-gray-800">📋 订单管理</h1>
-      <div class="flex items-center gap-2 flex-wrap">
-        <!-- 随机测试数据 -->
-        <div v-if="isAdmin" class="inline-flex items-center gap-1">
+      <h1 class="text-lg md:text-xl font-bold text-gray-800 truncate">📋 订单管理</h1>
+      <div class="flex items-center gap-2 shrink-0">
+        <!-- 桌面端按钮 -->
+        <div v-if="isAdmin" class="hidden md:inline-flex items-center gap-1">
           <select v-model="testCount" class="text-xs border border-dashed border-gray-300 rounded px-2 py-1 text-gray-500 bg-transparent outline-none cursor-pointer">
             <option :value="1">1条</option>
             <option :value="5">5条</option>
@@ -19,7 +19,7 @@
         <button
           v-if="isAdmin || isFinance"
           @click="openPendingRefunds"
-          class="relative px-3 md:px-4 py-2 rounded-lg text-sm transition cursor-pointer whitespace-nowrap bg-orange-50 text-orange-700 hover:bg-orange-100"
+          class="relative hidden md:inline-flex px-4 py-2 rounded-lg text-sm transition cursor-pointer whitespace-nowrap bg-orange-50 text-orange-700 hover:bg-orange-100"
         >
           💳 待审批退款
           <span v-if="pendingRefundCount > 0" class="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">{{ pendingRefundCount > 99 ? '99+' : pendingRefundCount }}</span>
@@ -27,7 +27,7 @@
         <button
           v-if="canCreate"
           @click="showTextMode = !showTextMode"
-          class="px-3 md:px-4 py-2 rounded-lg text-sm transition cursor-pointer whitespace-nowrap"
+          class="hidden md:inline-flex px-4 py-2 rounded-lg text-sm transition cursor-pointer whitespace-nowrap"
           :class="showTextMode ? 'bg-purple-600 text-white hover:bg-purple-700' : 'bg-purple-50 text-purple-700 hover:bg-purple-100'"
         >
           📋 文本模式
@@ -35,10 +35,25 @@
         <button
           v-if="canCreate"
           @click="openImportModal()"
-          class="bg-green-600 text-white px-3 md:px-4 py-2 rounded-lg text-sm hover:bg-green-700 transition cursor-pointer whitespace-nowrap"
+          class="hidden md:inline-flex bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700 transition cursor-pointer whitespace-nowrap"
         >
           📥 导入
         </button>
+        <!-- 移动端更多菜单 -->
+        <div class="relative md:hidden">
+          <button @click="showMobileMenu = !showMobileMenu" class="px-2.5 py-2 rounded-lg text-sm border border-gray-200 text-gray-600 hover:bg-gray-50 cursor-pointer">
+            ⋯
+          </button>
+          <div v-if="showMobileMenu" class="absolute right-0 top-full mt-1 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50 min-w-[140px]">
+            <button v-if="isAdmin || isFinance" @click="openPendingRefunds(); showMobileMenu = false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer flex items-center gap-2">
+              💳 待审批退款
+              <span v-if="pendingRefundCount > 0" class="bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[16px] h-[16px] flex items-center justify-center px-1">{{ pendingRefundCount }}</span>
+            </button>
+            <button v-if="canCreate" @click="showTextMode = !showTextMode; showMobileMenu = false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer">📋 文本模式</button>
+            <button v-if="canCreate" @click="openImportModal(); showMobileMenu = false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer">📥 导入</button>
+            <button v-if="isAdmin" @click="generateTestData(testCount); showMobileMenu = false" class="w-full text-left px-4 py-2.5 text-sm text-gray-400 hover:bg-gray-50 cursor-pointer">🎲 随机测试</button>
+          </div>
+        </div>
         <button
           v-if="canCreate"
           @click="openModal()"
@@ -48,6 +63,8 @@
         </button>
       </div>
     </div>
+    <!-- 移动端菜单遮罩 -->
+    <div v-if="showMobileMenu" class="fixed inset-0 z-40 md:hidden" @click="showMobileMenu = false"></div>
 
     <!-- Text Mode Panel -->
     <div v-if="showTextMode" class="mb-6">
@@ -1258,6 +1275,7 @@ const canCreate = computed(() => isAdmin.value || isFinance.value || authStore.i
 
 // ---------- text mode ----------
 const showTextMode = ref(false)
+const showMobileMenu = ref(false)
 const rawText = ref('')
 const parsedOrders = ref([])
 const orderAccountOptions = ref([])

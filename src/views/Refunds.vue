@@ -1,10 +1,9 @@
 <template>
   <div>
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-xl font-bold text-gray-800">💳 退款管理</h1>
-      <div class="flex items-center gap-2">
-        <!-- 随机测试数据 -->
-        <div v-if="canDeleteRefunds" class="inline-flex items-center gap-1">
+      <h1 class="text-xl font-bold text-gray-800 truncate">💳 退款管理</h1>
+      <div class="flex items-center gap-2 shrink-0">
+        <div v-if="canDeleteRefunds" class="hidden md:inline-flex items-center gap-1">
           <select v-model="testCount" class="text-xs border border-dashed border-gray-300 rounded px-2 py-1 text-gray-500 bg-transparent outline-none cursor-pointer">
             <option :value="1">1条</option>
             <option :value="5">5条</option>
@@ -16,9 +15,9 @@
           </button>
         </div>
         <button @click="openRefundModal"
-        class="bg-orange-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-orange-700 transition cursor-pointer">
-        + 登记退款
-      </button>
+          class="bg-orange-600 text-white px-3 md:px-4 py-2 rounded-lg text-sm hover:bg-orange-700 transition cursor-pointer whitespace-nowrap">
+          + 登记退款
+        </button>
       </div>
     </div>
 

@@ -1,17 +1,36 @@
 <template>
   <div class="p-4 md:p-6 space-y-6">
-    <!-- 顶部标题 + 操作栏 -->
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-      <h1 class="text-xl font-bold text-gray-800">🏪 电商店铺</h1>
-      <div class="flex items-center gap-2">
-        <input type="date" v-model="selectedDate" class="px-3 py-1.5 border border-gray-200 rounded-lg text-sm" />
-        <button @click="activeTab = 'overview'" :class="tabClass('overview')">数据看板</button>
-        <button @click="activeTab = 'stores'" :class="tabClass('stores')">店铺管理</button>
-        <button @click="activeTab = 'withdrawals'" :class="tabClass('withdrawals')">提现记录</button>
-        <button v-if="canEdit" @click="showImportModal = true" class="bg-green-600 text-white px-3 py-1.5 rounded-lg text-sm hover:bg-green-700 transition cursor-pointer">📥 导入订单</button>
-        <button v-if="canEdit" @click="showAddStore = true" class="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm hover:bg-blue-700 transition cursor-pointer">+ 新建店铺</button>
+    <!-- 顶部标题 + 操作按钮 -->
+    <div class="flex items-center justify-between mb-3">
+      <h1 class="text-xl font-bold text-gray-800 truncate">🏪 电商店铺</h1>
+      <div class="flex items-center gap-2 shrink-0">
+        <input type="date" v-model="selectedDate" class="hidden md:block px-3 py-1.5 border border-gray-200 rounded-lg text-sm" />
+        <button v-if="canEdit" @click="showImportModal = true" class="hidden md:inline-flex bg-green-600 text-white px-3 py-1.5 rounded-lg text-sm hover:bg-green-700 transition cursor-pointer whitespace-nowrap">📥 导入订单</button>
+        <!-- 移动端更多菜单 -->
+        <div class="relative md:hidden">
+          <button @click="showMobileMenu = !showMobileMenu" class="px-2.5 py-2 rounded-lg text-sm border border-gray-200 text-gray-600 hover:bg-gray-50 cursor-pointer">
+            ⋯
+          </button>
+          <div v-if="showMobileMenu" class="absolute right-0 top-full mt-1 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50 min-w-[140px]">
+            <div class="px-4 py-2 border-b border-gray-100">
+              <input type="date" v-model="selectedDate" class="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm" />
+            </div>
+            <button v-if="canEdit" @click="showImportModal = true; showMobileMenu = false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer">📥 导入订单</button>
+            <button v-if="canEdit" @click="showAddStore = true; showMobileMenu = false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer">+ 新建店铺</button>
+          </div>
+        </div>
+        <button v-if="canEdit" @click="showAddStore = true" class="bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm hover:bg-blue-700 transition cursor-pointer whitespace-nowrap">+ 新建店铺</button>
       </div>
     </div>
+    <!-- 标签栏（可横向滚动） -->
+    <div class="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none -mx-1 px-1">
+      <button @click="activeTab = 'overview'" :class="tabClass('overview')" class="shrink-0 whitespace-nowrap">数据看板</button>
+      <button @click="activeTab = 'stores'" :class="tabClass('stores')" class="shrink-0 whitespace-nowrap">店铺管理</button>
+      <button @click="activeTab = 'withdrawals'" :class="tabClass('withdrawals')" class="shrink-0 whitespace-nowrap">提现记录</button>
+      <input type="date" v-model="selectedDate" class="md:hidden shrink-0 px-2 py-1 border border-gray-200 rounded-lg text-xs" />
+    </div>
+    <!-- 移动端菜单遮罩 -->
+    <div v-if="showMobileMenu" class="fixed inset-0 z-40 md:hidden" @click="showMobileMenu = false"></div>
 
     <!-- ==================== 数据看板 ==================== -->
     <div v-if="activeTab === 'overview'">
@@ -422,6 +441,7 @@ const canEdit = computed(() => ['admin', 'finance', 'manager'].includes(role.val
 
 // 状态
 const activeTab = ref('overview')
+const showMobileMenu = ref(false)
 const selectedDate = ref(new Date().toISOString().split('T')[0])
 const stores = ref([])
 const dailyStats = ref([])
