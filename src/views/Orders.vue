@@ -1705,20 +1705,20 @@ async function loadStats() {
       .eq('status', 'completed')
       .is('platform_type', null)
 
-    // Month refunds (private orders only, via inner join)
-    const { data: monthRefunds } = await supabase
+    // Month refunds (private orders only, via inner join + client filter)
+    const { data: monthRefundsRaw } = await supabase
       .from('refunds')
-      .select('refund_amount, orders!inner(id)')
-      .gte('refunds.created_at', monthStart)
-      .is('refunds.deleted_at', null)
-      .in('refunds.status', ['pending', 'processing', 'completed'])
-      .is('orders.platform_type', null)
+      .select('refund_amount, orders!inner(id, platform_type)')
+      .gte('created_at', monthStart)
+      .is('deleted_at', null)
+      .in('status', ['pending', 'processing', 'completed'])
+    const monthRefunds = (monthRefundsRaw || []).filter(r => !r.orders?.platform_type)
 
     stats.todayCount = todayCount || 0
     stats.monthCount = monthCount || 0
     stats.monthAmount = (monthData || []).reduce((s, r) => s + (Number(r.amount) || 0), 0)
-    stats.monthRefundCount = (monthRefunds || []).length
-    stats.monthRefundAmount = (monthRefunds || []).reduce((s, r) => s + (Number(r.refund_amount) || 0), 0)
+    stats.monthRefundCount = monthRefunds.length
+    stats.monthRefundAmount = monthRefunds.reduce((s, r) => s + (Number(r.refund_amount) || 0), 0)
     stats.refundRate = stats.monthCount > 0 ? Math.round(stats.monthRefundCount / stats.monthCount * 1000) / 10 : 0
   } catch (e) {
     console.error('加载统计失败:', e)
