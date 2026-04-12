@@ -172,6 +172,19 @@ export function useOrderList(authStore) {
       await orderStore.deleteOrder(order)
       toast('订单已删除', 'success')
       selectedOrders.value = selectedOrders.value.filter(id => id !== order.id)
+      // 记录操作日志
+      try {
+        const { logOperation } = await import('../utils/operationLogger')
+        logOperation({
+          action: 'delete_order',
+          module: '订单',
+          description: `删除订单 ${order.order_no || ''}，金额 ¥${Number(order.amount || 0).toFixed(2)}，客户：${order.customer_name || ''}`,
+          detail: { order_id: order.id, order_no: order.order_no, amount: order.amount, customer: order.customer_name },
+          amount: order.amount,
+          accountId: order.account_id,
+          accountName: order.account_code || '',
+        })
+      } catch (_) {}
       loadOrders()
     } catch (e) {
       toast(e.message || '操作失败', 'error')

@@ -1476,6 +1476,21 @@ async function handleCreate() {
       toast('支出已提交', 'success')
     }
     
+    // 记录操作日志
+    try {
+      const { logOperation } = await import('../utils/operationLogger')
+      const accName = accounts.value.find(a => a.id === form.account_id)?.short_name || ''
+      logOperation({
+        action: editingExpenseId.value ? 'update_expense' : 'create_expense',
+        module: '支出',
+        description: `${editingExpenseId.value ? '编辑' : '创建'}支出 ¥${Number(form.amount).toFixed(2)}，收款方：${form.payee}，分类：${form.category}，账户：${accName}`,
+        detail: { amount: form.amount, payee: form.payee, category: form.category, account: accName },
+        amount: form.amount,
+        accountId: form.account_id || null,
+        accountName: accName,
+      })
+    } catch (_) {}
+
     showCreateModal.value = false
     editingExpenseId.value = null
     await loadPage(pagination.value.page)

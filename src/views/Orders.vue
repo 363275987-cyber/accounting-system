@@ -363,6 +363,7 @@
             <th class="px-3 py-3 text-left font-medium">商品</th>
             <th class="px-3 py-3 text-right font-medium">金额</th>
             <th class="px-3 py-3 text-center font-medium">订单类型</th>
+            <th class="px-3 py-3 text-center font-medium">状态</th>
             <th class="px-3 py-3 text-center font-medium" v-if="canEdit">操作</th>
           </tr>
         </thead>
@@ -394,6 +395,11 @@
                 {{ ORDER_SOURCE_LABELS[order.order_source] || '—' }}
               </span>
             </td>
+            <td class="px-3 py-3 text-center">
+              <span :class="[ORDER_STATUS[order.status]?.class, 'px-2 py-0.5 rounded text-xs']">
+                {{ ORDER_STATUS[order.status]?.label || order.status }}
+              </span>
+            </td>
             <td class="px-3 py-3 text-center" v-if="canEdit" @click.stop>
               <div class="flex items-center justify-center gap-1">
                 <button v-if="order.status === 'pending'" @click="handleConfirmPayment(order)" class="text-green-600 hover:text-green-800 text-xs px-2 py-1 rounded hover:bg-green-50 transition cursor-pointer">确认收款</button>
@@ -420,7 +426,7 @@
             </td>
           </tr>
           <tr v-if="!orderStore.loading && filteredOrders.length === 0">
-            <td :colspan="canEdit ? 13 : 12" class="px-4 py-16 text-center text-gray-500">
+            <td :colspan="canEdit ? 14 : 13" class="px-4 py-16 text-center text-gray-500">
               <div class="text-3xl mb-2">📭</div>
               <div>暂无订单数据</div>
             </td>
@@ -2619,6 +2625,24 @@ async function handleSubmit() {
         }
       }
     }
+
+    // 记录操作日志
+    try {
+      const { logOperation, getAccountBalance } = await import('../utils/operationLogger')
+      const accName = selectedAcc?.short_name || selectedAcc?.name || ''
+      const accInfo = selectedAcc ? await getAccountBalance(selectedAcc.id) : null
+      logOperation({
+        action: editingOrder.value ? 'update_order' : 'create_order',
+        module: '订单',
+        description: `${editingOrder.value ? '编辑' : '创建'}订单，金额 ¥${Number(form.amount).toFixed(2)}，产品：${form.product_name || form.productItems.map(i => i.name).filter(Boolean).join('、')}，客户：${form.customer_name}，账户：${accName}`,
+        detail: { order_id: orderId, amount: form.amount, product: form.product_name, customer: form.customer_name, account: accName },
+        amount: form.amount,
+        accountId: form.account_id || null,
+        accountName: accName,
+        balanceBefore: accInfo?.balance ?? null,
+        balanceAfter: accInfo?.balance != null ? accInfo.balance + Number(form.amount) : null,
+      })
+    } catch (_) {}
 
     showModal.value = false
     loadStats()
