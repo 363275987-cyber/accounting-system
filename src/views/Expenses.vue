@@ -1480,7 +1480,7 @@ async function handleCreate() {
     try {
       const { logOperation } = await import('../utils/operationLogger')
       const accName = accounts.value.find(a => a.id === form.account_id)?.short_name || ''
-      logOperation({
+      await logOperation({
         action: editingExpenseId.value ? 'update_expense' : 'create_expense',
         module: '支出',
         description: `${editingExpenseId.value ? '编辑' : '创建'}支出 ¥${Number(form.amount).toFixed(2)}，收款方：${form.payee}，分类：${form.category}，账户：${accName}`,
@@ -1580,7 +1580,7 @@ async function handleDeleteExpense(expense) {
       const balText = balResult?.old_balance != null && balResult?.new_balance != null
         ? `，余额 ${Number(balResult.old_balance).toFixed(2)} + ${Math.abs(Number(balResult.new_balance) - Number(balResult.old_balance)).toFixed(2)} → ${Number(balResult.new_balance).toFixed(2)}`
         : ''
-      logOperation({
+      await logOperation({
         action: 'delete_expense',
         module: '支出',
         description: `删除支出 ${expense.expense_no || ''}，金额 ${Number(expense.amount || 0).toFixed(2)}，类别：${expense.category || ''}，账户：${accName}${balText}`,
@@ -1619,7 +1619,7 @@ async function handleBatchDeleteExpenses() {
         const balText = balResult?.old_balance != null && balResult?.new_balance != null
           ? `，余额 ${Number(balResult.old_balance).toFixed(2)} + ${Math.abs(Number(balResult.new_balance) - Number(balResult.old_balance)).toFixed(2)} → ${Number(balResult.new_balance).toFixed(2)}`
           : ''
-        logOperation({
+        await logOperation({
           action: 'delete_expense',
           module: '支出',
           description: `[批量删除] 删除支出 ${exp.expense_no || ''}，金额 ${Number(exp.amount || 0).toFixed(2)}，类别：${exp.category || ''}，账户：${accName}${balText}`,

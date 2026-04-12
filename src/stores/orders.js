@@ -290,41 +290,53 @@ export const useOrderStore = defineStore('orders', {
       const order = typeof idOrOrder === 'object' ? idOrOrder : null
       const id = typeof idOrOrder === 'string' ? idOrOrder : order.id
 
-      // 通过 RPC 软删除
+      // 记录删除前的账户余额
+      let balBefore = null
+      let accName = ''
+      if (order?.account_id) {
+        try {
+          const { getAccountBalance } = await import('../utils/operationLogger')
+          const accInfo = await getAccountBalance(order.account_id)
+          balBefore = accInfo?.balance
+          accName = accInfo?.name || ''
+        } catch (_) {}
+      }
+
+      // 通过 RPC 软删除（RPC 内部已处理余额扣回）
       const { error: delError } = await supabase.rpc('delete_order', { p_id: id })
       if (delError) throw delError
 
-      // 仅已入账订单（completed/partially_refunded）才退回余额
-      // pending/cancelled 订单从未入账，删除时不应退余额
-      let refundInfo = null
-      const refundableStatuses = ['completed', 'partially_refunded']
-      if (order?.account_id && order?.amount && Number(order.amount) > 0
-          && refundableStatuses.includes(order.status)) {
-        const { data: refund } = await supabase.rpc('refund_order_balance', { p_order_id: id })
-        refundInfo = refund
-        if (refund?.ok) {
+      // 刷新账户余额
+      if (order?.account_id) {
+        try {
           const { useAccountStore } = await import('./accounts')
           useAccountStore().refreshBalance(order.account_id)
-        }
+        } catch (_) {}
       }
 
-      // 操作日志
+      // 记录删除后的账户余额并写操作日志
       if (order) {
         try {
           const { logOperation, getAccountBalance } = await import('../utils/operationLogger')
-          const accInfo = order.account_id ? await getAccountBalance(order.account_id) : null
-          const accName = accInfo?.name || ''
-          const balText = refundInfo?.old_balance != null && refundInfo?.new_balance != null
-            ? `，余额 ${Number(refundInfo.old_balance).toFixed(2)} - ${Math.abs(Number(refundInfo.old_balance) - Number(refundInfo.new_balance)).toFixed(2)} → ${Number(refundInfo.new_balance).toFixed(2)}`
+          let balAfter = null
+          if (order.account_id) {
+            const accInfo = await getAccountBalance(order.account_id)
+            balAfter = accInfo?.balance
+            if (!accName) accName = accInfo?.name || ''
+          }
+          const balText = balBefore != null && balAfter != null
+            ? `，余额 ${Number(balBefore).toFixed(2)} → ${Number(balAfter).toFixed(2)}`
             : ''
-          logOperation({
+          await logOperation({
             action: 'delete_order',
             module: '订单',
-            description: `删除订单 ${order.order_no || ''}，退回金额 ${Number(order.amount || 0).toFixed(2)}，客户：${order.customer_name || ''}，账户：${accName}${balText}`,
-            detail: { order_id: id, order_no: order.order_no, amount: order.amount, customer_name: order.customer_name, account_id: order.account_id, account_name: accName, balance_before: refundInfo?.old_balance, balance_after: refundInfo?.new_balance },
+            description: `删除订单 ${order.order_no || ''}，扣回金额 ¥${Number(order.amount || 0).toFixed(2)}，客户：${order.customer_name || ''}，账户：${accName}${balText}`,
+            detail: { order_id: id, order_no: order.order_no, amount: order.amount, customer_name: order.customer_name, account_id: order.account_id, account_name: accName, balance_before: balBefore, balance_after: balAfter },
             amount: order.amount,
             accountId: order.account_id,
             accountName: accName,
+            balanceBefore: balBefore,
+            balanceAfter: balAfter,
           })
         } catch (e) { console.warn('操作日志写入失败:', e) }
       }

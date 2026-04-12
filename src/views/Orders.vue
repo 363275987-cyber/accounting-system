@@ -2087,7 +2087,7 @@ async function generateTestData(count) {
           ? `，余额 ${Number(balBefore).toFixed(2)} ${Number(balAfter) > Number(balBefore) ? '+' : '-'} ${Math.abs(Number(balAfter) - Number(balBefore)).toFixed(2)} → ${Number(balAfter).toFixed(2)}`
           : ''
         const accName = acc.short_name || acc.name || ''
-        logOperation({
+        await logOperation({
           action: 'create_order',
           module: '订单',
           description: `[测试] 创建订单 ${data.order_no || ''}，金额 ${Number(product.retail_price).toFixed(2)}，产品：${product.name}，客户：${data.customer_name}，账户：${accName}${balText}`,
@@ -2631,7 +2631,7 @@ async function handleSubmit() {
       const { logOperation, getAccountBalance } = await import('../utils/operationLogger')
       const accName = selectedAcc?.short_name || selectedAcc?.name || ''
       const accInfo = selectedAcc ? await getAccountBalance(selectedAcc.id) : null
-      logOperation({
+      await logOperation({
         action: editingOrder.value ? 'update_order' : 'create_order',
         module: '订单',
         description: `${editingOrder.value ? '编辑' : '创建'}订单，金额 ¥${Number(form.amount).toFixed(2)}，产品：${form.product_name || form.productItems.map(i => i.name).filter(Boolean).join('、')}，客户：${form.customer_name}，账户：${accName}`,
