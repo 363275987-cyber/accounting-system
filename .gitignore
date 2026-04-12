@@ -1,0 +1,13 @@
+node_modules
+dist
+.vite
+*.local
+
+# env files（不要把密钥提交进仓库）
+.env
+.env.*
+!.env.example
+
+# Local Netlify folder
+.netlify
+.vercel

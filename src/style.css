@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+/* 全局按钮触摸反馈 */
+button,
+[role="button"],
+a.cursor-pointer {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:active:not(:disabled),
+[role="button"]:active:not(:disabled) {
+  transform: scale(0.97);
+  opacity: 0.85;
+  transition: transform 0.1s, opacity 0.1s;
+}
+
+/* 模态框遮罩动画 */
+.modal-backdrop-enter-from,
+.modal-backdrop-leave-to {
+  opacity: 0;
+}
+.modal-backdrop-enter-active,
+.modal-backdrop-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+/* 模态框内容动画 */
+.modal-content-enter-from {
+  opacity: 0;
+  transform: scale(0.95) translateY(10px);
+}
+.modal-content-leave-to {
+  opacity: 0;
+  transform: scale(0.95) translateY(10px);
+}
+.modal-content-enter-active,
+.modal-content-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+/* 滚动条美化 */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 4px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 2px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
