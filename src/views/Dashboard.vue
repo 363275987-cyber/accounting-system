@@ -24,7 +24,7 @@
           <div v-else class="text-2xl font-bold text-gray-800">
             {{ todayStats.todaySales !== null ? formatMoney(todayStats.todaySales) : '--' }}
           </div>
-          <div class="text-xs text-gray-500 mt-1">线下+电商合计</div>
+          <div class="text-xs text-gray-500 mt-1">私域+电商合计</div>
         </div>
 
         <!-- 今日订单数 -->
@@ -34,7 +34,7 @@
           <div v-else class="text-2xl font-bold text-gray-800">
             {{ todayStats.todayOrders !== null ? todayStats.todayOrders + ' 笔' : '--' }}
           </div>
-          <div class="text-xs text-gray-500 mt-1">线下+电商合计</div>
+          <div class="text-xs text-gray-500 mt-1">私域+电商合计</div>
         </div>
 
         <!-- 本月利润 -->
