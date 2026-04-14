@@ -114,7 +114,8 @@
                     <div class="flex-1 min-w-0">
                       <div class="flex items-center gap-2 flex-wrap">
                         <span class="text-sm font-medium text-gray-700">{{ s.sku_code || '未编码' }}</span>
-                        <span v-for="spec in (s.specs || [])" :key="spec.name" class="text-xs bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">{{ spec.name }}:{{ spec.value }}</span>
+                        <span v-if="typeof s.specs === 'string'" class="text-xs bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">{{ s.specs }}</span>
+                        <span v-else v-for="spec in (Array.isArray(s.specs) ? s.specs : [])" :key="spec.name" class="text-xs bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">{{ spec.name }}:{{ spec.value }}</span>
                       </div>
                       <div class="flex items-center gap-4 mt-1 text-xs text-gray-500">
                         <span v-if="canSeeCost">成本: <span class="text-red-500">¥{{ s.cost_price || 0 }}</span></span>
@@ -600,7 +601,12 @@ function getBundleItemName(item) {
   if (!ps) return '未知'
   const pname = ps.products?.name || '未知'
   const code = ps.sku_code || ''
-  const specs = (ps.specs || []).map(s => s.value).join('/')
+  let specs = ''
+  if (Array.isArray(ps.specs)) {
+    specs = ps.specs.map(s => typeof s === 'string' ? s : s.value).join('/')
+  } else if (typeof ps.specs === 'string') {
+    specs = ps.specs
+  }
   return [pname, code, specs].filter(Boolean).join(' - ')
 }
 

@@ -5,7 +5,6 @@
       <h1 class="text-xl font-bold text-gray-800 truncate">🏪 电商店铺</h1>
       <div class="flex items-center gap-2 shrink-0">
         <input type="date" v-model="selectedDate" class="hidden md:block px-3 py-1.5 border border-gray-200 rounded-lg text-sm" />
-        <button v-if="canEdit" @click="showImportModal = true" class="hidden md:inline-flex bg-green-600 text-white px-3 py-1.5 rounded-lg text-sm hover:bg-green-700 transition cursor-pointer whitespace-nowrap">📥 导入订单</button>
         <!-- 移动端更多菜单 -->
         <div class="relative md:hidden">
           <button @click="showMobileMenu = !showMobileMenu" class="px-2.5 py-2 rounded-lg text-sm border border-gray-200 text-gray-600 hover:bg-gray-50 cursor-pointer">
@@ -15,7 +14,6 @@
             <div class="px-4 py-2 border-b border-gray-100">
               <input type="date" v-model="selectedDate" class="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm" />
             </div>
-            <button v-if="canEdit" @click="showImportModal = true; showMobileMenu = false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer">📥 导入订单</button>
             <button v-if="canEdit" @click="showAddStore = true; showMobileMenu = false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer">+ 新建店铺</button>
           </div>
         </div>
@@ -53,6 +51,18 @@
           <div class="text-xs text-gray-500 mb-1">可提现金额</div>
           <div class="text-lg font-bold text-purple-600">¥{{ formatNum(totalWithdrawable) }}</div>
           <div class="text-xs text-gray-500">已过结算周期</div>
+        </div>
+      </div>
+
+      <!-- 已提现汇总 -->
+      <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100 mb-6">
+        <div class="flex flex-wrap items-center gap-3">
+          <div class="flex items-center gap-2">
+            <span class="text-sm font-medium text-gray-700">已提现</span>
+            <input type="month" v-model="withdrawnMonth" class="px-2 py-1 border border-gray-200 rounded-lg text-sm" />
+          </div>
+          <div class="text-xl font-bold text-orange-600">¥{{ formatNum(monthlyWithdrawnTotal) }}</div>
+          <div class="text-xs text-gray-500">{{ withdrawnMonth }} 到账合计</div>
         </div>
       </div>
 
@@ -292,86 +302,7 @@
         </div>
       </div>
     </div>
-    <!-- 电商订单导入弹窗 -->
-    <div v-if="showImportModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] pb-16 md:pb-0" @click.self="showImportModal = false">
-      <div class="bg-white rounded-2xl w-full max-w-lg mx-4 max-h-[85vh] flex flex-col overflow-hidden">
-        <div class="shrink-0 px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h2 class="font-bold text-gray-800">🛒 电商订单导入</h2>
-          <button @click="closeImport" class="text-gray-500 hover:text-gray-600 cursor-pointer text-xl">&times;</button>
-        </div>
-        <div class="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-          <!-- 使用说明 -->
-          <div class="bg-blue-50 rounded-lg p-3 text-xs text-blue-700 space-y-1">
-            <div class="font-medium">📌 使用说明</div>
-            <ul class="list-disc list-inside space-y-0.5">
-              <li>支持抖音、快手、视频号的销售和售后订单</li>
-              <li>自动识别 Sheet 名称判断平台</li>
-              <li>客户端自动对冲退款，只导入有效订单</li>
-              <li>自动去重：已导入的订单号会跳过</li>
-            </ul>
-          </div>
-
-          <!-- 平台选择 -->
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">平台选择</label>
-            <div class="flex gap-3 flex-wrap">
-              <label v-for="opt in importPlatformOptions" :key="opt.key" class="flex items-center gap-1.5 cursor-pointer">
-                <input type="radio" v-model="importPlatform" :value="opt.key" class="cursor-pointer" />
-                <span class="text-sm">{{ opt.label }}</span>
-              </label>
-            </div>
-          </div>
-
-          <!-- 文件上传 -->
-          <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-blue-400 transition"
-               @click="$refs.importFileInput?.click()"
-               @dragover.prevent @drop.prevent="handleImportDrop">
-            <input ref="importFileInput" type="file" accept=".xlsx,.xls" class="hidden" @change="handleImportFile" />
-            <div v-if="!importParsed">
-              <div class="text-3xl mb-2">📂</div>
-              <div class="text-sm text-gray-600">点击选择 Excel 文件，或拖拽到此处</div>
-              <div class="text-xs text-gray-400 mt-1">支持 .xlsx / .xls</div>
-            </div>
-            <div v-else class="text-left">
-              <div class="text-sm font-medium text-gray-800 mb-2">📄 {{ importFileName }}</div>
-              <div class="text-xs text-gray-600 space-y-1">
-                <div>📦 销售订单：{{ importSalesCount }} 条</div>
-                <div>↩️ 售后订单：{{ importAfterSalesCount }} 条</div>
-                <div class="text-green-600 font-medium">✅ 对冲后有效订单：{{ importEffectiveCount }} 条</div>
-                <div v-if="importSkipped > 0" class="text-gray-500">⏭️ 跳过：{{ importSkipped }} 条</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 导入进度 -->
-          <div v-if="importProgress" class="bg-gray-50 rounded-lg p-3">
-            <div class="text-sm text-gray-700 mb-1">{{ importProgress.message }}</div>
-            <div class="w-full bg-gray-200 rounded-full h-2">
-              <div class="bg-blue-500 rounded-full h-2 transition-all" :style="{ width: importProgress.percent + '%' }"></div>
-            </div>
-          </div>
-
-          <!-- 导入结果 -->
-          <div v-if="importResult" class="rounded-lg p-3" :class="importResult.failures?.length ? 'bg-orange-50' : 'bg-green-50'">
-            <div class="text-sm font-medium mb-1" :class="importResult.failures?.length ? 'text-orange-700' : 'text-green-700'">
-              导入完成
-            </div>
-            <div class="text-xs space-y-0.5">
-              <div class="text-green-600">✅ 成功：{{ importResult.success }} 条</div>
-              <div v-if="importResult.duplicate" class="text-gray-500">⏭️ 重复跳过：{{ importResult.duplicate }} 条</div>
-              <div v-if="importResult.failures?.length" class="text-red-500">❌ 失败：{{ importResult.failures.length }} 条</div>
-            </div>
-          </div>
-        </div>
-        <div class="shrink-0 px-6 py-4 border-t border-gray-100 flex justify-end gap-2">
-          <button @click="closeImport" class="px-4 py-2 text-gray-600 text-sm rounded-lg hover:bg-gray-100 cursor-pointer">{{ importResult ? '关闭' : '取消' }}</button>
-          <button v-if="importParsed && !importResult" @click="doImport" :disabled="importing || importEffectiveCount === 0"
-            class="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer">
-            {{ importing ? '导入中...' : '开始导入' }}
-          </button>
-        </div>
-      </div>
-    </div>
+    <!-- 导入功能已移至「电商订单」页面 -->
     <!-- ==================== 店铺明细弹窗 ==================== -->
     <div v-if="showStoreDetail" class="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] pb-16 md:pb-0" @click.self="showStoreDetail = false">
       <div class="bg-white rounded-2xl w-full max-w-2xl mx-4 max-h-[90vh] flex flex-col overflow-hidden">
@@ -449,6 +380,11 @@ const withdrawals = ref([])
 const cashAccounts = ref([])
 const expandedPlatforms = ref({ douyin: true, kuaishou: true, shipinhao: true })
 const loading = ref(false)
+
+// 已提现月度汇总
+const withdrawnMonth = ref(new Date().toISOString().substring(0, 7)) // '2026-04'
+const monthlyWithdrawnData = ref([])
+const monthlyWithdrawnTotal = computed(() => monthlyWithdrawnData.value.reduce((s, w) => s + Number(w.actual_arrival || 0), 0))
 
 // 提现弹窗
 const showWithdrawModal = ref(false)
@@ -698,8 +634,24 @@ async function doWithdraw() {
       }
     }
 
-    // 4. 记操作日志
+    // 4. 写入 withdrawals 表（供财务报表读取）
     const targetName = cashAccounts.value.find(a => a.id === f.toAccountId)?.short_name || ''
+    try {
+      await supabase.from('withdrawals').insert({
+        account_id: f.storeId,
+        to_account_id: f.toAccountId,
+        amount: totalDeduct,
+        actual_arrival: f.amount,
+        fee_detail: feeAmount > 0 ? [{ amount: feeAmount, label: f.feeRemark || '手续费' }] : [],
+        store_name: f.storeName,
+        remark: f.remark || '',
+        status: 'completed',
+      })
+    } catch (wErr) {
+      console.warn('withdrawals 记录写入失败:', wErr)
+    }
+
+    // 5. 记操作日志
     const remarkText = f.remark ? `（${f.remark}）` : ''
     const feeText = feeAmount > 0 ? `，手续费 ¥${feeAmount.toFixed(2)}` : ''
 
@@ -734,6 +686,7 @@ async function doWithdraw() {
     const feeMsg = feeAmount > 0 ? `（手续费 ¥${feeAmount.toFixed(2)} 已计入支出）` : ''
     toast(`提现成功！¥${f.amount.toFixed(2)} 已转入 ${targetName}${feeMsg}`, 'success')
     await loadData()
+    await loadMonthlyWithdrawn()
   } catch (e) {
     toast('提现失败：' + (e.message || ''), 'error')
   }
@@ -1023,6 +976,9 @@ async function loadData() {
       withdrawable_amount: Math.max(0, Number(store.balance || 0)),
     }))
     dailyStats.value = statsData
+
+    // 加载月度已提现
+    await loadMonthlyWithdrawn()
   } catch (e) {
     console.error('加载电商数据失败:', e)
   } finally {
@@ -1030,9 +986,40 @@ async function loadData() {
   }
 }
 
+// 加载月度已提现数据
+async function loadMonthlyWithdrawn() {
+  try {
+    const ym = withdrawnMonth.value // '2026-04'
+    const startISO = `${ym}-01T00:00:00`
+    // 计算月末
+    const [y, m] = ym.split('-').map(Number)
+    const endDate = new Date(y, m, 0) // 月末日期
+    const endISO = `${ym}-${String(endDate.getDate()).padStart(2, '0')}T23:59:59`
+    const { data, error } = await supabase
+      .from('withdrawals')
+      .select('actual_arrival, amount, store_name, created_at')
+      .gte('created_at', startISO)
+      .lte('created_at', endISO)
+    if (error) {
+      console.warn('月度提现查询失败:', error.message)
+      monthlyWithdrawnData.value = []
+    } else {
+      monthlyWithdrawnData.value = data || []
+    }
+  } catch (e) {
+    console.warn('月度提现查询异常:', e.message)
+    monthlyWithdrawnData.value = []
+  }
+}
+
 // 监听日期变化
 watch(selectedDate, async () => {
   dailyStats.value = await fetchDailyStats(selectedDate.value)
+})
+
+// 监听提现月份变化
+watch(withdrawnMonth, () => {
+  loadMonthlyWithdrawn()
 })
 
 onMounted(() => {

@@ -120,6 +120,7 @@
             <th class="px-3 py-3 text-left text-gray-500 font-medium text-sm hidden md:table-cell">平台</th>
             <th class="px-3 py-3 text-right text-gray-500 font-medium text-sm">余额</th>
             <th class="px-3 py-3 text-center text-gray-500 font-medium text-sm hidden sm:table-cell">状态</th>
+            <th class="px-3 py-3 text-left text-gray-500 font-medium text-sm hidden lg:table-cell">关键词</th>
             <th class="px-3 py-3 text-center text-gray-500 font-medium text-sm hidden md:table-cell">信息</th>
             <th class="px-3 py-3 text-right text-gray-500 font-medium text-sm">操作</th>
           </tr>
@@ -146,6 +147,14 @@
               <span class="text-xs px-2 py-0.5 rounded-full" :class="acc.status === 'active' ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-500'">
                 {{ acc.status === 'active' ? '活跃' : '停用' }}
               </span>
+            </td>
+            <td class="px-3 py-2.5 hidden lg:table-cell">
+              <div class="flex flex-wrap gap-0.5">
+                <span v-for="kw in (acc.expense_keywords || [])" :key="'e'+kw" class="text-[10px] px-1.5 py-0.5 bg-red-50 text-red-600 rounded">{{ kw }}</span>
+                <span v-for="kw in (acc.income_keywords || [])" :key="'i'+kw" class="text-[10px] px-1.5 py-0.5 bg-green-50 text-green-600 rounded">{{ kw }}</span>
+                <span v-for="rule in (acc.transfer_rules || [])" :key="'t'+rule.keyword" class="text-[10px] px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded">{{ rule.keyword }}</span>
+                <span v-if="!acc.expense_keywords?.length && !acc.income_keywords?.length && !acc.transfer_rules?.length" class="text-[10px] text-gray-300">未设置</span>
+              </div>
             </td>
             <td class="px-3 py-2.5 text-center hidden md:table-cell">
               <span v-if="isIncomplete(acc)" class="inline-block w-2 h-2 bg-red-500 rounded-full" title="信息不完整"></span>
@@ -272,15 +281,70 @@
               >
             </div>
 
-            <!-- Payment Alias -->
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-1">💳 付款简称</label>
-              <input
-                v-model="form.payment_alias"
-                placeholder="选填，如：南1（自动加'付'后缀）"
-                class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
-              >
-              <p class="text-xs text-gray-500 mt-1">设置后，在支出管理文本模式中输入此简称即可匹配到此账户作为付款账户</p>
+            <!-- 🔑 智能识别关键词 -->
+            <div class="border-t border-gray-100 pt-4">
+              <div class="flex items-center gap-2 mb-3">
+                <span class="text-base">🔑</span>
+                <span class="text-sm font-semibold text-gray-700">智能识别关键词</span>
+              </div>
+              <p class="text-xs text-gray-500 mb-3">设置关键词后，在文本模式输入时可自动识别此账户的收支和转账。关键词全局唯一，不可重复。</p>
+
+              <!-- 支出关键词 -->
+              <div class="mb-3">
+                <label class="block text-xs font-medium text-gray-600 mb-1">💸 支出关键词</label>
+                <div class="flex flex-wrap gap-1.5 mb-1.5">
+                  <span v-for="(kw, i) in form.expense_keywords" :key="'ek'+i"
+                    class="inline-flex items-center gap-1 bg-red-50 text-red-700 text-xs px-2 py-1 rounded-full">
+                    {{ kw }}
+                    <button @click="form.expense_keywords.splice(i, 1)" class="hover:text-red-900 cursor-pointer">&times;</button>
+                  </span>
+                </div>
+                <div class="flex gap-1.5">
+                  <input v-model="newExpenseKw" @keydown.enter.prevent="addKeyword('expense')" placeholder="如：宝付、卡付" class="flex-1 px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs outline-none focus:ring-1 focus:ring-red-400">
+                  <button @click="addKeyword('expense')" class="px-2.5 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs hover:bg-red-100 cursor-pointer">添加</button>
+                </div>
+                <p v-if="keywordError.expense" class="text-xs text-red-500 mt-1">{{ keywordError.expense }}</p>
+              </div>
+
+              <!-- 收入关键词 -->
+              <div class="mb-3">
+                <label class="block text-xs font-medium text-gray-600 mb-1">💰 收入关键词</label>
+                <div class="flex flex-wrap gap-1.5 mb-1.5">
+                  <span v-for="(kw, i) in form.income_keywords" :key="'ik'+i"
+                    class="inline-flex items-center gap-1 bg-green-50 text-green-700 text-xs px-2 py-1 rounded-full">
+                    {{ kw }}
+                    <button @click="form.income_keywords.splice(i, 1)" class="hover:text-green-900 cursor-pointer">&times;</button>
+                  </span>
+                </div>
+                <div class="flex gap-1.5">
+                  <input v-model="newIncomeKw" @keydown.enter.prevent="addKeyword('income')" placeholder="如：宝收、卡收" class="flex-1 px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs outline-none focus:ring-1 focus:ring-green-400">
+                  <button @click="addKeyword('income')" class="px-2.5 py-1.5 bg-green-50 text-green-600 rounded-lg text-xs hover:bg-green-100 cursor-pointer">添加</button>
+                </div>
+                <p v-if="keywordError.income" class="text-xs text-red-500 mt-1">{{ keywordError.income }}</p>
+              </div>
+
+              <!-- 转账规则 -->
+              <div class="mb-3">
+                <label class="block text-xs font-medium text-gray-600 mb-1">🔄 转账关键词</label>
+                <div class="space-y-1.5 mb-1.5">
+                  <div v-for="(rule, i) in form.transfer_rules" :key="'tr'+i"
+                    class="flex items-center gap-1.5 bg-blue-50 text-blue-700 text-xs px-2.5 py-1.5 rounded-lg">
+                    <span class="font-medium">{{ rule.keyword }}</span>
+                    <span class="text-blue-400">→</span>
+                    <span>{{ getAccountName(rule.target_account_id) }}</span>
+                    <button @click="form.transfer_rules.splice(i, 1)" class="ml-auto hover:text-blue-900 cursor-pointer">&times;</button>
+                  </div>
+                </div>
+                <div class="flex gap-1.5">
+                  <input v-model="newTransferKw" placeholder="关键词如：转卡" class="w-24 px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs outline-none focus:ring-1 focus:ring-blue-400">
+                  <select v-model="newTransferTarget" class="flex-1 px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs outline-none focus:ring-1 focus:ring-blue-400">
+                    <option value="">→ 转入账户</option>
+                    <option v-for="acc in otherAccounts" :key="acc.id" :value="acc.id">{{ acc.short_name || acc.code }}</option>
+                  </select>
+                  <button @click="addTransferRule" class="px-2.5 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-xs hover:bg-blue-100 cursor-pointer">添加</button>
+                </div>
+                <p v-if="keywordError.transfer" class="text-xs text-red-500 mt-1">{{ keywordError.transfer }}</p>
+              </div>
             </div>
 
             <!-- Note -->
@@ -461,7 +525,76 @@ const defaultForm = () => ({
   balance: 0,
   payment_alias: '',
   note: '',
+  income_keywords: [],
+  expense_keywords: [],
+  transfer_rules: [],
 })
+
+// 关键词编辑状态
+const newExpenseKw = ref('')
+const newIncomeKw = ref('')
+const newTransferKw = ref('')
+const newTransferTarget = ref('')
+const keywordError = reactive({ expense: '', income: '', transfer: '' })
+
+// 获取除当前编辑账户外的其他账户（用于转账目标选择）
+const otherAccounts = computed(() => {
+  return allAccounts.value.filter(a => a.id !== editingId.value && a.status !== 'deleted')
+})
+
+function getAccountName(id) {
+  const acc = allAccounts.value.find(a => a.id === id)
+  return acc ? (acc.short_name || acc.code) : '未知账户'
+}
+
+// 检查关键词是否已被其他账户使用
+function isKeywordTaken(kw) {
+  for (const acc of allAccounts.value) {
+    if (acc.id === editingId.value) continue
+    const ek = acc.expense_keywords || []
+    const ik = acc.income_keywords || []
+    const tr = (acc.transfer_rules || []).map(r => r.keyword)
+    if (ek.includes(kw)) return `已被「${acc.short_name}」的支出关键词使用`
+    if (ik.includes(kw)) return `已被「${acc.short_name}」的收入关键词使用`
+    if (tr.includes(kw)) return `已被「${acc.short_name}」的转账关键词使用`
+  }
+  // 也检查当前表单内是否重复
+  if (form.expense_keywords.includes(kw) || form.income_keywords.includes(kw) || form.transfer_rules.some(r => r.keyword === kw)) {
+    return '此关键词已在当前账户中使用'
+  }
+  return null
+}
+
+function addKeyword(type) {
+  const kw = type === 'expense' ? newExpenseKw.value.trim() : newIncomeKw.value.trim()
+  if (!kw) return
+  keywordError[type] = ''
+  const taken = isKeywordTaken(kw)
+  if (taken) {
+    keywordError[type] = `「${kw}」${taken}`
+    return
+  }
+  if (type === 'expense') {
+    form.expense_keywords.push(kw)
+    newExpenseKw.value = ''
+  } else {
+    form.income_keywords.push(kw)
+    newIncomeKw.value = ''
+  }
+}
+
+function addTransferRule() {
+  const kw = newTransferKw.value.trim()
+  const target = newTransferTarget.value
+  keywordError.transfer = ''
+  if (!kw) { keywordError.transfer = '请填写转账关键词'; return }
+  if (!target) { keywordError.transfer = '请选择转入账户'; return }
+  const taken = isKeywordTaken(kw)
+  if (taken) { keywordError.transfer = `「${kw}」${taken}`; return }
+  form.transfer_rules.push({ keyword: kw, target_account_id: target })
+  newTransferKw.value = ''
+  newTransferTarget.value = ''
+}
 
 const form = reactive(defaultForm())
 
@@ -718,7 +851,16 @@ function openModal(acc = null) {
       balance: acc.balance || 0,
       payment_alias: acc.payment_alias ? acc.payment_alias.replace(/付$/, '') : '',
       note: acc.note || '',
+      income_keywords: [...(acc.income_keywords || [])],
+      expense_keywords: [...(acc.expense_keywords || [])],
+      transfer_rules: [...(acc.transfer_rules || [])].map(r => ({ ...r })),
     })
+    // 清空临时输入
+    newExpenseKw.value = ''
+    newIncomeKw.value = ''
+    newTransferKw.value = ''
+    newTransferTarget.value = ''
+    Object.assign(keywordError, { expense: '', income: '', transfer: '' })
   } else {
     isEditing.value = false
     editingId.value = null
@@ -732,6 +874,11 @@ function closeModal() {
   isEditing.value = false
   editingId.value = null
   Object.assign(form, defaultForm())
+  newExpenseKw.value = ''
+  newIncomeKw.value = ''
+  newTransferKw.value = ''
+  newTransferTarget.value = ''
+  Object.assign(keywordError, { expense: '', income: '', transfer: '' })
 }
 
 async function saveAccount() {
@@ -756,6 +903,9 @@ async function saveAccount() {
         payment_alias: (form.payment_alias?.trim() || null),
         note: form.note?.trim() || null,
         category: form.category || null,
+        income_keywords: form.income_keywords || [],
+        expense_keywords: form.expense_keywords || [],
+        transfer_rules: form.transfer_rules || [],
       }
       // 手动模式下余额有变化，记录日志
       const oldAcc = allAccounts.value.find(a => a.id === editingId.value)
@@ -823,6 +973,9 @@ async function saveAccount() {
         payment_alias: (form.payment_alias?.trim() || null),
         note: form.note?.trim() || null,
         category: form.category || null,
+        income_keywords: form.income_keywords || [],
+        expense_keywords: form.expense_keywords || [],
+        transfer_rules: form.transfer_rules || [],
       }
       await accountStore.createAccount(payload)
       toast('账户已添加', 'success')

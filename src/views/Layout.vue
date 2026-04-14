@@ -107,7 +107,7 @@
       </router-link>
       <router-link to="/expenses" class="flex flex-col items-center justify-center flex-1 h-full transition-colors active:scale-90 active:opacity-70" :class="$route.path === '/expenses' ? 'text-blue-600' : 'text-gray-500'">
         <span class="text-lg leading-none mb-0.5">💸</span>
-        <span class="text-[10px] leading-none">支出</span>
+        <span class="text-[10px] leading-none">收支</span>
       </router-link>
       <router-link to="/accounts" class="flex flex-col items-center justify-center flex-1 h-full transition-colors active:scale-90 active:opacity-70" :class="$route.path === '/accounts' ? 'text-blue-600' : 'text-gray-500'">
         <span class="text-lg leading-none mb-0.5">🏦</span>
@@ -161,7 +161,7 @@ function closeSidebar() {
 const ROUTE_TITLES = {
   '/': '收支总览',
   '/orders': '订单登记',
-  '/expenses': '收支登记',
+  '/expenses': '收支管理',
   '/service-numbers': '客服号管理',
   '/accounts': '账户管理',
   '/transfers': '转账提现',
@@ -187,6 +187,14 @@ const ROUTE_TITLES = {
   '/inventory': '库存管理',
   '/inventory-logs': '库存流水',
   '/purchase-orders': '产品订货',
+  '/fixed-assets': '固定资产',
+  '/deferred-expenses': '长期待摊费用',
+  '/intangible-assets': '无形资产',
+  '/prepaid-accounts': '预付账款',
+  '/payable-accounts': '应付账款',
+  '/deferred-revenue': '预收账款',
+  '/other-receivables': '其他应收款',
+  '/other-payables': '其他应付款',
 }
 
 const routeTitle = computed(() => {
@@ -245,7 +253,7 @@ const menuGroups = computed(() => {
     label: '业务登记',
     items: [
       { label: '订单管理', path: '/orders' },
-      { label: '支出管理', path: '/expenses' },
+      { label: '收支管理', path: '/expenses' },
       { label: '支出分类', path: '/expense-categories' },
       { label: '客户管理', path: '/customers' },
     ],
@@ -257,7 +265,8 @@ const menuGroups = computed(() => {
     label: '产品与电商',
     items: [
       { label: '产品库', path: '/products' },
-      { label: '产品销售', path: '/product-sales' },
+      { label: '产品销量', path: '/product-sales' },
+      { label: '电商订单', path: '/ecommerce-orders' },
       { label: '电商销量', path: '/ecommerce-sales' },
       { label: '电商管理', path: '/ecommerce' },
     ],
@@ -272,7 +281,24 @@ const menuGroups = computed(() => {
       { label: '转账提现', path: '/transfers' },
       { label: '余额对账', path: '/balance' },
       { label: '股东垫资', path: '/shareholder-loans' },
-      { label: '资产管理', path: '/assets' },
+      { label: '股东分红', path: '/dividends' },
+      { label: '设备资产', path: '/assets' },
+    ],
+  })
+
+  // 📒 财务台账
+  groups.push({
+    icon: '📒',
+    label: '财务台账',
+    items: [
+      { label: '固定资产', path: '/fixed-assets' },
+      { label: '长期待摊', path: '/deferred-expenses' },
+      { label: '无形资产', path: '/intangible-assets' },
+      { label: '预付账款', path: '/prepaid-accounts' },
+      { label: '应付账款', path: '/payable-accounts' },
+      { label: '预收账款', path: '/deferred-revenue' },
+      { label: '其他应收', path: '/other-receivables' },
+      { label: '其他应付', path: '/other-payables' },
     ],
   })
 

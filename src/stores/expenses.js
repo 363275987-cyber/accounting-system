@@ -17,6 +17,7 @@ export const useExpenseStore = defineStore('expenses', {
         let query = supabase
           .from('expenses')
           .select('*, profiles:created_by(name, role), approver:approver_id(name)', { count: 'exact' })
+          .is('deleted_at', null)
           .order('created_at', { ascending: false })
           .range((page - 1) * pageSize, page * pageSize - 1)
 
@@ -72,13 +73,26 @@ export const useExpenseStore = defineStore('expenses', {
         throw new Error('支出金额必须为正数')
       }
 
-      // <= 2000 不需要审批，提交后直接标记已付款
+      // 审批规则：
+      // 1. admin（超级管理员）：所有金额直接自动审批通过并标记已付款
+      // 2. 其他角色：<= 2000 自动通过，> 2000 进入待审批流程
       let status = 'pending'
       let approvedBy = null
       let approvedAt = null
       let paidAt = null
 
-      if (amt <= 2000) {
+      // 获取当前用户角色
+      const { data: profileData } = await supabase.from('profiles').select('role').eq('id', userId).single()
+      const userRole = profileData?.role || ''
+
+      if (userRole === 'admin') {
+        // 超级管理员：全部自动通过
+        status = 'paid'
+        approvedBy = userId
+        approvedAt = new Date().toISOString()
+        paidAt = new Date().toISOString()
+      } else if (amt <= 2000) {
+        // 非管理员：小金额自动通过
         status = 'paid'
         approvedBy = userId
         approvedAt = new Date().toISOString()

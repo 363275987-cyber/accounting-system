@@ -2,7 +2,7 @@
   <div>
     <!-- Header -->
     <div class="flex items-center justify-between mb-4 md:mb-6">
-      <h1 class="text-lg md:text-xl font-bold text-gray-800 truncate">💸 支出管理</h1>
+      <div></div>
       <div class="flex items-center gap-2 shrink-0">
         <!-- 桌面端按钮 -->
         <div v-if="canDeleteExpenses" class="hidden md:inline-flex items-center gap-1">
@@ -56,13 +56,13 @@
     <div v-if="showTextMode" class="mb-6">
       <div class="bg-white rounded-xl border border-gray-100 p-5">
         <div class="flex items-center justify-between mb-3">
-          <h3 class="text-sm font-semibold text-gray-700">📋 粘贴支出文本</h3>
+          <h3 class="text-sm font-semibold text-gray-700">📋 智能记账 — 粘贴文本自动识别</h3>
           <button @click="showTextMode = false" class="text-gray-500 hover:text-gray-600 text-sm cursor-pointer">收起 ✕</button>
         </div>
         <textarea
           v-model="rawText"
           rows="5"
-          placeholder="粘贴支出文本，每行一条（格式：账户简称 金额 备注，可包含日期如'3月15日'）"
+          placeholder="每行一条，自动识别收入/支出/转账/资产等类型&#10;示例：&#10;宝付 3月15日 物流费 580元&#10;转卡 5000&#10;卡付 买球台 28000元&#10;宝收 李明 课程费 9800"
           class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-purple-500 resize-none font-mono"
         ></textarea>
         <div class="flex items-center gap-3 mt-3">
@@ -90,86 +90,350 @@
           >
             清空
           </button>
+          <button
+            @click="showKeywordManager = !showKeywordManager"
+            class="px-4 py-2 border border-gray-200 text-gray-600 rounded-lg text-sm hover:bg-gray-50 cursor-pointer transition ml-auto"
+          >
+            ⚙️ 管理识别词
+          </button>
+        </div>
+
+        <!-- 关键词管理面板 -->
+        <div v-if="showKeywordManager" class="mt-3 bg-gray-50 rounded-lg border border-gray-200 p-4">
+          <div class="flex items-center justify-between mb-3">
+            <h4 class="text-sm font-semibold text-gray-700">⚙️ 类型识别关键词</h4>
+            <button @click="showKeywordManager = false" class="text-gray-400 hover:text-gray-600 text-sm cursor-pointer">✕</button>
+          </div>
+          <p class="text-xs text-gray-500 mb-3">当文本中包含以下关键词时，会自动识别为对应类型。你可以添加新词或删除不需要的。</p>
+
+          <!-- 按类型分组展示 -->
+          <div v-for="(group, gType) in groupedTypeKeywords" :key="gType" class="mb-3">
+            <div class="text-xs font-semibold mb-1.5" :class="typeColorClass(gType)">
+              {{ TYPE_LABELS[gType] || gType }}
+            </div>
+            <div class="flex flex-wrap gap-1.5 mb-1.5">
+              <span v-for="kw in group" :key="kw.id"
+                class="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border"
+                :class="typeTagClass(gType)">
+                {{ kw.keyword }}
+                <button @click="deleteTypeKeyword(kw.id)" class="hover:opacity-70 cursor-pointer">&times;</button>
+              </span>
+            </div>
+          </div>
+
+          <!-- 添加新关键词 -->
+          <div class="flex gap-2 mt-3 pt-3 border-t border-gray-200">
+            <select v-model="newKwType" class="px-2 py-1.5 border border-gray-200 rounded-lg text-xs bg-white cursor-pointer">
+              <option value="fixed_asset">🏗️ 固定资产</option>
+              <option value="prepaid">📦 预付账款</option>
+              <option value="deferred_revenue">🎓 预收账款</option>
+              <option value="other_receivable">💰 押金/借出</option>
+              <option value="other_payable">📥 收到押金</option>
+              <option value="payable">📋 应付账款</option>
+              <option value="salary">👥 工资</option>
+              <option value="dividend">💎 分红</option>
+            </select>
+            <input v-model="newKwText" @keydown.enter.prevent="addTypeKeyword" placeholder="输入新关键词，如：球桌、买灯"
+              class="flex-1 px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs outline-none focus:ring-1 focus:ring-purple-400">
+            <button @click="addTypeKeyword"
+              class="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-xs hover:bg-purple-700 cursor-pointer shrink-0">
+              添加
+            </button>
+          </div>
+          <p v-if="kwManagerError" class="text-xs text-red-500 mt-1">{{ kwManagerError }}</p>
         </div>
 
         <!-- Parsed Preview -->
         <div v-if="parsedExpenses.length > 0" class="mt-4 space-y-3">
-          <div class="text-xs text-gray-500 mb-1">解析到 {{ parsedExpenses.length }} 条记录，可编辑后确认提交：</div>
+          <div class="text-xs text-gray-500 mb-1">解析到 {{ parsedExpenses.length }} 条记录，可修改类型/字段后确认提交：</div>
           <div
             v-for="(exp, idx) in parsedExpenses"
             :key="idx"
-            :class="[
-              'border rounded-lg p-4',
-              exp._type === 'transfer' ? 'border-blue-200 bg-blue-50/30' :
-              exp._type === 'income' ? 'border-green-200 bg-green-50/30' :
-              'border-purple-100 bg-purple-50/30'
-            ]"
+            :class="['border rounded-lg p-4', txnCardClass(exp._type)]"
           >
-            <div class="text-xs text-gray-500 font-mono bg-gray-50 rounded px-2 py-1 mb-2 break-all whitespace-pre-wrap">{{ exp._rawText }}</div>
-            <div class="flex items-center justify-between mb-2">
-              <div class="flex items-center gap-2">
-                <span class="text-xs font-semibold" :class="exp._type === 'transfer' ? 'text-blue-600' : exp._type === 'income' ? 'text-green-600' : 'text-purple-600'">
-                  {{ exp._type === 'transfer' ? '🔄 转账' : exp._type === 'income' ? '💰 收入' : '💸 支出' }} {{ idx + 1 }}
-                </span>
-                <span v-if="exp._type === 'transfer'" class="text-xs text-blue-400">（非支出，建议用转账页记录）</span>
-              </div>
-              <button
-                @click="submitParsedExpense(idx)"
-                :disabled="submittingParsed"
-                class="px-3 py-1 bg-green-600 text-white rounded-md text-xs hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition"
-              >
-                ✅ 确认提交
-              </button>
+            <!-- 原文 + 匹配置信度 -->
+            <div class="flex items-center gap-2 mb-2">
+              <div class="text-xs text-gray-500 font-mono bg-gray-50 rounded px-2 py-1 break-all whitespace-pre-wrap flex-1">{{ exp._rawText }}</div>
+              <span v-if="exp._confidence >= 85" class="text-[9px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 whitespace-nowrap">✓ 高</span>
+              <span v-else-if="exp._confidence >= 50" class="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 whitespace-nowrap">~ 中</span>
+              <span v-else-if="exp._confidence > 0" class="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 whitespace-nowrap">⚠ 低</span>
+              <span v-else class="text-[9px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 whitespace-nowrap">? 未识别</span>
             </div>
-            <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+
+            <!-- 头部：类型选择 + 提交按钮 -->
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center gap-2">
+                <select v-model="exp._type" class="text-xs font-semibold border border-gray-200 rounded-lg px-2 py-1 bg-white cursor-pointer" @change="onTypeChange(exp)">
+                  <option value="expense">💸 支出</option>
+                  <option value="income">💰 收入</option>
+                  <option value="transfer">🔄 转账</option>
+                  <option value="fixed_asset">🏗️ 固定资产</option>
+                  <option value="prepaid">📦 预付账款</option>
+                  <option value="deferred_revenue">🎓 预收课程费</option>
+                  <option value="other_receivable">💰 押金/借出</option>
+                  <option value="other_payable">📥 收到押金</option>
+                  <option value="payable">📋 应付账款</option>
+                  <option value="salary">👥 工资</option>
+                  <option value="dividend">💎 分红</option>
+                </select>
+                <span class="text-[10px] text-gray-400">{{ idx + 1 }}/{{ parsedExpenses.length }}</span>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <button @click="parsedExpenses.splice(idx, 1)" class="px-2 py-1 text-gray-400 hover:text-red-500 text-xs cursor-pointer">🗑️</button>
+                <button
+                  @click="submitParsedExpense(idx)"
+                  :disabled="submittingParsed"
+                  class="px-3 py-1 bg-green-600 text-white rounded-md text-xs hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition"
+                >
+                  ✅ 提交
+                </button>
+              </div>
+            </div>
+
+            <!-- 学习提示：手动改了类型时显示 -->
+            <div v-if="exp._typeChanged && exp._type !== 'expense' && exp._type !== 'income' && exp._type !== 'transfer'"
+              class="flex items-center gap-2 mb-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              <span class="text-xs text-amber-700 shrink-0">🧠 记住这个词？</span>
+              <input v-model="exp._learnKeyword" placeholder="输入要记住的关键词"
+                class="flex-1 px-2 py-1 border border-amber-200 rounded text-xs bg-white outline-none focus:ring-1 focus:ring-amber-400" />
+              <button @click="learnKeyword(exp)"
+                class="px-2.5 py-1 bg-amber-500 text-white rounded text-xs hover:bg-amber-600 cursor-pointer shrink-0">
+                记住
+              </button>
+              <button @click="exp._typeChanged = false" class="text-amber-400 hover:text-amber-600 text-xs cursor-pointer">✕</button>
+            </div>
+
+            <!-- 通用字段：账户 + 金额 + 日期 -->
+            <div class="grid grid-cols-3 gap-2 text-sm mb-2">
               <div>
-                <span class="text-gray-500 text-xs">付款账户：</span>
+                <span class="text-gray-500 text-[10px]">{{ exp._type === 'transfer' ? '转出账户' : exp._type === 'income' || exp._type === 'deferred_revenue' || exp._type === 'other_payable' ? '收款账户' : '付款账户' }}</span>
                 <SearchableSelect
                   v-model="exp.account_id"
                   :options="activeAccounts"
                   label-key="code"
                   value-key="id"
-                  placeholder="选择付款账户"
-                  search-placeholder="搜索账户..."
+                  placeholder="选择账户"
+                  search-placeholder="搜索..."
                   drop-up
                 />
               </div>
               <div>
-                <span class="text-gray-500 text-xs">金额：</span>
-                <input
-                  v-model.number="exp.amount"
-                  type="number"
-                  min="0.01"
-                  step="0.01"
-                  class="border border-gray-200 rounded px-2 py-1 text-sm w-full bg-white"
+                <span class="text-gray-500 text-[10px]">金额</span>
+                <input v-model.number="exp.amount" type="number" min="0.01" step="0.01" class="border border-gray-200 rounded px-2 py-1 text-sm w-full bg-white" />
+              </div>
+              <div>
+                <span class="text-gray-500 text-[10px]">日期</span>
+                <input v-model="exp.expense_date" type="date" class="border border-gray-200 rounded px-2 py-1 text-sm w-full bg-white" />
+              </div>
+            </div>
+
+            <!-- ===== 按类型显示不同字段 ===== -->
+
+            <!-- 普通支出 -->
+            <div v-if="exp._type === 'expense'" class="grid grid-cols-3 gap-2 text-sm">
+              <div>
+                <span class="text-gray-500 text-[10px]">类别</span>
+                <select v-model="exp.category" @change="onCategoryChange(exp)" class="border border-gray-200 rounded px-2 py-1 text-sm w-full bg-white cursor-pointer"
+                  :class="exp._confidence != null && exp._confidence < 50 ? 'border-amber-400 bg-amber-50' : ''">
+                  <option value="">请选择</option>
+                  <option v-for="cat in categories" :key="cat.id || cat.name" :value="cat.name">{{ cat.name }}</option>
+                </select>
+                <span v-if="exp._confidence != null && exp._confidence < 50" class="text-[9px] text-amber-600">⚠ 低置信度，请确认</span>
+              </div>
+              <div>
+                <span class="text-gray-500 text-[10px]">收款方</span>
+                <input v-model="exp.payee" class="border border-gray-200 rounded px-2 py-1 text-sm w-full bg-white" />
+              </div>
+              <div>
+                <span class="text-gray-500 text-[10px]">备注</span>
+                <input v-model="exp.note" class="border border-gray-200 rounded px-2 py-1 text-sm w-full bg-white" />
+              </div>
+            </div>
+
+            <!-- 收入 -->
+            <div v-else-if="exp._type === 'income'" class="grid grid-cols-2 gap-2 text-sm">
+              <div>
+                <span class="text-gray-500 text-[10px]">来源/付款人</span>
+                <input v-model="exp.payee" class="border border-gray-200 rounded px-2 py-1 text-sm w-full bg-white" />
+              </div>
+              <div>
+                <span class="text-gray-500 text-[10px]">备注</span>
+                <input v-model="exp.note" class="border border-gray-200 rounded px-2 py-1 text-sm w-full bg-white" />
+              </div>
+            </div>
+
+            <!-- 转账 -->
+            <div v-else-if="exp._type === 'transfer'" class="grid grid-cols-2 gap-2 text-sm">
+              <div>
+                <span class="text-gray-500 text-[10px]">转入账户</span>
+                <SearchableSelect
+                  v-model="exp.target_account_id"
+                  :options="activeAccounts"
+                  label-key="code"
+                  value-key="id"
+                  placeholder="选择转入账户"
+                  search-placeholder="搜索..."
+                  drop-up
                 />
               </div>
               <div>
-                <span class="text-gray-500 text-xs">类别：</span>
-                <select v-model="exp.category" class="border border-gray-200 rounded px-2 py-1 text-sm w-full bg-white cursor-pointer">
-                  <option value="">请选择类别</option>
-                  <option v-for="cat in categories" :key="cat.id || cat.name" :value="cat.name">{{ cat.name }}</option>
+                <span class="text-gray-500 text-[10px]">备注</span>
+                <input v-model="exp.note" class="border border-gray-200 rounded px-2 py-1 text-sm w-full bg-white" />
+              </div>
+            </div>
+
+            <!-- 固定资产 -->
+            <div v-else-if="exp._type === 'fixed_asset'" class="space-y-2">
+              <div class="grid grid-cols-2 gap-2 text-sm">
+                <div>
+                  <span class="text-gray-500 text-[10px]">资产名称</span>
+                  <input v-model="exp.asset_name" placeholder="如：星牌球台" class="border border-gray-200 rounded px-2 py-1 text-sm w-full bg-white" />
+                </div>
+                <div>
+                  <span class="text-gray-500 text-[10px]">资产分类</span>
+                  <select v-model="exp.asset_category" class="border border-gray-200 rounded px-2 py-1 text-sm w-full bg-white cursor-pointer">
+                    <option value="equipment">设备器材</option>
+                    <option value="furniture">办公家具</option>
+                    <option value="vehicle">交通工具</option>
+                    <option value="electronics">电子设备</option>
+                    <option value="other">其他</option>
+                  </select>
+                </div>
+              </div>
+              <div class="grid grid-cols-3 gap-2 text-sm">
+                <div>
+                  <span class="text-gray-500 text-[10px]">使用年限</span>
+                  <div class="flex items-center gap-1">
+                    <input v-model.number="exp.useful_life_years" type="number" min="1" max="50" class="border border-gray-200 rounded px-2 py-1 text-sm w-full bg-white" />
+                    <span class="text-xs text-gray-400 shrink-0">年</span>
+                  </div>
+                </div>
+                <div>
+                  <span class="text-gray-500 text-[10px]">残值率</span>
+                  <div class="flex items-center gap-1">
+                    <input v-model.number="exp.residual_rate" type="number" min="0" max="100" class="border border-gray-200 rounded px-2 py-1 text-sm w-full bg-white" />
+                    <span class="text-xs text-gray-400 shrink-0">%</span>
+                  </div>
+                </div>
+                <div>
+                  <span class="text-gray-500 text-[10px]">月折旧额</span>
+                  <div class="text-sm font-medium text-orange-600 py-1">
+                    ¥{{ ((exp.amount * (1 - (exp.residual_rate || 5) / 100)) / ((exp.useful_life_years || 5) * 12)).toFixed(2) }}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 预付账款 -->
+            <div v-else-if="exp._type === 'prepaid'" class="grid grid-cols-3 gap-2 text-sm">
+              <div>
+                <span class="text-gray-500 text-[10px]">供应商</span>
+                <input v-model="exp.supplier" placeholder="供应商名称" class="border border-gray-200 rounded px-2 py-1 text-sm w-full bg-white" />
+              </div>
+              <div>
+                <span class="text-gray-500 text-[10px]">预计到货日</span>
+                <input v-model="exp.expected_date" type="date" class="border border-gray-200 rounded px-2 py-1 text-sm w-full bg-white" />
+              </div>
+              <div>
+                <span class="text-gray-500 text-[10px]">备注</span>
+                <input v-model="exp.note" class="border border-gray-200 rounded px-2 py-1 text-sm w-full bg-white" />
+              </div>
+            </div>
+
+            <!-- 预收课程费 -->
+            <div v-else-if="exp._type === 'deferred_revenue'" class="grid grid-cols-3 gap-2 text-sm">
+              <div>
+                <span class="text-gray-500 text-[10px]">客户姓名</span>
+                <input v-model="exp.customer_name" placeholder="客户姓名" class="border border-gray-200 rounded px-2 py-1 text-sm w-full bg-white" />
+              </div>
+              <div>
+                <span class="text-gray-500 text-[10px]">总课时</span>
+                <input v-model.number="exp.total_sessions" type="number" min="1" placeholder="10" class="border border-gray-200 rounded px-2 py-1 text-sm w-full bg-white" />
+              </div>
+              <div>
+                <span class="text-gray-500 text-[10px]">课程类型</span>
+                <select v-model="exp.course_type" class="border border-gray-200 rounded px-2 py-1 text-sm w-full bg-white cursor-pointer">
+                  <option value="1v1">线下1v1</option>
+                  <option value="group">小班课</option>
+                  <option value="online">线上课</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- 押金/借出 (其他应收) -->
+            <div v-else-if="exp._type === 'other_receivable'" class="grid grid-cols-3 gap-2 text-sm">
+              <div>
+                <span class="text-gray-500 text-[10px]">类型</span>
+                <select v-model="exp.receivable_type" class="border border-gray-200 rounded px-2 py-1 text-sm w-full bg-white cursor-pointer">
+                  <option value="deposit">押金</option>
+                  <option value="loan">借出</option>
                 </select>
               </div>
               <div>
-                <span class="text-gray-500 text-xs">收款方：</span>
-                <input v-model="exp.payee" class="border border-gray-200 rounded px-2 py-1 text-sm w-full bg-white" />
-              </div>
-              <div class="col-span-2">
-                <span class="text-gray-500 text-xs">备注：</span>
-                <input v-model="exp.note" class="border border-gray-200 rounded px-2 py-1 text-sm w-full bg-white" />
+                <span class="text-gray-500 text-[10px]">对方</span>
+                <input v-model="exp.counterparty" placeholder="对方名称" class="border border-gray-200 rounded px-2 py-1 text-sm w-full bg-white" />
               </div>
               <div>
-                <span class="text-gray-500 text-xs">日期：</span>
-                <span class="text-sm text-gray-600">{{ exp.date || '今天' }}</span>
+                <span class="text-gray-500 text-[10px]">备注</span>
+                <input v-model="exp.note" class="border border-gray-200 rounded px-2 py-1 text-sm w-full bg-white" />
               </div>
+            </div>
+
+            <!-- 收到押金 (其他应付) -->
+            <div v-else-if="exp._type === 'other_payable'" class="grid grid-cols-3 gap-2 text-sm">
+              <div>
+                <span class="text-gray-500 text-[10px]">类型</span>
+                <select v-model="exp.payable_type" class="border border-gray-200 rounded px-2 py-1 text-sm w-full bg-white cursor-pointer">
+                  <option value="deposit">押金</option>
+                  <option value="guarantee">保证金</option>
+                </select>
+              </div>
+              <div>
+                <span class="text-gray-500 text-[10px]">对方</span>
+                <input v-model="exp.counterparty" placeholder="对方名称" class="border border-gray-200 rounded px-2 py-1 text-sm w-full bg-white" />
+              </div>
+              <div>
+                <span class="text-gray-500 text-[10px]">备注</span>
+                <input v-model="exp.note" class="border border-gray-200 rounded px-2 py-1 text-sm w-full bg-white" />
+              </div>
+            </div>
+
+            <!-- 应付账款 -->
+            <div v-else-if="exp._type === 'payable'" class="grid grid-cols-3 gap-2 text-sm">
+              <div>
+                <span class="text-gray-500 text-[10px]">供应商</span>
+                <input v-model="exp.supplier" placeholder="供应商名称" class="border border-gray-200 rounded px-2 py-1 text-sm w-full bg-white" />
+              </div>
+              <div>
+                <span class="text-gray-500 text-[10px]">到期日</span>
+                <input v-model="exp.due_date" type="date" class="border border-gray-200 rounded px-2 py-1 text-sm w-full bg-white" />
+              </div>
+              <div>
+                <span class="text-gray-500 text-[10px]">备注</span>
+                <input v-model="exp.note" class="border border-gray-200 rounded px-2 py-1 text-sm w-full bg-white" />
+              </div>
+            </div>
+
+            <!-- 📎 上传凭证（所有类型通用） -->
+            <div class="mt-2 flex items-center gap-2 text-sm">
+              <div v-if="exp.receipt_url" class="flex items-center gap-1.5 bg-green-50 border border-green-200 rounded px-2 py-1">
+                <img v-if="/\.(jpg|jpeg|png|gif|webp)$/i.test(exp.receipt_url)" :src="exp.receipt_url" class="w-8 h-8 object-cover rounded" />
+                <span v-else class="text-sm">📄</span>
+                <span class="text-[10px] text-green-700 max-w-[100px] truncate">{{ exp.receipt_url.split('/').pop() }}</span>
+                <button type="button" @click="exp.receipt_url = ''" class="text-red-400 hover:text-red-600 text-[10px] cursor-pointer">✕</button>
+              </div>
+              <label class="flex items-center gap-1 px-2 py-1 border border-dashed border-gray-300 rounded text-[10px] text-gray-500 hover:border-blue-400 hover:text-blue-500 cursor-pointer transition">
+                <span>📷</span>
+                <span>{{ exp._uploading ? '上传中...' : '上传凭证' }}</span>
+                <input type="file" accept="image/*,.pdf" class="hidden" @change="handleReceiptUpload($event, exp)" :disabled="exp._uploading" />
+              </label>
             </div>
           </div>
 
           <!-- Batch submit -->
           <div class="flex items-center justify-between pt-2">
             <span class="text-xs text-gray-500">
-              共 {{ parsedExpenses.length }} 条，合计 {{ formatMoney(parsedExpenses.reduce((s, e) => s + (Number(e.amount) || 0), 0)) }}
+              共 {{ parsedExpenses.length }} 条，合计 ¥{{ parsedExpenses.reduce((s, e) => s + (Number(e.amount) || 0), 0).toLocaleString() }}
             </span>
             <button
               @click="submitAllParsedExpenses"
@@ -338,7 +602,10 @@
               </span>
             </td>
             <td class="px-4 py-3 text-gray-800">
-              <div>{{ expense.payee }}</div>
+              <div class="flex items-center gap-1">
+                {{ expense.payee }}
+                <a v-if="expense.receipt_url" :href="expense.receipt_url" target="_blank" class="text-blue-500 hover:text-blue-700" title="查看凭证">📎</a>
+              </div>
               <div v-if="expense.note" class="text-xs text-gray-500 mt-0.5 line-clamp-1">{{ expense.note }}</div>
             </td>
             <td class="px-4 py-3 text-gray-600 text-sm">
@@ -574,8 +841,11 @@
                 class="w-full pl-8 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
               >
             </div>
-            <p v-if="form.amount > 2000" class="text-xs text-orange-500 mt-1">
+            <p v-if="form.amount > 2000 && !authStore.isAdmin" class="text-xs text-orange-500 mt-1">
               ⚠️ 金额超过 ¥2,000，提交后将进入审批流程
+            </p>
+            <p v-if="authStore.isAdmin && form.amount > 2000" class="text-xs text-green-600 mt-1">
+              ✅ 超级管理员：所有金额自动审批通过
             </p>
           </div>
 
@@ -604,16 +874,36 @@
             />
           </div>
 
-          <!-- Receipt URL -->
+          <!-- 上传凭证 -->
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">票据链接</label>
-            <input
-              v-model="form.receipt_url"
-              type="url"
-              placeholder="https://example.com/receipt.jpg"
-              class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
-            >
-            <p class="text-xs text-gray-500 mt-1">暂时使用 URL 输入，V2 支持文件上传</p>
+            <label class="block text-sm font-medium text-gray-700 mb-1">📎 上传凭证</label>
+            <div class="space-y-2">
+              <!-- 已上传的凭证预览 -->
+              <div v-if="form.receipt_url" class="flex items-center gap-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                <img v-if="/\.(jpg|jpeg|png|gif|webp)$/i.test(form.receipt_url)" :src="form.receipt_url" class="w-12 h-12 object-cover rounded" />
+                <span v-else class="text-lg">📄</span>
+                <span class="text-xs text-green-700 flex-1 truncate">{{ form.receipt_url.split('/').pop() }}</span>
+                <button type="button" @click="form.receipt_url = ''" class="text-red-400 hover:text-red-600 text-xs cursor-pointer">✕</button>
+              </div>
+              <!-- 上传按钮 -->
+              <div class="flex gap-2">
+                <label class="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 border-2 border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:border-blue-400 hover:text-blue-500 cursor-pointer transition">
+                  <span>📷</span>
+                  <span>{{ form._uploading ? '上传中...' : '拍照/选择图片' }}</span>
+                  <input type="file" accept="image/*,.pdf" class="hidden" @change="handleReceiptUpload($event, form)" :disabled="form._uploading" />
+                </label>
+              </div>
+              <!-- 或手动输入URL -->
+              <details class="text-xs">
+                <summary class="text-gray-400 cursor-pointer hover:text-gray-600">或手动输入链接</summary>
+                <input
+                  v-model="form.receipt_url"
+                  type="url"
+                  placeholder="https://example.com/receipt.jpg"
+                  class="w-full mt-1 px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
+                >
+              </details>
+            </div>
           </div>
 
           <!-- Notes -->
@@ -641,7 +931,7 @@
               :disabled="submitting"
               class="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
-              {{ submitting ? '提交中...' : (form.amount > 2000 ? '提交审批' : '确认提交') }}
+              {{ submitting ? '提交中...' : (form.amount > 2000 && !authStore.isAdmin ? '提交审批' : '确认提交') }}
             </button>
           </div>
         </form>
@@ -848,222 +1138,601 @@ async function loadTodayExpense() {
 }
 
 // Category keyword mapping for text parsing
+// ── 卡片样式映射 ──
+function txnCardClass(type) {
+  const map = {
+    expense: 'border-purple-100 bg-purple-50/30',
+    income: 'border-green-200 bg-green-50/30',
+    transfer: 'border-blue-200 bg-blue-50/30',
+    fixed_asset: 'border-orange-200 bg-orange-50/30',
+    prepaid: 'border-yellow-200 bg-yellow-50/30',
+    deferred_revenue: 'border-emerald-200 bg-emerald-50/30',
+    other_receivable: 'border-indigo-200 bg-indigo-50/30',
+    other_payable: 'border-pink-200 bg-pink-50/30',
+    payable: 'border-red-200 bg-red-50/30',
+  }
+  return map[type] || 'border-gray-200 bg-gray-50/30'
+}
+
+// 类别被手动修改时自动学习
+function onCategoryChange(exp) {
+  if (!exp.category || !exp._rawText) return
+  // 从原文提取核心关键词用于学习
+  const learnText = (exp.note || exp._rawText || '').toLowerCase().trim()
+  if (learnText.length >= 2 && learnText.length <= 20) {
+    saveLearnedCategory(learnText, exp.category)
+    exp._confidence = 95
+    exp._matchSource = 'learned'
+    console.log(`[智能记账] 学习：「${learnText}」→「${exp.category}」`)
+  }
+  // 同时把原文中每个 2+ 字的词段都学习
+  const words = learnText.split(/[\s,，、/]+/).filter(w => w.length >= 2)
+  for (const w of words) {
+    saveLearnedCategory(w, exp.category)
+  }
+}
+
+// 切换类型时设置默认字段 + 触发学习提示
+function onTypeChange(exp) {
+  // 标记类型被手动修改，触发学习提示
+  if (exp._type !== exp._originalType) {
+    exp._typeChanged = true
+    // 智能提取关键词：从原文中找出最可能的核心词
+    exp._learnKeyword = extractLearnKeyword(exp._rawText, exp.note)
+  } else {
+    exp._typeChanged = false
+  }
+
+  if (exp._type === 'fixed_asset') {
+    exp.asset_name = exp.asset_name || exp.note || ''
+    exp.asset_category = exp.asset_category || 'equipment'
+    exp.useful_life_years = exp.useful_life_years || 5
+    exp.residual_rate = exp.residual_rate || 5
+  } else if (exp._type === 'deferred_revenue') {
+    exp.customer_name = exp.customer_name || exp.payee || ''
+    exp.total_sessions = exp.total_sessions || 10
+    exp.course_type = exp.course_type || '1v1'
+  } else if (exp._type === 'other_receivable') {
+    exp.receivable_type = exp.receivable_type || 'deposit'
+    exp.counterparty = exp.counterparty || exp.payee || ''
+  } else if (exp._type === 'other_payable') {
+    exp.payable_type = exp.payable_type || 'deposit'
+    exp.counterparty = exp.counterparty || exp.payee || ''
+  } else if (exp._type === 'prepaid') {
+    exp.supplier = exp.supplier || exp.payee || ''
+  } else if (exp._type === 'payable') {
+    exp.supplier = exp.supplier || exp.payee || ''
+  }
+}
+
+// 从原文提取最可能的核心关键词（去掉日期、金额、账户名，留下有意义的词）
+function extractLearnKeyword(rawText, note) {
+  // 优先用清洗后的 note
+  let text = (note || rawText || '').trim()
+  // 去掉纯数字、日期、金额相关
+  text = text.replace(/\d{1,2}月\d{1,2}日?/g, '')
+  text = text.replace(/[￥¥]?\s*[\d,.]+\s*(万?)\s*元?/g, '')
+  text = text.replace(/\s+/g, ' ').trim()
+  // 如果剩余内容太长，取前4个字
+  if (text.length > 6) text = text.slice(0, 6)
+  return text
+}
+
+// 一键记住关键词
+async function learnKeyword(exp) {
+  const kw = (exp._learnKeyword || '').trim()
+  if (!kw) { toast('请输入要记住的关键词', 'warning'); return }
+  if (typeKeywords.value.some(t => t.keyword === kw)) {
+    toast(`「${kw}」已存在`, 'warning')
+    exp._typeChanged = false
+    return
+  }
+  const { data, error } = await supabase.from('transaction_type_keywords').insert({
+    transaction_type: exp._type,
+    keyword: kw,
+    target_table: TARGET_TABLE_MAP[exp._type] || 'expenses',
+    description: `${TYPE_LABELS[exp._type] || exp._type}-${kw}（自动学习）`,
+  }).select().single()
+  if (error) {
+    toast('保存失败: ' + (error.message || ''), 'error')
+    return
+  }
+  typeKeywords.value.push(data)
+  exp._typeChanged = false
+  toast(`已记住：「${kw}」→ ${TYPE_LABELS[exp._type]}，下次自动识别`, 'success')
+}
+
+// ── 从 DB 加载类型关键词 ──
+const typeKeywords = ref([])
+async function loadTypeKeywords() {
+  const { data } = await supabase.from('transaction_type_keywords').select('*').order('keyword')
+  typeKeywords.value = data || []
+}
+loadTypeKeywords()
+
+// 根据文本匹配交易类型（先匹配 DB 关键词，再 fallback 到硬编码）
+function matchTransactionType(text) {
+  const lower = text.toLowerCase()
+  // 按关键词长度降序匹配，长关键词优先
+  const sorted = [...typeKeywords.value].sort((a, b) => b.keyword.length - a.keyword.length)
+  for (const tk of sorted) {
+    if (lower.includes(tk.keyword.toLowerCase())) {
+      return { type: tk.transaction_type, description: tk.description }
+    }
+  }
+  return null
+}
+
+// ── 关键词管理面板 ──
+const showKeywordManager = ref(false)
+const newKwType = ref('fixed_asset')
+const newKwText = ref('')
+const kwManagerError = ref('')
+
+const TYPE_LABELS = {
+  expense: '💸 支出', income: '💰 收入', transfer: '🔄 转账',
+  fixed_asset: '🏗️ 固定资产', prepaid: '📦 预付账款', deferred_revenue: '🎓 预收账款',
+  other_receivable: '💰 押金/借出', other_payable: '📥 收到押金', payable: '📋 应付账款',
+  salary: '👥 工资', dividend: '💎 分红',
+}
+
+const TARGET_TABLE_MAP = {
+  fixed_asset: 'assets', prepaid: 'prepaid_accounts', deferred_revenue: 'deferred_revenue',
+  other_receivable: 'other_receivables', other_payable: 'other_payables', payable: 'payable_accounts',
+  salary: 'salaries', dividend: 'dividends',
+}
+
+// 按类型分组
+const groupedTypeKeywords = computed(() => {
+  const groups = {}
+  for (const kw of typeKeywords.value) {
+    if (!groups[kw.transaction_type]) groups[kw.transaction_type] = []
+    groups[kw.transaction_type].push(kw)
+  }
+  return groups
+})
+
+function typeColorClass(t) {
+  const map = {
+    fixed_asset: 'text-orange-600', prepaid: 'text-yellow-600', deferred_revenue: 'text-emerald-600',
+    other_receivable: 'text-indigo-600', other_payable: 'text-pink-600', payable: 'text-red-600',
+    salary: 'text-blue-600', dividend: 'text-purple-600',
+  }
+  return map[t] || 'text-gray-600'
+}
+
+function typeTagClass(t) {
+  const map = {
+    fixed_asset: 'bg-orange-50 text-orange-700 border-orange-200',
+    prepaid: 'bg-yellow-50 text-yellow-700 border-yellow-200',
+    deferred_revenue: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    other_receivable: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+    other_payable: 'bg-pink-50 text-pink-700 border-pink-200',
+    payable: 'bg-red-50 text-red-700 border-red-200',
+    salary: 'bg-blue-50 text-blue-700 border-blue-200',
+    dividend: 'bg-purple-50 text-purple-700 border-purple-200',
+  }
+  return map[t] || 'bg-gray-50 text-gray-700 border-gray-200'
+}
+
+async function addTypeKeyword() {
+  const kw = newKwText.value.trim()
+  kwManagerError.value = ''
+  if (!kw) { kwManagerError.value = '请输入关键词'; return }
+  if (typeKeywords.value.some(t => t.keyword === kw)) {
+    kwManagerError.value = `「${kw}」已存在`
+    return
+  }
+  const { data, error } = await supabase.from('transaction_type_keywords').insert({
+    transaction_type: newKwType.value,
+    keyword: kw,
+    target_table: TARGET_TABLE_MAP[newKwType.value] || 'expenses',
+    description: `${TYPE_LABELS[newKwType.value] || newKwType.value}-${kw}`,
+  }).select().single()
+  if (error) {
+    kwManagerError.value = error.message.includes('unique') ? `「${kw}」已存在` : '保存失败: ' + error.message
+    return
+  }
+  typeKeywords.value.push(data)
+  newKwText.value = ''
+  toast(`关键词「${kw}」已添加`, 'success')
+}
+
+async function deleteTypeKeyword(id) {
+  const kw = typeKeywords.value.find(t => t.id === id)
+  if (!kw) return
+  if (!confirm(`确定删除关键词「${kw.keyword}」？`)) return
+  await supabase.from('transaction_type_keywords').delete().eq('id', id)
+  typeKeywords.value = typeKeywords.value.filter(t => t.id !== id)
+  toast('已删除', 'success')
+}
+
+// ══════════════════════════════════════════════════════════
+// 智能类别匹配引擎 v2
+// 三层匹配：① 用户学习记忆 → ② 扩展关键词库 → ③ DB类别名模糊匹配
+// ══════════════════════════════════════════════════════════
+
+// 第①层：用户学习记忆（localStorage）
+// 当用户手动修改类别后自动记录，下次同样文本直接命中
+const LEARNED_STORAGE_KEY = 'smart_entry_learned_categories'
+function getLearnedCategories() {
+  try { return JSON.parse(localStorage.getItem(LEARNED_STORAGE_KEY) || '{}') } catch { return {} }
+}
+function saveLearnedCategory(keyword, category) {
+  const learned = getLearnedCategories()
+  learned[keyword.toLowerCase()] = category
+  // 限制最多保存500条，超出删最旧的
+  const keys = Object.keys(learned)
+  if (keys.length > 500) { delete learned[keys[0]] }
+  localStorage.setItem(LEARNED_STORAGE_KEY, JSON.stringify(learned))
+}
+
+// 第②层：扩展关键词库（硬编码 + DB类别名衍生）
+// 顺序即优先级，长关键词优先匹配（避免"直播"被"工资"截胡）
 const CATEGORY_KEYWORD_MAP = {
-  '采购成本': ['采购', '进货', '拿货', '成本', '杆头成本', '皮头', '胶带', '球杆'],
-  '物流快递': ['物流', '快递', '运费', '邮费', '发货', '物流费'],
-  '售后赔偿': ['售后', '赔偿', '退款', '补发', '售后赔偿'],
-  '水电费': ['水电', '电费', '水费', '水电费'],
-  '房租物业': ['房租', '物业', '租金', '房租物业'],
-  '工资': ['工资', '薪水', '薪资', '人员工资'],
-  '税费': ['税', '税费', '发票'],
-  '营销': ['推广', '广告', '营销', '推广营销', '团建', '活动', '直播', '投流'],
-  '培训学习': ['培训', '学习', '课程', '培训学习'],
-  '设备': ['设备', '电脑', '打印机', '设备费'],
-  '平台费': ['平台', '服务费', '平台费', '平台服务费', '有赞', '抖店'],
-  '退款': ['退款'],
-  '日常': ['日常', '耗材', '办公', '文具', '办公耗材'],
+  '直播费用': ['直播费用', '直播费', '直播', '控评', '出场费', '选手'],
+  '投流': ['投流', '信息流', '投放', '千川', 'dou+', 'DOU+'],
+  '球杆采购': ['球杆', '杆头', '皮头', '球杆采购'],
+  '配件采购': ['配件', '胶带', '手套', '巧粉', '球袋', '铜嘴'],
+  '运费': ['物流', '快递', '运费', '邮费', '发货', '顺丰', '中通', '圆通', '韵达', '极兔', '德邦'],
+  '包装费': ['包装', '打包', '纸箱', '气泡膜'],
+  '工资': ['工资', '薪水', '薪资', '人员工资', '兼职薪资', '底薪', '提成'],
+  '社保费': ['社保', '公积金', '五险', '医保'],
+  '房租': ['房租', '物业', '租金', '场地费', '场地租'],
+  '水电': ['水电', '电费', '水费', '水电费', '网费', '宽带'],
+  '广告推广': ['推广', '广告', '营销', '宣传', '引流'],
+  '平台手续费': ['平台费', '服务费', '手续费', '有赞', '抖店', '星橙', '技术服务费', '佣金'],
+  '退款': ['退款', '售后', '赔偿', '补发', '退货'],
+  '办公费': ['办公费', '办公', 'A4纸', '文具', '耗材', '打印', '办公用品'],
+  '缴纳税费': ['税费', '税款', '增值税', '所得税', '发票', '缴税'],
+  '差旅费': ['差旅', '出差', '机票', '高铁', '火车票', '住宿'],
+  '培训费': ['培训', '学习', '课程', '考试'],
+  '维修费': ['维修', '维护', '修理', '换件'],
+  '招待费': ['招待', '餐费', '饭费', '聚餐', '请客'],
+  '样品费': ['样品', '打样'],
+  '交通费': ['交通', '打车', '滴滴', '加油', '停车', '过路费', 'ETC'],
+  '通讯费': ['通讯', '话费', '流量', '充流量'],
+  '拍摄道具/工具': ['拍摄', '道具', '摄影', '补光灯', '三脚架'],
+  '软件服务费': ['软件', '系统', '会员', '订阅', 'SaaS', 'ERP'],
+  '团建费': ['团建聚餐', '团建活动', '团建', '年会聚餐', '年会'],
+  '福利费': ['福利', '节日', '红包', '礼品'],
+  '招聘费': ['招聘', 'BOSS直聘', '猎头'],
+  '好评返现': ['好评', '返现', '好评返'],
+  '收号费': ['收号', '买号'],
+  '品牌设计服务费': ['设计', 'logo', 'LOGO', 'VI', '品牌设计'],
+  '安装费': ['安装', '调试'],
+  '商标费': ['商标', '专利'],
   '其他': [],
 }
 
+// 构建扁平化的关键词→类别索引（长关键词优先）
+let _flatCategoryIndex = null
+function getFlatCategoryIndex() {
+  if (_flatCategoryIndex) return _flatCategoryIndex
+  const pairs = []
+  for (const [cat, kws] of Object.entries(CATEGORY_KEYWORD_MAP)) {
+    for (const kw of kws) pairs.push({ kw: kw.toLowerCase(), cat })
+  }
+  // 长关键词优先匹配
+  pairs.sort((a, b) => b.kw.length - a.kw.length)
+  _flatCategoryIndex = pairs
+  return pairs
+}
+
+// 第③层：DB类别名直接匹配（"直播费用"文本里包含DB类别名"直播费用"→直接命中）
+// 在 loadCategories 之后自动可用
+const dbCategoryNames = ref([])
+
 function matchCategory(text) {
   const lower = text.toLowerCase()
-  for (const [category, keywords] of Object.entries(CATEGORY_KEYWORD_MAP)) {
-    for (const kw of keywords) {
-      if (lower.includes(kw)) return category
-    }
+
+  // ① 用户学习记忆（精确词匹配）
+  const learned = getLearnedCategories()
+  // 按关键词长度降序匹配（长词优先）
+  const learnedKeys = Object.keys(learned).sort((a, b) => b.length - a.length)
+  for (const kw of learnedKeys) {
+    if (lower.includes(kw)) return { category: learned[kw], confidence: 95, source: 'learned' }
   }
-  return 'other'
+
+  // ② 扩展关键词库
+  const index = getFlatCategoryIndex()
+  for (const { kw, cat } of index) {
+    if (lower.includes(kw)) return { category: cat, confidence: 85, source: 'keyword' }
+  }
+
+  // ③ DB类别名直接匹配（如果文本包含某个完整类别名）
+  // 按名称长度降序（"配件采购"优先于"采购"）
+  const sortedDbNames = [...dbCategoryNames.value].sort((a, b) => b.length - a.length)
+  for (const name of sortedDbNames) {
+    if (lower.includes(name.toLowerCase())) return { category: name, confidence: 70, source: 'db_name' }
+  }
+
+  return { category: '其他', confidence: 0, source: 'none' }
+}
+
+// 从文本中智能提取收款方/对方名称
+function extractPayee(text, matchedKw) {
+  let cleaned = text
+  // 去掉日期
+  cleaned = cleaned.replace(/\d{1,2}月?\d{0,2}日?/g, '')
+  // 去掉金额
+  cleaned = cleaned.replace(/[￥¥]\s*[\d,.]+/g, '')
+  cleaned = cleaned.replace(/\d[\d,.]*\s*[元万]/g, '')
+  // 去掉已匹配的关键词
+  if (matchedKw) cleaned = cleaned.replace(new RegExp(matchedKw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), '')
+  cleaned = cleaned.trim()
+  // 去掉常见的动词前缀
+  cleaned = cleaned.replace(/^(付|交|给|转|买|购|充|缴|报销|支付)\s*/g, '')
+  // 去掉常见的类型后缀词（工资、报销、费用等），以便提取人名
+  cleaned = cleaned.replace(/(工资|薪水|薪资|报销|费用|分红|奖金|补贴|提成)\s*$/g, '')
+  cleaned = cleaned.replace(/\s+/g, ' ').trim()
+  // 如果剩余内容是 2-20 个字符，可能是人名/公司名
+  if (cleaned.length >= 2 && cleaned.length <= 20 && !/^\d+$/.test(cleaned)) {
+    return cleaned
+  }
+  return ''
 }
 
 function parseExpenseText(text) {
-  const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
   const results = []
 
-  // Build account name map (longest first for greedy matching)
+  // ── 构建关键词索引（从DB字段读取） ──
   const activeAccs = accountStore.getActiveAccounts()
+
+  // 1. 账户名匹配表（含 short_name 和 payment_alias）
   const accountNameMap = {}
   for (const a of activeAccs) {
     const names = [(a.short_name || a.code)].filter(Boolean)
     if (a.payment_alias) names.push(a.payment_alias)
     for (const n of names) {
-      if (!accountNameMap[n] || n.length > (accountNameMap[n] || '').length) {
-        accountNameMap[n] = { id: a.id, label: a.short_name || a.code }
-      }
+      accountNameMap[n] = { id: a.id, label: a.short_name || a.code }
     }
   }
   const accountNames = Object.keys(accountNameMap).sort((a, b) => b.length - a.length)
 
-  for (const line of lines) {
-    // === 智能模式：先判断是"关键词开头"还是"账户名开头" ===
-    const isKeywordStart = /^(卡付|卡收|宝付|宝收|南\d*入账|转账|转卡|转余利宝|转中信|转支付宝|转平安|(.{1,4})公户(收|支出)?)/.test(line)
-    
-    if (isKeywordStart) {
-      // === 关键词开头格式（老王Excel格式） ===
-      // 格式: 关键词 日期 金额 备注 账户
+  // 2. 收入/支出/转账关键词索引（从 accounts 的 JSONB 字段读取）
+  const expenseKwMap = {}
+  const incomeKwMap = {}
+  const transferKwMap = {}
+  for (const a of activeAccs) {
+    const label = a.short_name || a.code
+    for (const kw of (a.expense_keywords || [])) {
+      expenseKwMap[kw] = { id: a.id, label }
+    }
+    for (const kw of (a.income_keywords || [])) {
+      incomeKwMap[kw] = { id: a.id, label }
+    }
+    for (const rule of (a.transfer_rules || [])) {
+      transferKwMap[rule.keyword] = { source_id: a.id, source_label: label, target_id: rule.target_account_id }
+    }
+  }
+  const allExpKws = Object.keys(expenseKwMap).sort((a, b) => b.length - a.length)
+  const allIncKws = Object.keys(incomeKwMap).sort((a, b) => b.length - a.length)
+  const allTransKws = Object.keys(transferKwMap).sort((a, b) => b.length - a.length)
 
-      // 1. 类型判断
-      let type = 'expense'
-      if (/到账$|到账-|公户收/.test(line)) {
-        // "XX到账" = 提现转账（平台→银行卡/公户），不是收入
+  // ══ Step 0: 拆分条目 ══
+  // 格式：描述部分 ￥X,XXX.XX（一行可能多条，用 ￥ 金额作为分隔锚点）
+  // 也支持旧格式（无 ￥ 后缀，纯文本每行一条）
+  const entries = []
+  const entryRegex = /([^￥¥\n]+?)\s*[￥¥]\s*([\d,]+\.?\d*)/g
+  let m
+  while ((m = entryRegex.exec(text)) !== null) {
+    const desc = m[1].trim()
+    const fmtAmount = parseFloat(m[2].replace(/,/g, ''))
+    if (desc && fmtAmount > 0) {
+      entries.push({ desc, fmtAmount })
+    }
+  }
+  // 如果没有 ￥ 格式，回退到按行分割
+  if (entries.length === 0) {
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
+    for (const line of lines) {
+      entries.push({ desc: line, fmtAmount: 0 })
+    }
+  }
+
+  for (const { desc, fmtAmount } of entries) {
+    const line = desc
+    let type = 'expense'
+    let matchedAccountId = ''
+    let matchedAccount = ''
+    let targetAccountId = ''
+
+    // ── Step 1: 关键词匹配（优先级：转账 > 收入 > 支出） ──
+    let matchedKw = ''
+    for (const kw of allTransKws) {
+      if (line.includes(kw)) {
         type = 'transfer'
-      } else if (/下单|其他收入/.test(line) || /收入/.test(line)) {
-        type = 'income'
-      } else if (/^(转卡|转余利宝|转中信|转支付宝|转平安|任公户.*转|公户.*转)/.test(line)) {
-        type = 'transfer'
+        matchedAccountId = transferKwMap[kw].source_id
+        matchedAccount = transferKwMap[kw].source_label
+        targetAccountId = transferKwMap[kw].target_id
+        matchedKw = kw
+        break
       }
-
-      // 2. 金额提取（支持万单位、逗号分隔）
-      let amount = 0
-      const wan = line.match(/([\d.]+)\s*万/)
-      if (wan && parseFloat(wan[1]) > 0) {
-        amount = parseFloat(wan[1]) * 10000
-      } else {
-        const m = line.match(/[￥¥]?\s*([\d,]+\.?\d*)\s*元/)
-        if (m && parseFloat(m[1]) > 0) {
-          amount = parseFloat(m[1].replace(/,/g, ''))
-        }
-      }
-
-      // 3. 账户匹配（先末尾精确匹配，再全文模糊匹配，取最长命中）
-      let matchedAccountId = ''
-      let matchedAccount = ''
-      const stripped = line.replace(/[￥¥]\s*[\d,.]+\s*(万?)\s*元?\s*$/, '').replace(/\s+$/, '')
-      // 先尝试末尾精确
-      for (const name of accountNames) {
-        if (stripped.endsWith(name)) {
-          matchedAccountId = accountNameMap[name].id
-          matchedAccount = accountNameMap[name].label
+    }
+    if (!matchedKw) {
+      for (const kw of allIncKws) {
+        if (line.includes(kw)) {
+          type = 'income'
+          matchedAccountId = incomeKwMap[kw].id
+          matchedAccount = incomeKwMap[kw].label
+          matchedKw = kw
           break
         }
       }
-      // 末尾没命中，全文模糊匹配（取最长）
+    }
+    if (!matchedKw) {
+      for (const kw of allExpKws) {
+        if (line.includes(kw)) {
+          type = 'expense'
+          matchedAccountId = expenseKwMap[kw].id
+          matchedAccount = expenseKwMap[kw].label
+          matchedKw = kw
+          break
+        }
+      }
+    }
+
+    // Fallback: 内置类型规则（覆盖最常见的"支出/收入/转账/提现"场景）
+    // 优先级：特定组合 > 通用词。长表达式先匹配，避免短词"转账"/"到账"误吞
+    if (!matchedKw) {
+      // ── 第一优先级：容易误判的特定组合（必须在通用规则之前） ──
+      // "微信转账给xxx" / "支付宝转给xxx" 是支出（付款给别人），不是内部转账
+      if (/转账.*给|转.*给[^账]|转给/.test(line)) {
+        type = 'expense'
+      }
+      // "退税到账" / "退税" 是收入，不是转账
+      else if (/退税|税费返还/.test(line)) {
+        type = 'income'
+      }
+      // "下单收款" / "客户付款" / "xxx回款" 是收入
+      else if (/下单|收款|其他收入|营业收入|销售收入|回款/.test(line)) {
+        type = 'income'
+      }
+
+      // ── 第二优先级：提现类（本质是转账：平台/微信/支付宝 → 银行卡） ──
+      else if (/微信提现|支付宝提现|店铺提现|抖店提现|有赞提现|平台提现|提现到|提现/.test(line)) {
+        type = 'transfer'
+      }
+
+      // ── 第三优先级：内部转账 ──
+      else if (/到账$|到账-|公户收|银行.*转入|转入.*银行/.test(line)) {
+        type = 'transfer'
+      } else if (/^(转卡|转余利宝|转中信|转支付宝|转平安|任公户.*转|公户.*转)/.test(line)) {
+        type = 'transfer'
+      } else if (/转账(?!手续)|互转|划转|调拨|内部转/.test(line)) {
+        type = 'transfer'
+      }
+
+      // 账户名匹配
+      for (const name of accountNames) {
+        if (line.startsWith(name)) {
+          matchedAccountId = accountNameMap[name].id
+          matchedAccount = accountNameMap[name].label
+          matchedKw = name
+          break
+        }
+      }
       if (!matchedAccountId) {
         for (const name of accountNames) {
-          if (stripped.includes(name) && name.length > 2) {
+          if (line.includes(name) && name.length >= 2) {
             matchedAccountId = accountNameMap[name].id
             matchedAccount = accountNameMap[name].label
             break
           }
         }
       }
-
-      // 4. 日期提取
-      let date = null
-      const dm = line.match(/(\d{1,2})月(\d{1,2})日/)
-      if (dm) date = dm[0]
-
-      // 5. 备注提取（去掉关键词、日期、金额、账户）
-      let note = line
-      note = note.replace(/（基本户）任公户\s*转（一般户）任公户/, '基本户→一般户')
-      note = note.replace(/（基本户）任公户/, '')
-      note = note.replace(/（一般户）任公户支出/, '')
-      note = note.replace(/(.{1,4}公户)(收|支出)?/, '')
-      // 关键词
-      note = note.replace(/^(卡付|卡收|宝付|宝收|南\d*入账|转账|转卡|转余利宝|转中信|转支付宝|转平安)\s*/, '')
-      // 日期
-      note = note.replace(/\d{1,2}月?\d{0,2}日?\s*/, '')
-      // 金额
-      note = note.replace(/[￥¥]?\s*[\d,.]+\.?\d*\s*(万?)\s*元?\s*/g, '')
-      // 账户
-      for (const name of accountNames) note = note.replace(new RegExp(name + '\\s*$'), '')
-      note = note.replace(/下单\s*其他收入\s*$/, '').replace(/其他收入\s*$/, '').replace(/\s+/g, ' ').trim()
-
-      results.push({
-        _rawText: line,
-        _type: type, // income/expense/transfer
-        account_id: matchedAccountId,
-        account_label: matchedAccount || '未匹配',
-        amount: amount || null,
-        category: type === 'expense' ? matchCategory(note) : 'other',
-        payee: '',
-        note,
-        date: date || null,
-      })
-    } else {
-      // === 原有模式：账户名开头 ===
-      let remaining = line
-
-      let matchedAccount = null
-      let matchedAccountId = null
-      for (const { name, accountId, label } of accountNames.map(n => ({ name: n, accountId: accountNameMap[n].id, label: accountNameMap[n].label }))) {
-        if (remaining.startsWith(name)) {
-          matchedAccount = label
-          matchedAccountId = accountId
-          remaining = remaining.slice(name.length).trim()
-          break
-        }
-      }
-
-      let expenseDate = null
-      const fullMonthDate = remaining.match(/(\d{1,2})月(\d{1,2})日?/)
-      if (fullMonthDate) {
-        const m = parseInt(fullMonthDate[1])
-        const d = parseInt(fullMonthDate[2])
-        if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
-          expenseDate = fullMonthDate[0]
-          remaining = remaining.slice(0, fullMonthDate.index) + remaining.slice(fullMonthDate.index + fullMonthDate[0].length).trim()
-        }
-      }
-      if (!expenseDate) {
-        const dayMatch = remaining.match(/(\d{1,2})日/)
-        if (dayMatch) {
-          const d = parseInt(dayMatch[1])
-          if (d >= 1 && d <= 31) {
-            expenseDate = dayMatch[0]
-            remaining = remaining.slice(0, dayMatch.index) + remaining.slice(dayMatch.index + dayMatch[0].length).trim()
-          }
-        }
-      }
-
-      let amount = 0
-      let amountConsumed = ''
-      const amtYuan = remaining.match(/[￥¥]?(\d[\d,]*\.?\d*)\s*[元￥¥]?/)
-      if (amtYuan && parseFloat(amtYuan[1]) > 0) {
-        amount = parseFloat(amtYuan[1].replace(/,/g, ''))
-        amountConsumed = amtYuan[0]
-      } else {
-        const amtCN = remaining.match(/(\d[\d,]*\.?\d*)([\u4e00-\u9fff])/)
-        if (amtCN && parseFloat(amtCN[1]) > 0) {
-          amount = parseFloat(amtCN[1].replace(/,/g, ''))
-          amountConsumed = amtCN[1] + amtCN[2]
-        } else {
-          const amtSpace = remaining.match(/(\d[\d,]*\.?\d*)\s+(?=[\u4e00-\u9fff])/)
-          if (amtSpace && parseFloat(amtSpace[1]) > 0) {
-            amount = parseFloat(amtSpace[1].replace(/,/g, ''))
-            amountConsumed = amtSpace[1] + ' '
-          } else {
-            const amtEnd = remaining.match(/(\d[\d,]*\.?\d*)$/)
-            if (amtEnd && parseFloat(amtEnd[1]) > 0) {
-              amount = parseFloat(amtEnd[1].replace(/,/g, ''))
-              amountConsumed = amtEnd[0]
-            }
-          }
-        }
-      }
-      if (amountConsumed) {
-        const idx = remaining.indexOf(amountConsumed)
-        if (idx >= 0) {
-          remaining = remaining.slice(0, idx) + remaining.slice(idx + amountConsumed.length).trim()
-        }
-      }
-
-      const category = matchCategory(line)
-
-      let note = remaining.replace(/\s+/g, ' ').trim()
-      note = note.replace(/元$/, '').trim()
-
-      results.push({
-        _rawText: line,
-        _type: 'expense',
-        account_id: matchedAccountId || '',
-        account_label: matchedAccount || '未匹配',
-        amount: amount || null,
-        category,
-        payee: '',
-        note,
-        date: expenseDate || null,
-      })
     }
+
+    // ── Step 2: 资产/台账类型识别 ──
+    const typeMatch = matchTransactionType(line)
+    if (typeMatch) {
+      type = typeMatch.type
+    }
+
+    // ── Step 3: 提取金额（优先用 ￥ 格式金额，否则从描述提取） ──
+    let amount = fmtAmount
+    if (!amount) {
+      // 万元
+      const wan = line.match(/([\d.]+)\s*万/)
+      if (wan && parseFloat(wan[1]) > 0) {
+        amount = parseFloat(wan[1]) * 10000
+      } else {
+        // 匹配 XXXX元 或 XXXX.XX元（排除 XX日 的数字）
+        // 先尝试带"元"的精确匹配
+        const amtYuan = line.match(/(\d[\d,.]*)\s*元/)
+        if (amtYuan) {
+          amount = parseFloat(amtYuan[1].replace(/,/g, ''))
+        } else {
+          // 再尝试独立数字（排除 XX日、XX月、XX号、XX%、XX个 等）
+          const nums = [...line.matchAll(/(?<!\d)(\d[\d,.]*\.?\d*)(?!\s*[日月号%个h])/g)]
+          // 取最大的数字作为金额（通常金额是最大的数）
+          let maxNum = 0
+          for (const nm of nums) {
+            const v = parseFloat(nm[1].replace(/,/g, ''))
+            if (v > maxNum) maxNum = v
+          }
+          if (maxNum > 0) amount = maxNum
+        }
+      }
+    }
+
+    // ── Step 4: 提取日期 ──
+    // 支持格式：XX月XX日、XX日、MM/DD
+    let dayOfMonth = null
+    let monthNum = null
+    const dmFull = line.match(/(\d{1,2})月(\d{1,2})日?/)
+    if (dmFull) {
+      monthNum = parseInt(dmFull[1])
+      dayOfMonth = parseInt(dmFull[2])
+    } else {
+      const dOnly = line.match(/(\d{1,2})日/)
+      if (dOnly) {
+        dayOfMonth = parseInt(dOnly[1])
+      }
+    }
+
+    // ── Step 5: 提取备注（去掉已识别的部分） ──
+    let note = line
+    if (matchedKw) note = note.replace(matchedKw, '')
+    // 去掉日期部分
+    note = note.replace(/\d{1,2}月\d{1,2}日?/g, '')
+    note = note.replace(/\d{1,2}日/g, '')
+    // 去掉金额部分（带元的数字、纯大数字）
+    note = note.replace(/\d[\d,.]*\s*元/g, '')
+    // 去掉账户名
+    for (const name of accountNames) note = note.replace(new RegExp(name, 'g'), '')
+    note = note.replace(/\s+/g, ' ').trim()
+
+    // ── Step 6: 类别匹配 + 收款方提取 ──
+    const catResult = type === 'expense' ? matchCategory(line) : { category: '', confidence: 100, source: 'type' }
+    const payee = extractPayee(line, matchedKw)
+
+    const result = {
+      _rawText: desc + (fmtAmount ? `\t￥${fmtAmount.toLocaleString()}` : ''),
+      _type: type,
+      _originalType: type,
+      _typeChanged: false,
+      _learnKeyword: '',
+      _confidence: catResult.confidence,
+      _matchSource: catResult.source,
+      _uploading: false,
+      account_id: matchedAccountId,
+      account_label: matchedAccount || '未匹配',
+      amount: amount || null,
+      category: catResult.category,
+      payee,
+      note,
+      receipt_url: '',
+      _dayOfMonth: dayOfMonth,
+      _monthNum: monthNum,
+      expense_date: new Date().toISOString().slice(0, 10),
+    }
+
+    if (type === 'transfer') result.target_account_id = targetAccountId || ''
+    if (type === 'fixed_asset') {
+      result.asset_name = note
+      result.asset_category = 'equipment'
+      result.useful_life_years = 5
+      result.residual_rate = 5
+    }
+    if (type === 'prepaid') result.supplier = note
+    if (type === 'deferred_revenue') {
+      result.customer_name = ''
+      result.total_sessions = 10
+      result.course_type = '1v1'
+    }
+    if (type === 'other_receivable') {
+      result.receivable_type = /借/.test(line) ? 'loan' : 'deposit'
+      result.counterparty = note
+    }
+    if (type === 'other_payable') {
+      result.payable_type = /保证金/.test(line) ? 'guarantee' : 'deposit'
+      result.counterparty = note
+    }
+    if (type === 'payable') result.supplier = note
+
+    results.push(result)
   }
 
   return results
@@ -1075,23 +1744,23 @@ function handleParseExpenses() {
   try {
     const expenses = parseExpenseText(rawText.value)
     if (expenses.length === 0) {
-      parseError.value = '未能解析出任何支出，请检查文本格式'
+      parseError.value = '未能解析出任何记录，请检查文本格式'
       parsedExpenses.value = []
       return
     }
     parsedExpenses.value = expenses.map(exp => {
-      // 计算实际付款日期
-      if (exp.date) {
-        const dm = exp.date.match(/(\d{1,2})月(\d{1,2})/)
-        if (dm) {
-          const year = expenseMonth.value.getFullYear()
-          const month = parseInt(dm[1]) - 1
-          const day = parseInt(dm[2])
-          exp.expense_date = new Date(year, month, day).toISOString().slice(0, 10)
-        }
+      // 用提取到的日期 + 月份选择器计算完整日期（注意用本地时间，避免 UTC 偏移）
+      if (exp._dayOfMonth) {
+        const year = expenseMonth.value.getFullYear()
+        const month = exp._monthNum
+          ? exp._monthNum - 1
+          : expenseMonth.value.getMonth()
+        const day = exp._dayOfMonth
+        // 不用 toISOString()（UTC），手动拼本地日期字符串
+        exp.expense_date = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
       } else {
-        // 没有日期，用月份选择器的当月当天
-        exp.expense_date = new Date().toISOString().slice(0, 10)
+        const now = new Date()
+        exp.expense_date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
       }
       return exp
     })
@@ -1102,32 +1771,275 @@ function handleParseExpenses() {
   }
 }
 
+// ── 智能提交：根据类型写入不同表 ──
+async function submitOneTransaction(exp) {
+  const amount = Number(exp.amount)
+  const date = exp.expense_date || new Date().toISOString().slice(0, 10)
+  const accountId = exp.account_id || null
+  const note = exp.note || ''
+  console.log('[智能记账] submitOneTransaction 开始, type:', exp._type, 'amount:', amount, 'accountId:', accountId)
+
+  switch (exp._type) {
+    case 'expense': {
+      console.log('[智能记账] 调用 store.createExpense...')
+      await store.createExpense({
+        category: exp.category || 'other',
+        amount,
+        payee: exp.payee || note || '未填写',
+        account_id: accountId,
+        note,
+        expense_date: date,
+        receipt_url: exp.receipt_url || null,
+      })
+      console.log('[智能记账] store.createExpense 完成')
+      break
+    }
+    case 'income': {
+      console.log('[智能记账] 写入 other_income...')
+      const { error: incErr } = await supabase.from('other_income').insert({
+        amount,
+        category: '其他收入',
+        description: exp.payee || note || '未填写',
+        account_id: accountId,
+      })
+      if (incErr) throw new Error('收入写入失败: ' + incErr.message)
+      console.log('[智能记账] other_income 写入完成')
+      break
+    }
+    case 'transfer': {
+      console.log('[智能记账] 写入 account_transfers...')
+      const { error: trErr } = await supabase.from('account_transfers').insert({
+        from_account_id: accountId,
+        to_account_id: exp.target_account_id || null,
+        amount,
+        transfer_date: date,
+        note,
+      })
+      if (trErr) throw new Error('转账写入失败: ' + trErr.message)
+      console.log('[智能记账] account_transfers 写入完成')
+      break
+    }
+    case 'fixed_asset': {
+      const usefulMonths = (exp.useful_life_years || 5) * 12
+      const residualRate = exp.residual_rate || 5
+      const monthlyDep = (amount * (1 - residualRate / 100)) / usefulMonths
+      console.log('[智能记账] 写入 assets...')
+      const { error: assetErr } = await supabase.from('assets').insert({
+        name: exp.asset_name || note || '未命名资产',
+        category: exp.asset_category || 'equipment',
+        purchase_price: amount,
+        purchase_date: date,
+        useful_life_months: usefulMonths,
+        residual_rate: residualRate,
+        monthly_depreciation: Math.round(monthlyDep * 100) / 100,
+        accumulated_depreciation: 0,
+        current_value: amount,
+        status: 'in_use',
+      })
+      if (assetErr) throw new Error('资产写入失败: ' + assetErr.message)
+      console.log('[智能记账] assets 写入完成，写入支出记录...')
+      await store.createExpense({
+        category: 'equipment',
+        amount,
+        payee: exp.asset_name || '固定资产',
+        account_id: accountId,
+        note: `购入固定资产: ${exp.asset_name || ''}`,
+        expense_date: date,
+      })
+      console.log('[智能记账] 固定资产全部完成')
+      break
+    }
+    case 'prepaid': {
+      console.log('[智能记账] 写入 prepaid_accounts...')
+      const { error: preErr } = await supabase.from('prepaid_accounts').insert({
+        supplier_name: exp.supplier || note || '未填写',
+        amount,
+        settled_amount: 0,
+        remaining_amount: amount,
+        paid_date: date,
+        purpose: note || '预付货款',
+        status: 'pending',
+        note,
+      })
+      if (preErr) throw new Error('预付写入失败: ' + preErr.message)
+      console.log('[智能记账] prepaid 写入完成，写入支出记录...')
+      await store.createExpense({
+        category: '预付账款',
+        amount,
+        payee: exp.supplier || '预付款',
+        account_id: accountId,
+        note: `预付账款: ${exp.supplier || ''}`,
+        expense_date: date,
+      })
+      console.log('[智能记账] 预付全部完成')
+      break
+    }
+    case 'deferred_revenue': {
+      console.log('[智能记账] 写入 deferred_revenue...')
+      const { error: defErr } = await supabase.from('deferred_revenue').insert({
+        customer_name: exp.customer_name || '未填写',
+        total_amount: amount,
+        remaining_amount: amount,
+        total_sessions: exp.total_sessions || 10,
+        consumed_sessions: 0,
+        remaining_sessions: exp.total_sessions || 10,
+        received_date: date,
+        product_name: exp.course_type === 'group' ? '小班课' : exp.course_type === 'online' ? '线上课' : '线下1v1',
+        status: 'active',
+        note,
+      })
+      if (defErr) throw new Error('预收写入失败: ' + defErr.message)
+      console.log('[智能记账] deferred_revenue 写入完成')
+      break
+    }
+    case 'other_receivable': {
+      console.log('[智能记账] 写入 other_receivables...')
+      const { error: recErr } = await supabase.from('other_receivables').insert({
+        receivable_type: exp.receivable_type || 'deposit',
+        counterparty: exp.counterparty || note || '未填写',
+        amount,
+        recovered_amount: 0,
+        remaining_amount: amount,
+        occurred_date: date,
+        status: 'pending',
+        note,
+      })
+      if (recErr) throw new Error('应收写入失败: ' + recErr.message)
+      console.log('[智能记账] other_receivables 写入完成，写入支出记录...')
+      await store.createExpense({
+        category: '押金/保证金',
+        amount,
+        payee: exp.counterparty || '押金',
+        account_id: accountId,
+        note: `${exp.receivable_type === 'loan' ? '借出' : '押金'}: ${exp.counterparty || ''}`,
+        expense_date: date,
+      })
+      console.log('[智能记账] 应收全部完成')
+      break
+    }
+    case 'other_payable': {
+      console.log('[智能记账] 写入 other_payables...')
+      const { error: opErr } = await supabase.from('other_payables').insert({
+        payable_type: exp.payable_type || 'deposit',
+        counterparty: exp.counterparty || note || '未填写',
+        amount,
+        returned_amount: 0,
+        remaining_amount: amount,
+        occurred_date: date,
+        status: 'pending',
+        note,
+      })
+      if (opErr) throw new Error('应付写入失败: ' + opErr.message)
+      console.log('[智能记账] other_payables 写入完成')
+      break
+    }
+    case 'payable': {
+      console.log('[智能记账] 写入 payable_accounts...')
+      const { error: paErr } = await supabase.from('payable_accounts').insert({
+        supplier_name: exp.supplier || note || '未填写',
+        amount,
+        paid_amount: 0,
+        remaining_amount: amount,
+        due_date: exp.due_date || null,
+        status: 'pending',
+        note,
+      })
+      if (paErr) throw new Error('应付账款写入失败: ' + paErr.message)
+      console.log('[智能记账] payable_accounts 写入完成')
+      break
+    }
+    case 'salary': {
+      console.log('[智能记账] 写入 salaries...')
+      const { data: { session: salSession } } = await supabase.auth.getSession()
+      const { error: salErr } = await supabase.from('salaries').insert({
+        employee_name: exp.payee || note || '未填写',
+        base_salary: amount,
+        actual_amount: amount,
+        pay_month: date.slice(0, 7),
+        pay_date: date,
+        status: 'paid',
+        account_id: accountId,
+        note,
+        created_by: salSession?.user?.id,
+      })
+      if (salErr) throw new Error('工资写入失败: ' + salErr.message)
+      console.log('[智能记账] salaries 写入完成，写入支出记录...')
+      await store.createExpense({
+        category: '工资',
+        amount,
+        payee: exp.payee || '工资发放',
+        account_id: accountId,
+        note: `工资: ${exp.payee || ''}`,
+        expense_date: date,
+      })
+      console.log('[智能记账] 工资全部完成')
+      break
+    }
+    case 'dividend': {
+      console.log('[智能记账] 写入 dividends...')
+      const { error: divErr } = await supabase.from('dividends').insert({
+        shareholder_name: exp.payee || note || '未填写',
+        amount,
+        pay_date: date,
+        account_id: accountId,
+        status: 'paid',
+        note,
+      })
+      if (divErr) throw new Error('分红写入失败: ' + divErr.message)
+      console.log('[智能记账] dividends 写入完成，写入支出记录...')
+      await store.createExpense({
+        category: '股东分红',
+        amount,
+        payee: exp.payee || '股东分红',
+        account_id: accountId,
+        note: `分红: ${exp.payee || ''}`,
+        expense_date: date,
+      })
+      console.log('[智能记账] 分红全部完成')
+      break
+    }
+    default: {
+      console.log('[智能记账] 默认支出处理...')
+      await store.createExpense({
+        category: exp.category || 'other',
+        amount,
+        payee: exp.payee || note || '未填写',
+        account_id: accountId,
+        note,
+        expense_date: date,
+      })
+      console.log('[智能记账] 默认支出完成')
+    }
+  }
+  console.log('[智能记账] submitOneTransaction 结束')
+}
+
+// TYPE_LABELS 已在关键词管理区定义
+
+// 超时保护：防止网络请求挂起导致按钮一直转
+function withTimeout(promise, ms = 20000) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(`操作超时(${ms/1000}s)，请检查网络后重试`)), ms))
+  ])
+}
+
 async function submitParsedExpense(idx) {
   const exp = parsedExpenses.value[idx]
   if (!exp || !exp.amount) {
     toast('请填写金额', 'warning')
     return
   }
-  if (!exp.payee && !exp.note) {
-    toast('请填写收款方或备注', 'warning')
-    return
-  }
   submittingParsed.value = true
   try {
-    const payload = {
-      category: exp.category || 'other',
-      amount: Number(exp.amount),
-      payee: exp.payee || exp.note || '未填写',
-      account_id: exp.account_id || null,
-      note: exp.note || null,
-      expense_date: exp.expense_date || new Date().toISOString().slice(0, 10),
-    }
-    await store.createExpense(payload)
+    console.log('[智能记账] 单条提交, type:', exp._type, 'amount:', exp.amount)
+    await withTimeout(submitOneTransaction(exp))
     parsedExpenses.value.splice(idx, 1)
-    toast('支出已创建', 'success')
+    toast(`${TYPE_LABELS[exp._type] || '记录'}已创建`, 'success')
     await loadPage(pagination.value.page)
     await fetchStats()
   } catch (e) {
+    console.error('[智能记账] 单条提交失败:', e?.message || e)
     toast('创建失败：' + (e.message || ''), 'error')
   } finally {
     submittingParsed.value = false
@@ -1135,36 +2047,37 @@ async function submitParsedExpense(idx) {
 }
 
 async function submitAllParsedExpenses() {
-  const valid = parsedExpenses.value.filter(e => e.amount && (e.payee || e.note))
+  const valid = parsedExpenses.value.filter(e => e.amount)
   if (valid.length === 0) {
-    toast('没有可提交的支出（请确保每条都有金额和收款方/备注）', 'warning')
+    toast('没有可提交的记录（请确保每条都有金额）', 'warning')
     return
   }
-  if (!confirm(`确认批量提交 ${valid.length} 条支出？`)) return
+  if (!confirm(`确认批量提交 ${valid.length} 条记录？`)) return
   submittingParsed.value = true
   let successCount = 0
   let failCount = 0
-  for (const exp of valid) {
-    try {
-      const payload = {
-        category: exp.category || 'other',
-        amount: Number(exp.amount),
-        payee: exp.payee || exp.note || '未填写',
-        account_id: exp.account_id || null,
-        note: exp.note || null,
+  try {
+    for (const exp of valid) {
+      try {
+        console.log(`[智能记账] 提交第 ${successCount + failCount + 1}/${valid.length} 条，类型: ${exp._type}，金额: ${exp.amount}`)
+        await withTimeout(submitOneTransaction(exp))
+        successCount++
+        console.log(`[智能记账] ✅ 成功`)
+      } catch (e) {
+        failCount++
+        console.error('[智能记账] ❌ 提交失败:', e?.message || e)
       }
-      await store.createExpense(payload)
-      successCount++
-    } catch (e) {
-      failCount++
-      console.error('提交失败:', e)
     }
+    parsedExpenses.value = []
+    toast(`成功提交 ${successCount} 条${failCount > 0 ? `，失败 ${failCount} 条` : ''}`, successCount > 0 ? 'success' : 'error')
+    await loadPage(pagination.value.page)
+    await fetchStats()
+  } catch (e) {
+    console.error('[智能记账] 批量提交异常:', e)
+    toast('提交过程出错：' + (e.message || '未知错误'), 'error')
+  } finally {
+    submittingParsed.value = false
   }
-  submittingParsed.value = false
-  parsedExpenses.value = []
-  toast(`成功提交 ${successCount} 条${failCount > 0 ? `，失败 ${failCount} 条` : ''}`, successCount > 0 ? 'success' : 'error')
-  await loadPage(pagination.value.page)
-  await fetchStats()
 }
 
 // --- Filters ---
@@ -1243,6 +2156,7 @@ async function fetchStats() {
     const { data: monthData } = await supabase
       .from('expenses')
       .select('amount, status')
+      .is('deleted_at', null)
       .gte('created_at', monthStart.value)
     if (monthData) {
       stats.monthTotal = monthData.reduce((s, e) => s + (e.amount || 0), 0)
@@ -1306,6 +2220,7 @@ async function handleExportExpenses() {
     let query = supabase
       .from('expenses')
       .select('id, created_at, category, payee, amount, account_id, status, note, approver_id, expense_no')
+      .is('deleted_at', null)
       .order('created_at', { ascending: false })
       .limit(5000)
 
@@ -1414,7 +2329,73 @@ const form = reactive({
   account_id: '',
   receipt_url: '',
   note: '',
+  _uploading: false,
 })
+
+// ── 凭证上传（Supabase Storage） ──
+async function handleReceiptUpload(event, target) {
+  const file = event.target.files?.[0]
+  if (!file) return
+  // 限制大小 10MB
+  if (file.size > 10 * 1024 * 1024) {
+    toast('文件不能超过 10MB', 'warning')
+    event.target.value = ''
+    return
+  }
+  target._uploading = true
+  try {
+    const ext = file.name.split('.').pop() || 'jpg'
+    const fileName = `receipts/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`
+
+    // 先尝试用当前 session 上传（需 RLS 策略）
+    let uploadData = null
+    let uploadError = null
+    const result = await supabase.storage.from('expense-receipts').upload(fileName, file, {
+      cacheControl: '3600',
+      upsert: false,
+    })
+    uploadData = result.data
+    uploadError = result.error
+
+    // 如果 RLS 拒绝了，用 fetch + service role key 直接上传（内部系统可信场景）
+    if (uploadError && (uploadError.message?.includes('row-level security') || uploadError.statusCode === '403' || uploadError.statusCode === 403)) {
+      console.warn('[凭证上传] RLS 拦截，使用 service role 上传...')
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+      const serviceKey = import.meta.env.VITE_SUPABASE_SERVICE_KEY
+      if (!serviceKey) {
+        throw new Error('凭证上传需要配置 VITE_SUPABASE_SERVICE_KEY 环境变量（或在 Supabase 控制台为 expense-receipts 桶添加 INSERT 策略）')
+      }
+      const resp = await fetch(`${supabaseUrl}/storage/v1/object/expense-receipts/${fileName}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${serviceKey}`,
+          'Content-Type': file.type || 'application/octet-stream',
+          'x-upsert': 'false',
+        },
+        body: file,
+      })
+      if (!resp.ok) {
+        const errBody = await resp.text()
+        throw new Error(`上传失败 (${resp.status}): ${errBody}`)
+      }
+      const respData = await resp.json()
+      uploadData = { path: respData.Key || fileName }
+    } else if (uploadError) {
+      throw uploadError
+    }
+
+    // 获取公开 URL
+    const { data: urlData } = supabase.storage.from('expense-receipts').getPublicUrl(uploadData.path)
+    target.receipt_url = urlData.publicUrl
+    toast('凭证上传成功', 'success')
+  } catch (e) {
+    console.error('凭证上传失败:', e)
+    toast('上传失败：' + (e.message || '未知错误'), 'error')
+  } finally {
+    target._uploading = false
+    event.target.value = ''
+  }
+}
 
 function openCreateModal() {
   editingExpenseId.value = null
@@ -1657,6 +2638,8 @@ async function loadCategories() {
       .order('created_at', { ascending: true })
     if (error) throw error
     categories.value = data || []
+    // 同步更新 DB 类别名索引（供智能匹配第③层使用）
+    dbCategoryNames.value = (data || []).filter(c => c.status === 'active').map(c => c.name)
   } catch (e) {
     console.error('加载支出类别失败:', e)
   } finally {

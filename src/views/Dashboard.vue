@@ -44,7 +44,7 @@
           <div v-else class="text-2xl font-bold" :class="(stats.profit || 0) >= 0 ? 'text-green-500' : 'text-red-500'">
             {{ stats.profit !== null ? formatMoney(stats.profit) : '--' }}
           </div>
-          <div class="text-xs text-gray-500 mt-1">收入 - 支出</div>
+          <div class="text-xs text-gray-500 mt-1">私域+电商提现+其他收入 - 支出</div>
         </div>
       </div>
 
@@ -244,11 +244,11 @@ async function loadTodayStats() {
 async function loadFinanceDashboard() {
   const { start, end } = getMonthRange()
   try {
-  const [incRes, expRes, recentRes, accountsRes] = await Promise.all([
-    // 本月已到账收入（线下，platform_type IS NULL）
+  const [incRes, expRes, withdrawRes, otherIncRes, recentRes, accountsRes] = await Promise.all([
+    // 本月已到账收入（私域订单，platform_type IS NULL）
     supabase
       .from('orders')
-      .select('amount')
+      .select('amount, payment_amount')
       .in('status', ['completed', 'partially_refunded'])
       .gte('created_at', start)
       .lt('created_at', end)
@@ -258,6 +258,20 @@ async function loadFinanceDashboard() {
       .from('expenses')
       .select('amount')
       .in('status', ['approved', 'paid'])
+      .is('deleted_at', null)
+      .gte('created_at', start)
+      .lt('created_at', end),
+    // 本月电商提现到账金额
+    supabase
+      .from('withdrawals')
+      .select('actual_arrival')
+      .gte('created_at', start)
+      .lt('created_at', end),
+    // 本月其他收入
+    supabase
+      .from('other_income')
+      .select('amount')
+      .is('deleted_at', null)
       .gte('created_at', start)
       .lt('created_at', end),
     // 最近10笔订单（全部，包含电商）
@@ -276,7 +290,10 @@ async function loadFinanceDashboard() {
   ])
 
   // 汇总统计
-  const totalIncome = incRes.data?.reduce((s, r) => s + (Number(r.amount) || 0), 0) ?? 0
+  const privateIncome = incRes.data?.reduce((s, r) => s + (Number(r.payment_amount) || Number(r.amount) || 0), 0) ?? 0
+  const ecommerceIncome = withdrawRes.data?.reduce((s, r) => s + (Number(r.actual_arrival) || 0), 0) ?? 0
+  const otherIncome = (!otherIncRes.error && otherIncRes.data) ? otherIncRes.data.reduce((s, r) => s + (Number(r.amount) || 0), 0) : 0
+  const totalIncome = privateIncome + ecommerceIncome + otherIncome
   const totalExpense = expRes.data?.reduce((s, r) => s + (Number(r.amount) || 0), 0) ?? 0
 
   stats.value.totalIncome = totalIncome

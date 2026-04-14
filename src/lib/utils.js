@@ -83,17 +83,82 @@ export const ECOMMERCE_PLATFORMS = {
   shipinhao: '视频号',
 }
 
+// 费用科目分类（对应利润表结构）
 export const EXPENSE_CATEGORIES = {
-  salary: '工资',
-  rent: '房租',
-  equipment: '设备',
-  marketing: '营销',
+  // —— 人工成本 ——
+  salary: '基本工资',
+  social_insurance: '社保公积金',
+  commission: '销售提成',
+  bonus: '绩效奖金',
+  penalty: '罚款扣除',
+  // —— 营业费用 ——
+  rent: '场地租金',
+  water_electric: '水电费',
+  shipping: '物流快递',
+  marketing: '营销推广',
+  packaging: '包装费用',
+  office: '办公费用',
+  maintenance: '维修保养',
+  storage: '仓储费用',
+  material: '原材料',
+  daily: '日常开支',
+  // —— 直播/内容成本 ——
+  livestream_cost: '直播成本',
+  // —— 财务费用 ——
+  financial_fee: '转账手续费',
+  interest: '利息支出',
+  platform_fee: '平台费用',
+  // —— 管理费用 ——
+  travel: '差旅费用',
+  meal: '餐费',
   tax: '税费',
-  daily: '日常',
-  shipping: '物流',
-  platform_fee: '平台费',
+  insurance: '保险',
+  // —— 投资/资产 ——
+  equipment: '设备采购',
+  // —— 其他 ——
   refund: '退款',
   other: '其他',
+}
+
+// 费用科目→利润表归类映射
+export const EXPENSE_REPORT_GROUP = {
+  // 营业成本（直接成本）
+  livestream_cost: 'cogs',
+  // 人工成本
+  salary: 'labor', social_insurance: 'labor', commission: 'labor', bonus: 'labor', penalty: 'labor',
+  // 营业费用
+  rent: 'operating', water_electric: 'operating', shipping: 'operating', marketing: 'operating',
+  packaging: 'operating', office: 'operating', maintenance: 'operating', storage: 'operating',
+  material: 'operating', daily: 'operating',
+  // 财务费用
+  financial_fee: 'financial', interest: 'financial', platform_fee: 'financial',
+  // 管理费用
+  travel: 'admin', meal: 'admin', tax: 'admin', insurance: 'admin',
+  // 投资活动
+  equipment: 'investing',
+  // 其他
+  refund: 'other', other: 'other',
+}
+
+// 利润表费用分组标签
+export const EXPENSE_GROUP_LABELS = {
+  cogs: '直播/内容成本',
+  labor: '人工成本',
+  operating: '营业费用',
+  financial: '财务费用',
+  admin: '管理费用',
+  investing: '设备/资产投入',
+  other: '其他',
+}
+
+// 其他收入类型
+export const OTHER_INCOME_CATEGORIES = {
+  tips: '直播打赏',
+  ad_revenue: '广告收入',
+  sponsorship: '赞助收入',
+  interest_income: '利息收入',
+  subsidy: '补贴/返点',
+  other_income: '其他收入',
 }
 
 export const ORDER_STATUS = {
