@@ -22,9 +22,9 @@
             <select v-model="filterStatus"
               class="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400">
               <option value="">全部状态</option>
-              <option value="active">有效</option>
-              <option value="expired">已过期</option>
-              <option value="disposed">已处置</option>
+              <option :value="INTANGIBLE_ASSET_STATUS.ACTIVE">有效</option>
+              <option :value="INTANGIBLE_ASSET_STATUS.EXPIRED">已过期</option>
+              <option :value="INTANGIBLE_ASSET_STATUS.DISPOSED">已处置</option>
             </select>
             <input v-model="searchQuery" type="text" placeholder="搜索名称/登记号..."
               class="border border-gray-200 rounded-lg px-3 py-2 text-sm w-48 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400" />
@@ -218,6 +218,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { supabase } from '../lib/supabase'
+import { INTANGIBLE_ASSET_STATUS, INTANGIBLE_ASSET_STATUS_LABEL } from '../constants/enums'
 
 const assetTypes = ['商标', '专利', '软件', '著作权', '其他']
 
@@ -268,7 +269,7 @@ const filteredItems = computed(() => {
 })
 
 function isExpiringSoon(item) {
-  if (!item.expiry_date || item.status !== 'active') return false
+  if (!item.expiry_date || item.status !== INTANGIBLE_ASSET_STATUS.ACTIVE) return false
   const expiry = new Date(item.expiry_date)
   const now = new Date()
   const diff = (expiry - now) / (1000 * 60 * 60 * 24)
@@ -296,16 +297,15 @@ function formatMoney(val) {
 
 function statusClass(status) {
   const map = {
-    active: 'bg-green-50 text-green-700',
-    expired: 'bg-amber-50 text-amber-700',
-    disposed: 'bg-red-50 text-red-700',
+    [INTANGIBLE_ASSET_STATUS.ACTIVE]: 'bg-green-50 text-green-700',
+    [INTANGIBLE_ASSET_STATUS.EXPIRED]: 'bg-amber-50 text-amber-700',
+    [INTANGIBLE_ASSET_STATUS.DISPOSED]: 'bg-red-50 text-red-700',
   }
   return map[status] || 'bg-gray-100 text-gray-500'
 }
 
 function statusLabel(status) {
-  const map = { active: '有效', expired: '已过期', disposed: '已处置' }
-  return map[status] || status
+  return INTANGIBLE_ASSET_STATUS_LABEL[status] || status
 }
 
 function resetForm() {
@@ -388,7 +388,7 @@ async function saveItem() {
       useful_life_months: form.value.useful_life_months || null,
       accumulated_amortization: 0,
       current_value: form.value.purchase_cost,
-      status: 'active',
+      status: INTANGIBLE_ASSET_STATUS.ACTIVE,
       note: form.value.note || null,
     }
     const { error } = await supabase.from('intangible_assets').insert(payload)

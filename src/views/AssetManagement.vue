@@ -142,9 +142,10 @@
               <label class="block text-sm font-medium text-gray-700 mb-1">状态</label>
               <select v-model="form.status"
                 class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200">
-                <option value="active">活跃</option>
-                <option value="inactive">停用</option>
-                <option value="unbound">未绑定</option>
+                <option :value="ASSET_STATUS.IN_USE">在用</option>
+                <option :value="ASSET_STATUS.IDLE">闲置</option>
+                <option :value="ASSET_STATUS.MAINTENANCE">维修中</option>
+                <option :value="ASSET_STATUS.DISPOSED">已处置</option>
               </select>
             </div>
             <div>
@@ -220,6 +221,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { supabase } from '../lib/supabase'
+import { ASSET_STATUS } from '../constants/enums'
 
 const tabs = [
   { key: 'phone', label: '手机', icon: '📱' },
@@ -239,7 +241,7 @@ const showFormModal = ref(false)
 const editingAsset = ref(null)
 const form = ref({
   asset_type: 'phone', name: '', serial_number: '', monthly_cost: 0,
-  status: 'active', assigned_to: '', purchase_date: '', note: ''
+  status: ASSET_STATUS.IN_USE, assigned_to: '', purchase_date: '', note: ''
 })
 
 // Bind group modal
@@ -264,7 +266,7 @@ const stats = computed(() => {
   const list = assets.value
   const countByType = (type) => {
     const items = list.filter(a => a.asset_type === type)
-    return { total: items.length, active: items.filter(a => a.status === 'active').length }
+    return { total: items.length, active: items.filter(a => a.status === ASSET_STATUS.IN_USE).length }
   }
   const phone = countByType('phone')
   const wechat = countByType('wechat')
@@ -298,22 +300,28 @@ function typeIcon(type) {
 
 function statusClass(status) {
   const map = {
-    active: 'bg-green-50 text-green-700',
-    inactive: 'bg-red-50 text-red-700',
-    unbound: 'bg-gray-100 text-gray-500',
+    [ASSET_STATUS.IN_USE]: 'bg-green-50 text-green-700',
+    [ASSET_STATUS.IDLE]: 'bg-yellow-50 text-yellow-700',
+    [ASSET_STATUS.MAINTENANCE]: 'bg-blue-50 text-blue-700',
+    [ASSET_STATUS.DISPOSED]: 'bg-gray-100 text-gray-500',
   }
-  return map[status] || map.unbound
+  return map[status] || 'bg-gray-100 text-gray-500'
 }
 
 function statusLabel(status) {
-  const map = { active: '活跃', inactive: '停用', unbound: '未绑定' }
+  const map = {
+    [ASSET_STATUS.IN_USE]: '在用',
+    [ASSET_STATUS.IDLE]: '闲置',
+    [ASSET_STATUS.MAINTENANCE]: '维修中',
+    [ASSET_STATUS.DISPOSED]: '已处置',
+  }
   return map[status] || status
 }
 
 function resetForm() {
   form.value = {
     asset_type: activeTab.value, name: '', serial_number: '', monthly_cost: 0,
-    status: 'active', assigned_to: '', purchase_date: '', note: ''
+    status: ASSET_STATUS.IN_USE, assigned_to: '', purchase_date: '', note: ''
   }
   editingAsset.value = null
 }

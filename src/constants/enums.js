@@ -37,3 +37,25 @@ export const ASSET_STATUS_LABEL = {
   [ASSET_STATUS.MAINTENANCE]: '维修中',
   [ASSET_STATUS.DISPOSED]: '已处置',
 }
+
+/**
+ * 无形资产状态 (public.intangible_assets.status)
+ *
+ * 业务语义不同于固定资产：
+ *   - ACTIVE: 有效（如商标在有效期内）
+ *   - EXPIRED: 已过期（仅适用于有 expiry_date 的资产）
+ *   - DISPOSED: 已处置
+ *
+ * 数据库列是 text，无 enum 约束。当前真值依据 IntangibleAssets.vue 写入用 'active'。
+ */
+export const INTANGIBLE_ASSET_STATUS = {
+  ACTIVE: 'active',
+  EXPIRED: 'expired',
+  DISPOSED: 'disposed',
+}
+
+export const INTANGIBLE_ASSET_STATUS_LABEL = {
+  [INTANGIBLE_ASSET_STATUS.ACTIVE]: '有效',
+  [INTANGIBLE_ASSET_STATUS.EXPIRED]: '已过期',
+  [INTANGIBLE_ASSET_STATUS.DISPOSED]: '已处置',
+}

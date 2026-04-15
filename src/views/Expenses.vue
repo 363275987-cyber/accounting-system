@@ -1066,6 +1066,7 @@ import { formatMoney, EXPENSE_CATEGORIES, EXPENSE_STATUS, toast, formatDate, deb
 import { usePermission } from '../composables/usePermission'
 import { randomPick, randomAmount, todayDate, PAYEES } from '../lib/testDataHelper'
 import { dayEnd } from '../utils/dateRange'
+import { ASSET_STATUS } from '../constants/enums'
 
 const store = useExpenseStore()
 const accountStore = useAccountStore()
@@ -1903,7 +1904,7 @@ async function submitOneTransaction(exp) {
         monthly_depreciation: Math.round(monthlyDep * 100) / 100,
         accumulated_depreciation: 0,
         current_value: amount,
-        status: 'in_use',
+        status: ASSET_STATUS.IN_USE,
       })
       if (assetErr) throw new Error('资产写入失败: ' + assetErr.message)
       console.log('[智能记账] assets 写入完成，写入支出记录...')
