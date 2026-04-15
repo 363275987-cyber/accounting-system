@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { supabase } from '../lib/supabase'
+import { supabase, withTimeout } from '../lib/supabase'
 import { dayStart, dayEnd } from '../utils/dateRange'
 
 export const useInventoryStore = defineStore('inventory', {
@@ -18,10 +18,14 @@ export const useInventoryStore = defineStore('inventory', {
     async fetchWarehouses() {
       this.loading = true
       try {
-        const { data, error } = await supabase
-          .from('warehouses')
-          .select('*')
-          .order('created_at', { ascending: false })
+        const { data, error } = await withTimeout(
+          supabase
+            .from('warehouses')
+            .select('*')
+            .order('created_at', { ascending: false }),
+          10000,
+          '加载仓库列表'
+        )
         if (error) throw error
         this.warehouses = data || []
       } catch (e) {
@@ -33,23 +37,31 @@ export const useInventoryStore = defineStore('inventory', {
     },
 
     async createWarehouse(payload) {
-      const { data, error } = await supabase
-        .from('warehouses')
-        .insert(payload)
-        .select()
-        .single()
+      const { data, error } = await withTimeout(
+        supabase
+          .from('warehouses')
+          .insert(payload)
+          .select()
+          .single(),
+        10000,
+        '创建仓库'
+      )
       if (error) throw error
       this.warehouses.unshift(data)
       return data
     },
 
     async updateWarehouse(id, updates) {
-      const { data, error } = await supabase
-        .from('warehouses')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single()
+      const { data, error } = await withTimeout(
+        supabase
+          .from('warehouses')
+          .update(updates)
+          .eq('id', id)
+          .select()
+          .single(),
+        10000,
+        '更新仓库'
+      )
       if (error) throw error
       const idx = this.warehouses.findIndex(w => w.id === id)
       if (idx >= 0) this.warehouses[idx] = data
@@ -59,7 +71,11 @@ export const useInventoryStore = defineStore('inventory', {
     // ========== 库存管理 ==========
     async fetchStats() {
       try {
-        const { data, error } = await supabase.rpc('get_inventory_stats')
+        const { data, error } = await withTimeout(
+          supabase.rpc('get_inventory_stats'),
+          10000,
+          '加载库存统计'
+        )
         if (error) throw error
         if (data) {
           this.stats = {
@@ -99,7 +115,7 @@ export const useInventoryStore = defineStore('inventory', {
 
         query = query.order('product_name').range(from, to)
 
-        const { data, error, count } = await query
+        const { data, error, count } = await withTimeout(query, 10000, '加载库存')
         if (error) throw error
         this.inventory = data || []
         this.pagination = { page, pageSize, total: count || 0 }
@@ -143,7 +159,7 @@ export const useInventoryStore = defineStore('inventory', {
 
         query = query.range(from, to)
 
-        const { data, error, count } = await query
+        const { data, error, count } = await withTimeout(query, 10000, '加载库存日志')
         if (error) throw error
         this.logs = data || []
         this.logPagination = { page, pageSize, total: count || 0 }
@@ -157,43 +173,59 @@ export const useInventoryStore = defineStore('inventory', {
 
     // ========== 库存操作 ==========
     async adjustStock(warehouseId, productId, quantity, type, note) {
-      const { data, error } = await supabase.rpc('adjust_inventory', {
-        p_warehouse_id: warehouseId,
-        p_product_id: productId,
-        p_quantity: quantity,
-        p_change_type: type,
-        p_note: note,
-      })
+      const { data, error } = await withTimeout(
+        supabase.rpc('adjust_inventory', {
+          p_warehouse_id: warehouseId,
+          p_product_id: productId,
+          p_quantity: quantity,
+          p_change_type: type,
+          p_note: note,
+        }),
+        10000,
+        '调整库存'
+      )
       if (error) throw error
       return data
     },
 
     async transferStock(fromWarehouseId, toWarehouseId, productId, quantity, note) {
-      const { data, error } = await supabase.rpc('transfer_stock', {
-        p_from_wh: fromWarehouseId,
-        p_to_wh: toWarehouseId,
-        p_product_id: productId,
-        p_quantity: quantity,
-        p_note: note,
-      })
+      const { data, error } = await withTimeout(
+        supabase.rpc('transfer_stock', {
+          p_from_wh: fromWarehouseId,
+          p_to_wh: toWarehouseId,
+          p_product_id: productId,
+          p_quantity: quantity,
+          p_note: note,
+        }),
+        10000,
+        '调拨库存'
+      )
       if (error) throw error
       return data
     },
 
     async shipDeduct(orderId) {
-      const { data, error } = await supabase.rpc('ship_deduct_inventory', {
-        p_order_id: orderId,
-      })
+      const { data, error } = await withTimeout(
+        supabase.rpc('ship_deduct_inventory', {
+          p_order_id: orderId,
+        }),
+        10000,
+        '发货扣减库存'
+      )
       if (error) throw error
       return data
     },
 
     async returnAdd(refundId, productId, quantity) {
-      const { data, error } = await supabase.rpc('return_add_inventory', {
-        p_refund_id: refundId,
-        p_product_id: productId,
-        p_quantity: quantity,
-      })
+      const { data, error } = await withTimeout(
+        supabase.rpc('return_add_inventory', {
+          p_refund_id: refundId,
+          p_product_id: productId,
+          p_quantity: quantity,
+        }),
+        10000,
+        '退货入库'
+      )
       if (error) throw error
       return data
     },

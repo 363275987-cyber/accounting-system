@@ -501,9 +501,11 @@ async function handleBatchCreate() {
   creating.value = true
   try {
     const { data, error } = await supabase.rpc('batch_create_service_numbers', {
-      prefix, start, count,
-      sales_id: sales_id || null,
-      note: note || null,
+      p_prefix: prefix,
+      p_start: start,
+      p_count: count,
+      p_sales_id: sales_id || null,
+      p_note: note || null,
     })
     if (error) throw error
     toast(`成功创建 ${count} 个客服号及对应的微信收款账户`, 'success')

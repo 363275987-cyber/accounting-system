@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { supabase } from '../lib/supabase'
+import { supabase, withTimeout } from '../lib/supabase'
 
 export const useEcommerceStore = defineStore('ecommerce', {
   state: () => ({
@@ -45,12 +45,16 @@ export const useEcommerceStore = defineStore('ecommerce', {
     async loadStores() {
       this.loading = true
       try {
-        const { data, error } = await supabase
-          .from('accounts')
-          .select('id, short_name, platform, ecommerce_platform, settlement_days, balance, withdrawal_account_id, status')
-          .eq('status', 'active')
-          .not('ecommerce_platform', 'is', null)
-          .order('ecommerce_platform')
+        const { data, error } = await withTimeout(
+          supabase
+            .from('accounts')
+            .select('id, short_name, platform, ecommerce_platform, settlement_days, balance, withdrawal_account_id, status')
+            .eq('status', 'active')
+            .not('ecommerce_platform', 'is', null)
+            .order('ecommerce_platform'),
+          10000,
+          '加载电商店铺'
+        )
 
         if (error) throw error
 
@@ -58,7 +62,11 @@ export const useEcommerceStore = defineStore('ecommerce', {
         const storesWithdrawable = []
         for (const store of (data || [])) {
           try {
-            const { data: wd, error: wdErr } = await supabase.rpc('get_withdrawable_amount', { p_account_id: store.id })
+            const { data: wd, error: wdErr } = await withTimeout(
+              supabase.rpc('get_withdrawable_amount', { p_account_id: store.id }),
+              10000,
+              '查询可提现金额'
+            )
             storesWithdrawable.push({
               ...store,
               withdrawable_amount: wdErr ? 0 : Number(wd || 0),
@@ -79,12 +87,16 @@ export const useEcommerceStore = defineStore('ecommerce', {
     async loadDailyStats(dateRange) {
       try {
         const [startDate, endDate] = dateRange || [this.selectedDate, this.selectedDate]
-        const { data, error } = await supabase
-          .from('v_ecommerce_daily')
-          .select('*')
-          .gte('order_date', startDate)
-          .lte('order_date', endDate)
-          .order('order_date', { ascending: false })
+        const { data, error } = await withTimeout(
+          supabase
+            .from('v_ecommerce_daily')
+            .select('*')
+            .gte('order_date', startDate)
+            .lte('order_date', endDate)
+            .order('order_date', { ascending: false }),
+          10000,
+          '加载电商日统计'
+        )
 
         if (error) throw error
         this.dailyStats = data || []
@@ -106,7 +118,7 @@ export const useEcommerceStore = defineStore('ecommerce', {
           query = query.eq('account_id', accountId)
         }
 
-        const { data, error } = await query
+        const { data, error } = await withTimeout(query, 10000, '加载提现记录')
         if (error) throw error
         this.withdrawals = data || []
       } catch (e) {
@@ -117,13 +129,17 @@ export const useEcommerceStore = defineStore('ecommerce', {
     // 执行提现
     async executeWithdrawal(accountId, toAccountId, amount, feeDetail, remark) {
       try {
-        const { data, error } = await supabase.rpc('execute_withdrawal', {
-          p_account_id: accountId,
-          p_to_account_id: toAccountId,
-          p_amount: amount,
-          p_fee_detail: feeDetail,
-          p_remark: remark,
-        })
+        const { data, error } = await withTimeout(
+          supabase.rpc('execute_withdrawal', {
+            p_account_id: accountId,
+            p_to_account_id: toAccountId,
+            p_amount: amount,
+            p_fee_detail: feeDetail,
+            p_remark: remark,
+          }),
+          15000,
+          '执行提现'
+        )
 
         if (error) throw error
         return data
@@ -135,22 +151,26 @@ export const useEcommerceStore = defineStore('ecommerce', {
 
     // 新建电商店铺
     async createStore(storeData) {
-      const { data, error } = await supabase
-        .from('accounts')
-        .insert({
-          short_name: storeData.name,
-          code: storeData.name,
-          platform: storeData.ecommerce_platform === 'shipinhao' ? 'shipinhao' : storeData.ecommerce_platform,
-          ecommerce_platform: storeData.ecommerce_platform,
-          settlement_days: storeData.settlement_days,
-          balance: 0,
-          opening_balance: 0,
-          withdrawal_account_id: storeData.withdrawal_account_id || null,
-          status: 'active',
-          balance_method: 'auto',
-        })
-        .select()
-        .single()
+      const { data, error } = await withTimeout(
+        supabase
+          .from('accounts')
+          .insert({
+            short_name: storeData.name,
+            code: storeData.name,
+            platform: storeData.ecommerce_platform === 'shipinhao' ? 'shipinhao' : storeData.ecommerce_platform,
+            ecommerce_platform: storeData.ecommerce_platform,
+            settlement_days: storeData.settlement_days,
+            balance: 0,
+            opening_balance: 0,
+            withdrawal_account_id: storeData.withdrawal_account_id || null,
+            status: 'active',
+            balance_method: 'auto',
+          })
+          .select()
+          .single(),
+        10000,
+        '创建电商店铺'
+      )
 
       if (error) throw error
       return data
@@ -158,12 +178,16 @@ export const useEcommerceStore = defineStore('ecommerce', {
 
     // 更新店铺绑定
     async updateStore(accountId, updates) {
-      const { data, error } = await supabase
-        .from('accounts')
-        .update(updates)
-        .eq('id', accountId)
-        .select()
-        .single()
+      const { data, error } = await withTimeout(
+        supabase
+          .from('accounts')
+          .update(updates)
+          .eq('id', accountId)
+          .select()
+          .single(),
+        10000,
+        '更新店铺绑定'
+      )
 
       if (error) throw error
       return data
@@ -171,12 +195,16 @@ export const useEcommerceStore = defineStore('ecommerce', {
 
     // 获取现金账户列表（用于绑定提现到账账户）
     async loadCashAccounts() {
-      const { data, error } = await supabase
-        .from('accounts')
-        .select('id, short_name, platform, balance')
-        .is('ecommerce_platform', null)
-        .eq('status', 'active')
-        .order('short_name')
+      const { data, error } = await withTimeout(
+        supabase
+          .from('accounts')
+          .select('id, short_name, platform, balance')
+          .is('ecommerce_platform', null)
+          .eq('status', 'active')
+          .order('short_name'),
+        10000,
+        '加载现金账户'
+      )
 
       if (error) throw error
       return data || []

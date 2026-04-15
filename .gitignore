@@ -11,3 +11,7 @@ dist
 # Local Netlify folder
 .netlify
 .vercel
+
+# Local JSON backups (cleanup snapshots)
+backups/
+.claude/worktrees/

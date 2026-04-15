@@ -1687,6 +1687,7 @@ async function loadStats() {
       .gte('created_at', todayStr)
       .lte('created_at', dayEnd(todayStr))
       .eq('status', 'completed')
+      .is('deleted_at', null)
       .is('platform_type', null)
 
     // Month count (private orders only)
@@ -1695,6 +1696,7 @@ async function loadStats() {
       .select('id', { count: 'exact', head: true })
       .gte('created_at', monthStart)
       .eq('status', 'completed')
+      .is('deleted_at', null)
       .is('platform_type', null)
 
     // Month sum (private orders only)
@@ -1703,23 +1705,30 @@ async function loadStats() {
       .select('amount')
       .gte('created_at', monthStart)
       .eq('status', 'completed')
+      .is('deleted_at', null)
       .is('platform_type', null)
 
-    // Month refunds (private orders only, via inner join + client filter)
+    // BUG-11 fix: 退款率分子要和分母口径一致
+    // 1) 只算真正 completed 的退款（pending/processing 不算，不然用户没看到"已完成退款"却显示退款率）
+    // 2) 关联订单必须未被软删除（否则订单列表看不到那条订单，但 refundCount 还在）
+    // 3) refund_amount > 0（排除零金额垃圾数据）
     const { data: monthRefundsRaw } = await supabase
       .from('refunds')
-      .select('refund_amount, orders!inner(id, platform_type)')
+      .select('refund_amount, orders!inner(id, platform_type, deleted_at)')
       .gte('created_at', monthStart)
       .is('deleted_at', null)
-      .in('status', ['pending', 'processing', 'completed'])
-    const monthRefunds = (monthRefundsRaw || []).filter(r => !r.orders?.platform_type)
+      .eq('status', 'completed')
+      .gt('refund_amount', 0)
+    const monthRefunds = (monthRefundsRaw || []).filter(r => !r.orders?.platform_type && !r.orders?.deleted_at)
 
     stats.todayCount = todayCount || 0
     stats.monthCount = monthCount || 0
     stats.monthAmount = (monthData || []).reduce((s, r) => s + (Number(r.amount) || 0), 0)
     stats.monthRefundCount = monthRefunds.length
     stats.monthRefundAmount = monthRefunds.reduce((s, r) => s + (Number(r.refund_amount) || 0), 0)
-    stats.refundRate = stats.monthCount > 0 ? Math.round(stats.monthRefundCount / stats.monthCount * 1000) / 10 : 0
+    stats.refundRate = (stats.monthCount > 0 && stats.monthRefundCount > 0)
+      ? Math.round(stats.monthRefundCount / stats.monthCount * 1000) / 10
+      : 0
   } catch (e) {
     console.error('加载统计失败:', e)
     // RLS or network error — show 0, not NaN

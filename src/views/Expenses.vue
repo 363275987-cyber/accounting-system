@@ -22,7 +22,7 @@
           class="hidden md:inline-flex px-4 py-2 rounded-lg text-sm transition cursor-pointer whitespace-nowrap"
           :class="showTextMode ? 'bg-purple-600 text-white hover:bg-purple-700' : 'bg-purple-50 text-purple-700 hover:bg-purple-100'"
         >
-          📋 文本模式
+          🧠 智能记账
         </button>
         <button
           @click="showCategoryModal = true"
@@ -36,7 +36,7 @@
             ⋯
           </button>
           <div v-if="showMobileMenu" class="absolute right-0 top-full mt-1 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50 min-w-[140px]">
-            <button v-if="canDeleteExpenses" @click="showTextMode = !showTextMode; showMobileMenu = false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer">📋 文本模式</button>
+            <button v-if="canDeleteExpenses" @click="showTextMode = !showTextMode; showMobileMenu = false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer">🧠 智能记账</button>
             <button @click="showCategoryModal = true; showMobileMenu = false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer">🏷️ 类别</button>
             <button v-if="canDeleteExpenses" @click="generateTestData(testCount); showMobileMenu = false" class="w-full text-left px-4 py-2.5 text-sm text-gray-400 hover:bg-gray-50 cursor-pointer">🎲 随机测试</button>
           </div>
@@ -208,7 +208,8 @@
               <div>
                 <span class="text-gray-500 text-[10px]">{{ exp._type === 'transfer' ? '转出账户' : exp._type === 'income' || exp._type === 'deferred_revenue' || exp._type === 'other_payable' ? '收款账户' : '付款账户' }}</span>
                 <SearchableSelect
-                  v-model="exp.account_id"
+                  :model-value="exp.account_id"
+                  @update:modelValue="(v) => handleAccountChange(exp, v)"
                   :options="activeAccounts"
                   label-key="code"
                   value-key="id"
@@ -225,6 +226,20 @@
                 <span class="text-gray-500 text-[10px]">日期</span>
                 <input v-model="exp.expense_date" type="date" class="border border-gray-200 rounded px-2 py-1 text-sm w-full bg-white" />
               </div>
+            </div>
+
+            <!-- 🧠 账户关键词学习提示：用户手动改了账户时显示 -->
+            <div v-if="exp._accountChanged && exp.account_id && (exp._type === 'expense' || exp._type === 'income')"
+              class="flex items-center gap-2 mb-3 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+              <span class="text-xs text-emerald-700 shrink-0">🧠 记住「</span>
+              <input v-model="exp._learnAccountKeyword" placeholder="关键词"
+                class="flex-1 max-w-[10rem] px-2 py-1 border border-emerald-200 rounded text-xs bg-white outline-none focus:ring-1 focus:ring-emerald-400" />
+              <span class="text-xs text-emerald-700 shrink-0">」→ {{ getAccountName(exp.account_id) }}（{{ exp._type === 'income' ? '收入' : '支出' }}）？</span>
+              <button @click="learnAccountKeyword(exp)"
+                class="px-2.5 py-1 bg-emerald-500 text-white rounded text-xs hover:bg-emerald-600 cursor-pointer shrink-0">
+                记住
+              </button>
+              <button @click="exp._accountChanged = false" class="text-emerald-400 hover:text-emerald-600 text-xs cursor-pointer">✕</button>
             </div>
 
             <!-- ===== 按类型显示不同字段 ===== -->
@@ -459,30 +474,6 @@
         <span class="text-gray-500">今日支出</span>
         <span class="ml-2 font-semibold text-gray-800">{{ '¥' + todayExpenseData.total.toFixed(2) }}</span>
         <span class="ml-2 text-gray-300 text-xs">{{ todayExpenseData.count }} 笔</span>
-      </div>
-    </div>
-
-    <!-- Stats Cards -->
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-4 md:mb-6">
-      <div class="bg-white rounded-xl border border-gray-100 p-4 md:p-5">
-        <div class="text-sm text-gray-500 mb-1">📊 本月支出总额</div>
-        <div class="text-2xl font-bold text-red-600">{{ formatMoney(monthTotal) }}</div>
-        <div class="text-xs text-gray-500 mt-1">共 {{ monthCount }} 笔</div>
-      </div>
-      <div class="bg-white rounded-xl border border-gray-100 p-5">
-        <div class="text-sm text-gray-500 mb-1">⏳ 待审批笔数</div>
-        <div class="text-2xl font-bold text-orange-500">{{ pendingCount }}</div>
-        <div class="text-xs text-gray-500 mt-1">需要审批的支出</div>
-      </div>
-      <div class="bg-white rounded-xl border border-gray-100 p-5">
-        <div class="text-sm text-gray-500 mb-1">✅ 已付款笔数</div>
-        <div class="text-2xl font-bold text-green-600">{{ paidCount }}</div>
-        <div class="text-xs text-gray-500 mt-1">已完成付款</div>
-      </div>
-      <div class="bg-white rounded-xl border border-gray-100 p-5">
-        <div class="text-sm text-gray-500 mb-1">🔔 审批中金额</div>
-        <div class="text-2xl font-bold text-amber-500">{{ formatMoney(approvalPendingTotal) }}</div>
-        <div class="text-xs text-gray-500 mt-1">>¥2,000 待审批</div>
       </div>
     </div>
 
@@ -1242,6 +1233,81 @@ async function learnKeyword(exp) {
   toast(`已记住：「${kw}」→ ${TYPE_LABELS[exp._type]}，下次自动识别`, 'success')
 }
 
+// ══════════════════════════════════════════════════════════
+// 🧠 账户关键词智能学习
+// 当用户在解析结果里手动切换账户时，触发学习提示框
+// 确认后把关键词写入 accounts 表的 expense_keywords / income_keywords JSONB 字段
+// ══════════════════════════════════════════════════════════
+
+// 从原文提取"候选账户关键词"：优先抓最前面的 2-4 个中文字（通常是账户别名）
+function extractAccountKeyword(rawText) {
+  let text = (rawText || '').split('\t')[0] || ''  // 去掉 ￥ 金额
+  text = text.replace(/\d{1,2}月\d{1,2}日?/g, '')
+  text = text.replace(/\d{1,2}日/g, '')
+  text = text.replace(/[￥¥]?\s*[\d,.]+\s*(万?)\s*元?/g, '')
+  text = text.trim()
+  // 取开头的连续中文 2-4 个字
+  const head = text.match(/^[\u4e00-\u9fa5]{2,4}/)
+  if (head) return head[0]
+  // 退而求其次：取前 3 个字符
+  return text.slice(0, 3)
+}
+
+// 账户下拉变化处理：判断是不是用户手动改的（和解析器填的不同）
+function handleAccountChange(exp, newAccountId) {
+  exp.account_id = newAccountId
+  if (newAccountId && newAccountId !== exp._originalAccountId) {
+    exp._accountChanged = true
+    if (!exp._learnAccountKeyword) {
+      exp._learnAccountKeyword = extractAccountKeyword(exp._rawText)
+    }
+  } else {
+    exp._accountChanged = false
+  }
+}
+
+// 一键把关键词学到账户上
+async function learnAccountKeyword(exp) {
+  const kw = (exp._learnAccountKeyword || '').trim()
+  if (!kw) { toast('请输入要记住的关键词', 'warning'); return }
+  if (!exp.account_id) { toast('请先选择账户', 'warning'); return }
+  if (exp._type !== 'expense' && exp._type !== 'income') {
+    toast('仅支持收入/支出类型的账户关键词学习', 'warning'); return
+  }
+  const account = accountStore.accounts.find(a => a.id === exp.account_id)
+  if (!account) { toast('账户不存在', 'error'); return }
+
+  const field = exp._type === 'income' ? 'income_keywords' : 'expense_keywords'
+  const existingKws = Array.isArray(account[field]) ? account[field] : []
+  if (existingKws.some(k => (k || '').toLowerCase() === kw.toLowerCase())) {
+    toast(`「${kw}」已经在 ${account.short_name || account.code} 的${exp._type === 'income' ? '收入' : '支出'}关键词里了`, 'warning')
+    exp._accountChanged = false
+    return
+  }
+
+  // 检查关键词是否会和其他账户冲突（同一个词挂在多个账户上会解析错乱）
+  const conflictAccount = accountStore.accounts.find(a => {
+    if (a.id === account.id) return false
+    const kws = Array.isArray(a[field]) ? a[field] : []
+    return kws.some(k => (k || '').toLowerCase() === kw.toLowerCase())
+  })
+  if (conflictAccount) {
+    if (!confirm(`⚠️ 关键词「${kw}」已经挂在另一个账户「${conflictAccount.short_name || conflictAccount.code}」上。\n继续会导致解析时可能匹配错账户。\n\n是否仍要添加？`)) {
+      return
+    }
+  }
+
+  const newKws = [...existingKws, kw]
+  try {
+    await accountStore.updateAccount(account.id, { [field]: newKws })
+    toast(`已记住：「${kw}」→ ${account.short_name || account.code}（${exp._type === 'income' ? '收入' : '支出'}），下次自动识别`, 'success')
+    exp._accountChanged = false
+    exp._originalAccountId = exp.account_id  // 避免同一行再次触发学习提示
+  } catch (e) {
+    toast('保存失败: ' + (e.message || ''), 'error')
+  }
+}
+
 // ── 从 DB 加载类型关键词 ──
 const typeKeywords = ref([])
 async function loadTypeKeywords() {
@@ -1697,6 +1763,9 @@ function parseExpenseText(text) {
       _confidence: catResult.confidence,
       _matchSource: catResult.source,
       _uploading: false,
+      _originalAccountId: matchedAccountId,
+      _accountChanged: false,
+      _learnAccountKeyword: '',
       account_id: matchedAccountId,
       account_label: matchedAccount || '未匹配',
       amount: amount || null,

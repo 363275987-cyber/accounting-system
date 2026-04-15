@@ -10,17 +10,12 @@
 
     <!-- Filters -->
     <div class="bg-white rounded-xl border border-gray-100 p-4 mb-4 flex gap-3 items-center flex-wrap">
-      <input v-model="search" placeholder="搜索姓名/邮箱/手机" 
+      <input v-model="search" placeholder="搜索姓名/邮箱/手机"
         class="px-3 py-2 border border-gray-200 rounded-lg text-sm w-60 outline-none focus:ring-2 focus:ring-blue-500"
         @input="debouncedSearch">
       <select v-model="filters.role" class="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer">
         <option value="">全部角色</option>
         <option v-for="(label, key) in allRoles" :key="key" :value="key">{{ label }}</option>
-      </select>
-      <select v-model="filters.status" class="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer">
-        <option value="">全部状态</option>
-        <option value="active">在职</option>
-        <option value="inactive">停用</option>
       </select>
       <span class="text-sm text-gray-500 ml-auto">共 {{ filteredUsers.length }} 人</span>
     </div>
@@ -53,20 +48,10 @@
             <td class="px-4 py-3 text-gray-500 text-xs">{{ u.ip_code || '—' }}</td>
             <td class="px-4 py-3 text-gray-500 text-xs">{{ u.phone || '—' }}</td>
             <td class="px-4 py-3 text-center">
-              <span :class="u.status === 'active' ? 'text-green-600 bg-green-50' : 'text-gray-500 bg-gray-50'"
-                class="px-2 py-0.5 rounded-full text-xs font-medium">
-                {{ u.status === 'active' ? '在职' : '停用' }}
-              </span>
+              <span class="text-green-600 bg-green-50 px-2 py-0.5 rounded-full text-xs font-medium">在职</span>
             </td>
             <td class="px-4 py-3 text-center whitespace-nowrap" v-if="canManage">
-              <button v-if="u.status === 'active'" @click="toggleStatus(u, 'inactive')"
-                class="text-orange-600 hover:text-orange-800 text-xs mr-2 cursor-pointer">
-                停用
-              </button>
-              <button v-else @click="toggleStatus(u, 'active')"
-                class="text-green-600 hover:text-green-800 text-xs mr-2 cursor-pointer">
-                启用
-              </button>
+              <span class="text-gray-400 text-xs">—</span>
             </td>
           </tr>
           <tr v-if="filteredUsers.length === 0">
@@ -163,7 +148,7 @@ const search = ref('')
 const users = ref([])
 const showCreateModal = ref(false)
 
-const filters = reactive({ role: '', status: '' })
+const filters = reactive({ role: '' })
 
 const allRoles = {
   sales: '销售员',
@@ -191,7 +176,6 @@ const canManage = computed(() => auth.isAdmin || auth.isFinance)
 const filteredUsers = computed(() => {
   return users.value.filter(u => {
     if (filters.role && u.role !== filters.role) return false
-    if (filters.status && u.status !== filters.status) return false
     if (search.value) {
       const kw = search.value.toLowerCase()
       return [u.name, u.phone].some(f => f?.toLowerCase().includes(kw))
@@ -230,9 +214,10 @@ function openCreateModal() {
 async function loadUsers() {
   loading.value = true
   try {
+    // profiles 表无 status 列，不再查询 status
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, name, nickname, role, phone, status, department, created_at')
+      .select('id, name, role, phone, email, department, created_at')
       .order('created_at', { ascending: false })
     if (error) throw error
     // 过滤掉台球训练的学生（只显示公司相关角色）
@@ -283,18 +268,9 @@ async function handleCreate() {
   }
 }
 
-async function toggleStatus(user, newStatus) {
-  try {
-    const { error } = await supabase
-      .from('profiles')
-      .update({ status: newStatus })
-      .eq('id', user.id)
-    if (error) throw error
-    user.status = newStatus
-    toast(newStatus === 'active' ? '已启用' : '已停用', 'success')
-  } catch (e) {
-    toast('操作失败', 'error')
-  }
+// profiles 表无 status 列，停用/启用功能暂不支持
+async function toggleStatus(_user, _newStatus) {
+  toast('暂不支持启用/停用：profiles 表无 status 列', 'info')
 }
 
 onMounted(loadUsers)

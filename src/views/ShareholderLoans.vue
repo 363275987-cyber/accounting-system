@@ -193,6 +193,20 @@
             </div>
           </div>
           <div>
+            <label class="block text-sm text-gray-600 mb-1">
+              公司收款账户 <span class="text-red-500">*</span>
+            </label>
+            <SearchableSelect
+              v-model="createForm.receive_account_id"
+              :options="accountOptions"
+              label-key="code"
+              value-key="id"
+              placeholder="请选择公司收款账户"
+              search-placeholder="搜索账户名称..."
+            />
+            <p v-if="!createForm.receive_account_id" class="text-xs text-red-500 mt-1">请选择公司收款账户</p>
+          </div>
+          <div>
             <label class="block text-sm text-gray-600 mb-1">备注</label>
             <textarea v-model="createForm.note" rows="2" placeholder="选填"
               class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 resize-none"></textarea>
@@ -203,8 +217,8 @@
             class="flex-1 bg-gray-100 text-gray-600 py-2 rounded-lg text-sm hover:bg-gray-200 transition cursor-pointer">
             取消
           </button>
-          <button @click="handleCreate" :disabled="creating"
-            class="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm hover:bg-blue-700 transition cursor-pointer disabled:opacity-50">
+          <button @click="handleCreate" :disabled="creating || !createForm.receive_account_id"
+            class="flex-1 bg-blue-600 text-white py-2 rounded-lg text-sm hover:bg-blue-700 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
             {{ creating ? '提交中...' : '确认创建' }}
           </button>
         </div>
@@ -276,10 +290,19 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useShareholderLoanStore } from '../stores/shareholderLoans'
 import { supabase } from '../lib/supabase'
+import SearchableSelect from '../components/SearchableSelect.vue'
 
 const store = useShareholderLoanStore()
 const loans = computed(() => store.loans)
 const repayments = computed(() => store.repayments)
+
+// 账户下拉选项（公司收款账户用，复用 accounts ref 中的数据）
+const accountOptions = computed(() => {
+  return (accounts.value || []).map(a => ({
+    ...a,
+    code: `${a.short_name || a.platform || a.account_name}（余额 ¥${Number(a.balance || 0).toFixed(2)}）`,
+  }))
+})
 
 // --- Modal states ---
 const showCreateModal = ref(false)
@@ -300,6 +323,7 @@ const createForm = reactive({
   start_date: '',
   end_date: '',
   note: '',
+  receive_account_id: '',
 })
 
 // --- Repay form ---
@@ -370,12 +394,17 @@ function openCreateModal() {
   createForm.start_date = ''
   createForm.end_date = ''
   createForm.note = ''
+  createForm.receive_account_id = ''
   showCreateModal.value = true
 }
 
 async function handleCreate() {
   if (!createForm.shareholder_id || !createForm.loan_amount || !createForm.start_date) {
     alert('请填写股东、金额和起始日期')
+    return
+  }
+  if (!createForm.receive_account_id) {
+    alert('请选择公司收款账户')
     return
   }
   creating.value = true
@@ -388,6 +417,7 @@ async function handleCreate() {
       end_date: createForm.end_date || null,
       note: createForm.note || null,
       status: 'active',
+      receive_account_id: createForm.receive_account_id,
     })
     showCreateModal.value = false
     await store.fetchLoans()

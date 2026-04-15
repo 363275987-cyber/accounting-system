@@ -40,9 +40,9 @@
             <select v-model="filterStatus"
               class="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400">
               <option value="">全部状态</option>
-              <option value="active">在用</option>
-              <option value="idle">闲置</option>
-              <option value="disposed">已处置</option>
+              <option :value="ASSET_STATUS.IN_USE">在用</option>
+              <option :value="ASSET_STATUS.IDLE">闲置</option>
+              <option :value="ASSET_STATUS.DISPOSED">已处置</option>
             </select>
             <input v-model="searchQuery" type="text" placeholder="搜索资产名称/序列号..."
               class="border border-gray-200 rounded-lg px-3 py-2 text-sm w-52 focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400" />
@@ -104,7 +104,7 @@
                   </td>
                   <td class="px-3 py-3 text-center">
                     <button @click="openEditModal(a)" class="text-xs text-blue-600 hover:underline cursor-pointer mr-2">编辑</button>
-                    <button v-if="a.status !== 'disposed'" @click="confirmDispose(a)" class="text-xs text-red-500 hover:underline cursor-pointer">处置</button>
+                    <button v-if="a.status !== ASSET_STATUS.DISPOSED" @click="confirmDispose(a)" class="text-xs text-red-500 hover:underline cursor-pointer">处置</button>
                   </td>
                 </tr>
               </tbody>
@@ -134,7 +134,7 @@
               <div class="flex items-center gap-2 pt-3 border-t border-gray-50">
                 <button @click="openEditModal(a)" class="text-xs text-blue-600 hover:underline cursor-pointer">编辑</button>
                 <span class="text-gray-300">|</span>
-                <button v-if="a.status !== 'disposed'" @click="confirmDispose(a)" class="text-xs text-red-500 hover:underline cursor-pointer">处置</button>
+                <button v-if="a.status !== ASSET_STATUS.DISPOSED" @click="confirmDispose(a)" class="text-xs text-red-500 hover:underline cursor-pointer">处置</button>
               </div>
             </div>
           </div>
@@ -207,8 +207,8 @@
               <label class="block text-sm font-medium text-gray-700 mb-1">状态</label>
               <select v-model="form.status"
                 class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400">
-                <option value="active">在用</option>
-                <option value="idle">闲置</option>
+                <option :value="ASSET_STATUS.IN_USE">在用</option>
+                <option :value="ASSET_STATUS.IDLE">闲置</option>
               </select>
             </div>
           </div>
@@ -291,6 +291,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { supabase } from '../lib/supabase'
+import { ASSET_STATUS, ASSET_STATUS_LABEL } from '../constants/enums'
 
 const categories = ['装修', '设备', '器材', '办公家具', '车辆', '其他']
 
@@ -325,7 +326,7 @@ const defaultForm = () => ({
   residual_rate: 5,
   depreciation_start_date: new Date().toISOString().slice(0, 10),
   assigned_to: '',
-  status: 'active',
+  status: ASSET_STATUS.IN_USE,
   note: ''
 })
 const form = ref(defaultForm())
@@ -339,8 +340,8 @@ const computedMonthly = computed(() => {
 })
 
 const summary = computed(() => {
-  const nonDisposed = assets.value.filter(a => a.status !== 'disposed')
-  const active = assets.value.filter(a => a.status === 'active')
+  const nonDisposed = assets.value.filter(a => a.status !== ASSET_STATUS.DISPOSED)
+  const active = assets.value.filter(a => a.status === ASSET_STATUS.IN_USE)
   const totalOriginal = nonDisposed.reduce((s, a) => s + Number(a.purchase_price || 0), 0)
   const totalDepreciation = nonDisposed.reduce((s, a) => s + Number(a.accumulated_depreciation || 0), 0)
   return {
@@ -373,7 +374,7 @@ const currentPeriod = computed(() => {
 })
 
 const activeAssetsForDepreciation = computed(() => {
-  return assets.value.filter(a => a.status === 'active')
+  return assets.value.filter(a => a.status === ASSET_STATUS.IN_USE)
 })
 
 const depreciationTotal = computed(() => {
@@ -385,14 +386,15 @@ function formatNum(n) {
 }
 
 function statusLabel(s) {
-  return { active: '在用', idle: '闲置', disposed: '已处置' }[s] || s
+  return ASSET_STATUS_LABEL[s] || s
 }
 
 function statusClass(s) {
   return {
-    active: 'bg-green-50 text-green-700',
-    idle: 'bg-yellow-50 text-yellow-700',
-    disposed: 'bg-gray-100 text-gray-500'
+    [ASSET_STATUS.IN_USE]: 'bg-green-50 text-green-700',
+    [ASSET_STATUS.IDLE]: 'bg-yellow-50 text-yellow-700',
+    [ASSET_STATUS.MAINTENANCE]: 'bg-blue-50 text-blue-700',
+    [ASSET_STATUS.DISPOSED]: 'bg-gray-100 text-gray-500'
   }[s] || 'bg-gray-100 text-gray-500'
 }
 
@@ -427,7 +429,7 @@ function openEditModal(asset) {
     residual_rate: Number(asset.residual_rate || 5),
     depreciation_start_date: asset.depreciation_start_date || asset.purchase_date || '',
     assigned_to: asset.assigned_to || '',
-    status: asset.status || 'active',
+    status: asset.status || ASSET_STATUS.IN_USE,
     note: asset.note || ''
   }
   showModal.value = true
@@ -487,7 +489,7 @@ async function disposeAsset() {
   if (!disposeTarget.value) return
   disposing.value = true
   await supabase.from('assets').update({
-    status: 'disposed',
+    status: ASSET_STATUS.DISPOSED,
     note: (disposeTarget.value.note ? disposeTarget.value.note + '\n' : '') + `处置日期: ${new Date().toISOString().slice(0, 10)}`,
     updated_at: new Date().toISOString()
   }).eq('id', disposeTarget.value.id)

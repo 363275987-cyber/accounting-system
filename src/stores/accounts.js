@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { supabase } from '../lib/supabase'
+import { supabase, withTimeout } from '../lib/supabase'
 
 export const useAccountStore = defineStore('accounts', {
   state: () => ({
@@ -14,12 +14,16 @@ export const useAccountStore = defineStore('accounts', {
       this._forceRefresh = false
       this.loading = true
       try {
-        const { data, error } = await supabase
-          .from('accounts')
-          .select('*')
-          .neq('status', 'deleted')
-          .order('ip_code')
-          .order('sequence')
+        const { data, error } = await withTimeout(
+          supabase
+            .from('accounts')
+            .select('*')
+            .neq('status', 'deleted')
+            .order('ip_code')
+            .order('sequence'),
+          10000,
+          '加载账户列表'
+        )
         if (error) throw error
         this.accounts = data || []
       } catch (e) {
@@ -30,23 +34,31 @@ export const useAccountStore = defineStore('accounts', {
     },
 
     async createAccount(payload) {
-      const { data, error } = await supabase
-        .from('accounts')
-        .insert(payload)
-        .select()
-        .single()
+      const { data, error } = await withTimeout(
+        supabase
+          .from('accounts')
+          .insert(payload)
+          .select()
+          .single(),
+        10000,
+        '创建账户'
+      )
       if (error) throw error
       this.accounts.push(data)
       return data
     },
 
     async updateAccount(id, updates) {
-      const { data, error } = await supabase
-        .from('accounts')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single()
+      const { data, error } = await withTimeout(
+        supabase
+          .from('accounts')
+          .update(updates)
+          .eq('id', id)
+          .select()
+          .single(),
+        10000,
+        '更新账户'
+      )
       if (error) throw error
       const idx = this.accounts.findIndex(a => a.id === id)
       if (idx >= 0) this.accounts[idx] = data
@@ -54,12 +66,16 @@ export const useAccountStore = defineStore('accounts', {
     },
 
     async updateSequence(id, newSequence) {
-      const { data, error } = await supabase
-        .from('accounts')
-        .update({ sequence: newSequence })
-        .eq('id', id)
-        .select()
-        .single()
+      const { data, error } = await withTimeout(
+        supabase
+          .from('accounts')
+          .update({ sequence: newSequence })
+          .eq('id', id)
+          .select()
+          .single(),
+        10000,
+        '更新账户顺序'
+      )
       if (error) throw error
       const idx = this.accounts.findIndex(a => a.id === id)
       if (idx >= 0) this.accounts[idx] = data
@@ -75,11 +91,23 @@ export const useAccountStore = defineStore('accounts', {
       const seq1 = acc1.sequence || 0
       const seq2 = acc2.sequence || 0
       try {
-        const { error: e1 } = await supabase.from('accounts').update({ sequence: -999 }).eq('id', id1)
+        const { error: e1 } = await withTimeout(
+          supabase.from('accounts').update({ sequence: -999 }).eq('id', id1),
+          10000,
+          '交换账户顺序-1'
+        )
         if (e1) throw e1
-        const { error: e2 } = await supabase.from('accounts').update({ sequence: seq1 }).eq('id', id2)
+        const { error: e2 } = await withTimeout(
+          supabase.from('accounts').update({ sequence: seq1 }).eq('id', id2),
+          10000,
+          '交换账户顺序-2'
+        )
         if (e2) throw e2
-        const { error: e3 } = await supabase.from('accounts').update({ sequence: seq2 }).eq('id', id1)
+        const { error: e3 } = await withTimeout(
+          supabase.from('accounts').update({ sequence: seq2 }).eq('id', id1),
+          10000,
+          '交换账户顺序-3'
+        )
         if (e3) throw e3
         acc1.sequence = seq2
         acc2.sequence = seq1
@@ -100,11 +128,15 @@ export const useAccountStore = defineStore('accounts', {
         { table: 'refunds',  label: '退款',   column: 'account_id' },
       ]
       for (const { table, label, column } of relatedTables) {
-        const { count, error } = await supabase
-          .from(table)
-          .select('*', { count: 'exact', head: true })
-          .eq(column, id)
-          .is('deleted_at', null)
+        const { count, error } = await withTimeout(
+          supabase
+            .from(table)
+            .select('*', { count: 'exact', head: true })
+            .eq(column, id)
+            .is('deleted_at', null),
+          10000,
+          `检查${label}关联`
+        )
         // 表不存在时 Supabase 会返回错误，忽略即可（有些环境没开启相关模块）
         if (error) continue
         if (count && count > 0) {
@@ -112,15 +144,23 @@ export const useAccountStore = defineStore('accounts', {
         }
       }
       // transfers 表两边都可能引用
-      const { count: trCount, error: trErr } = await supabase
-        .from('account_transfers')
-        .select('*', { count: 'exact', head: true })
-        .or(`from_account_id.eq.${id},to_account_id.eq.${id}`)
+      const { count: trCount, error: trErr } = await withTimeout(
+        supabase
+          .from('account_transfers')
+          .select('*', { count: 'exact', head: true })
+          .or(`from_account_id.eq.${id},to_account_id.eq.${id}`),
+        10000,
+        '检查转账关联'
+      )
       if (!trErr && trCount && trCount > 0) {
         throw new Error(`该账户下有 ${trCount} 笔转账，无法删除。请先处理关联数据。`)
       }
 
-      const { error } = await supabase.from('accounts').delete().eq('id', id)
+      const { error } = await withTimeout(
+        supabase.from('accounts').delete().eq('id', id),
+        10000,
+        '删除账户'
+      )
       if (error) {
         if (error.message?.includes('foreign key')) {
           throw new Error('该账户有关联数据，无法删除')
@@ -138,13 +178,17 @@ export const useAccountStore = defineStore('accounts', {
     // 更新账户余额（原子操作）
     // amountDelta > 0 增加，< 0 减少
     async updateBalance(accountId, amountDelta, reason = '订单余额变动', refType = 'order', refId = null) {
-      const { data, error } = await supabase.rpc('increment_balance', {
-        p_account_id: accountId,
-        p_delta: amountDelta,
-        p_reason: reason,
-        p_ref_type: refType,
-        p_ref_id: refId,
-      })
+      const { data, error } = await withTimeout(
+        supabase.rpc('increment_balance', {
+          p_account_id: accountId,
+          p_delta: amountDelta,
+          p_reason: reason,
+          p_ref_type: refType,
+          p_ref_id: refId,
+        }),
+        10000,
+        '更新账户余额'
+      )
       if (error) throw error
       // data 现在是 {old_balance, new_balance}
       const newBal = data?.new_balance ?? (typeof data === 'number' ? data : null)
@@ -160,11 +204,15 @@ export const useAccountStore = defineStore('accounts', {
 
     // 从 Supabase 重新加载余额（同步真实数据）
     async refreshBalance(accountId) {
-      const { data, error } = await supabase
-        .from('accounts')
-        .select('balance')
-        .eq('id', accountId)
-        .single()
+      const { data, error } = await withTimeout(
+        supabase
+          .from('accounts')
+          .select('balance')
+          .eq('id', accountId)
+          .single(),
+        10000,
+        '刷新账户余额'
+      )
       if (error) throw error
       const idx = this.accounts.findIndex(a => a.id === accountId)
       if (idx >= 0) this.accounts[idx].balance = data.balance

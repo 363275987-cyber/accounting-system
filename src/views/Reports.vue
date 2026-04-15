@@ -314,8 +314,8 @@
           <table class="w-full text-sm" id="balance-table">
             <thead class="bg-gray-50">
               <tr>
-                <th class="px-6 py-3 text-left font-semibold text-gray-600 w-16">项目</th>
-                <th class="px-6 py-3 text-left font-semibold text-gray-600">行次</th>
+                <th class="px-6 py-3 text-left font-semibold text-gray-600 w-16">行次</th>
+                <th class="px-6 py-3 text-left font-semibold text-gray-600">项目</th>
                 <th class="px-6 py-3 text-right font-semibold text-gray-600">期末余额</th>
               </tr>
             </thead>
@@ -778,13 +778,20 @@ const balanceData = ref(null)
 const cashflowData = ref(null)
 const equityData = ref(null)
 
+// BUG-7 fix: 每个 tab 的数据对应的日期范围签名，切日期后对不上就重新拉
+const tabCacheKey = ref({ overview: '', income: '', balance: '', cashflow: '', equity: '' })
+function currentRangeKey() {
+  return `${startDate.value}_${endDate.value}`
+}
+
 const hasData = computed(() => {
+  const key = currentRangeKey()
   switch (activeTab.value) {
-    case 'overview': return !!overviewData.value
-    case 'income': return !!incomeData.value
-    case 'balance': return !!balanceData.value
-    case 'cashflow': return !!cashflowData.value
-    case 'equity': return !!equityData.value
+    case 'overview': return !!overviewData.value && tabCacheKey.value.overview === key
+    case 'income': return !!incomeData.value && tabCacheKey.value.income === key
+    case 'balance': return !!balanceData.value && tabCacheKey.value.balance === key
+    case 'cashflow': return !!cashflowData.value && tabCacheKey.value.cashflow === key
+    case 'equity': return !!equityData.value && tabCacheKey.value.equity === key
     default: return false
   }
 })
@@ -1019,13 +1026,14 @@ async function loadReport() {
   if (!auth.isLoggedIn) return
 
   loading.value = true
+  const key = currentRangeKey()
   try {
     switch (activeTab.value) {
-      case 'overview': await loadOverview(); break
-      case 'income': await loadIncome(); break
-      case 'balance': await loadBalance(); break
-      case 'cashflow': await loadCashflow(); break
-      case 'equity': await loadEquity(); break
+      case 'overview': await loadOverview(); tabCacheKey.value.overview = key; break
+      case 'income': await loadIncome(); tabCacheKey.value.income = key; break
+      case 'balance': await loadBalance(); tabCacheKey.value.balance = key; break
+      case 'cashflow': await loadCashflow(); tabCacheKey.value.cashflow = key; break
+      case 'equity': await loadEquity(); tabCacheKey.value.equity = key; break
     }
   } catch (err) {
     console.error('报表加载失败:', err)
@@ -1871,12 +1879,10 @@ onMounted(() => {
   initDates()
   if (auth.isLoggedIn) {
     loadReport()
-  }
-})
-
-watch(() => auth.isLoggedIn, (loggedIn) => {
-  if (loggedIn && startDate.value && endDate.value && !hasData.value) {
-    loadReport()
+  } else {
+    const unwatch = watch(() => auth.isLoggedIn, (val) => {
+      if (val) { loadReport(); unwatch() }
+    })
   }
 })
 </script>

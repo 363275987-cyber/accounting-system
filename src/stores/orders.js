@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { supabase } from '../lib/supabase'
+import { supabase, withTimeout } from '../lib/supabase'
 import { logOperation, getAccountBalance, formatMoneyStr } from '../utils/operationLogger'
 import { dayEnd } from '../utils/dateRange'
 
@@ -44,11 +44,15 @@ export const useOrderStore = defineStore('orders', {
             }
           } else if (field === 'account_name' || !field) {
             // 账户名搜索：先查账户
-            const { data: matchedAccounts } = await supabase
-              .from('accounts')
-              .select('id')
-              .or(`short_name.ilike.%${keyword}%,code.ilike.%${keyword}%`)
-              .limit(50)
+            const { data: matchedAccounts } = await withTimeout(
+              supabase
+                .from('accounts')
+                .select('id')
+                .or(`short_name.ilike.%${keyword}%,code.ilike.%${keyword}%`)
+                .limit(50),
+              10000,
+              '搜索订单关联账户'
+            )
             const accIds = (matchedAccounts || []).map(a => a.id)
             if (!field && accIds.length === 0) {
               // "全部字段"模式下账户没匹配到，退回到多字段 ilike
@@ -69,7 +73,7 @@ export const useOrderStore = defineStore('orders', {
         // 订单页只显示私域订单，始终排除电商订单
         query = query.is('platform_type', null)
 
-        const { data, error, count } = await query
+        const { data, error, count } = await withTimeout(query, 10000, '加载订单列表')
         if (error) throw error
         this.orders = data || []
         this.pagination = { total: count || 0, page, pageSize }
@@ -88,26 +92,34 @@ export const useOrderStore = defineStore('orders', {
       // 自动填充 sales_id：通过 account_id 查当前活跃分配
       let salesId = payload.sales_id
       if (!salesId && payload.account_id) {
-        const { data: ca } = await supabase
-          .from('channel_assignments')
-          .select('sales_id')
-          .eq('account_id', payload.account_id)
-          .eq('status', 'active')
-          .maybeSingle()
+        const { data: ca } = await withTimeout(
+          supabase
+            .from('channel_assignments')
+            .select('sales_id')
+            .eq('account_id', payload.account_id)
+            .eq('status', 'active')
+            .maybeSingle(),
+          10000,
+          '查询渠道分配'
+        )
         if (ca) salesId = ca.sales_id
       }
       // Fallback: 如果还是没有 sales_id，用当前用户
       if (!salesId) salesId = userId
 
-      const { data, error } = await supabase
-        .from('orders')
-        .insert({
-          ...payload,
-          sales_id: salesId,
-          creator_id: userId,
-        })
-        .select()
-        .single()
+      const { data, error } = await withTimeout(
+        supabase
+          .from('orders')
+          .insert({
+            ...payload,
+            sales_id: salesId,
+            creator_id: userId,
+          })
+          .select()
+          .single(),
+        10000,
+        '创建订单'
+      )
       if (error) throw error
       this.orders.unshift(data)
 
@@ -157,11 +169,15 @@ export const useOrderStore = defineStore('orders', {
         if (!userId) {
           throw new Error('未登录，无法修改订单')
         }
-        const { data: profile, error: profileErr } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', userId)
-          .single()
+        const { data: profile, error: profileErr } = await withTimeout(
+          supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', userId)
+            .single(),
+          10000,
+          '查询用户角色(订单)'
+        )
         if (profileErr || !profile || !['admin', 'finance'].includes(profile.role)) {
           delete updates.status
         }
@@ -181,12 +197,16 @@ export const useOrderStore = defineStore('orders', {
       const needAmountAdjust = amountDelta !== 0 && oldOrder && oldOrder.account_id
 
       // ⚠️ 先更新数据库，成功后再调整余额（防止余额变了但DB没变）
-      const { data, error } = await supabase
-        .from('orders')
-        .update(updates)
-        .eq('id', id)
-        .select()
-        .single()
+      const { data, error } = await withTimeout(
+        supabase
+          .from('orders')
+          .update(updates)
+          .eq('id', id)
+          .select()
+          .single(),
+        10000,
+        '更新订单'
+      )
       if (error) throw error
       const idx = this.orders.findIndex(o => o.id === id)
       if (idx >= 0) this.orders[idx] = data
@@ -303,7 +323,11 @@ export const useOrderStore = defineStore('orders', {
       }
 
       // 通过 RPC 软删除（RPC 内部已处理余额扣回）
-      const { error: delError } = await supabase.rpc('delete_order', { p_id: id })
+      const { error: delError } = await withTimeout(
+        supabase.rpc('delete_order', { p_id: id }),
+        10000,
+        '删除订单'
+      )
       if (delError) throw delError
 
       // 刷新账户余额

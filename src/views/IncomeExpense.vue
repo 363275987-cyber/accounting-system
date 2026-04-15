@@ -19,7 +19,6 @@
     <KeepAlive>
       <Expenses v-if="activeTab === 'expenses'" />
       <OtherIncome v-else-if="activeTab === 'income'" />
-      <SalaryManagement v-else-if="activeTab === 'salary'" />
     </KeepAlive>
   </div>
 </template>
@@ -28,12 +27,10 @@
 import { ref } from 'vue'
 import Expenses from './Expenses.vue'
 import OtherIncome from './OtherIncome.vue'
-import SalaryManagement from './SalaryManagement.vue'
 
 const tabs = [
   { key: 'expenses', label: '支出记录', icon: '💸' },
   { key: 'income', label: '其他收入', icon: '💰' },
-  { key: 'salary', label: '工资发放', icon: '👥' },
 ]
 
 const activeTab = ref('expenses')

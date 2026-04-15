@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { supabase } from '../lib/supabase'
+import { supabase, withTimeout } from '../lib/supabase'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -30,7 +30,11 @@ export const useAuthStore = defineStore('auth', {
       })
     },
     async fetchProfile(userId) {
-      const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single()
+      const { data, error } = await withTimeout(
+        supabase.from('profiles').select('*').eq('id', userId).single(),
+        10000,
+        '加载用户资料'
+      )
       if (error) {
         console.error('Failed to fetch profile:', error?.message || error?.code || JSON.stringify(error))
         this.user = null
@@ -44,6 +48,16 @@ export const useAuthStore = defineStore('auth', {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) throw error
       await this.fetchProfile(data.user.id)
+    },
+    async resetPassword(email) {
+      // Supabase 发送重置密码邮件，链接回到登录页
+      const redirectTo = window.location.origin + window.location.pathname + '#/login?reset=1'
+      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo })
+      if (error) throw error
+    },
+    async updatePassword(newPassword) {
+      const { error } = await supabase.auth.updateUser({ password: newPassword })
+      if (error) throw error
     },
     async logout() {
       await supabase.auth.signOut()

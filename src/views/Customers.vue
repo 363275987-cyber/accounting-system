@@ -3,9 +3,19 @@
     <!-- Header -->
     <div class="flex items-center justify-between mb-6">
       <h1 class="text-xl font-bold text-gray-800">👥 客户管理</h1>
-      <button @click="openAddModal" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition cursor-pointer">
-        + 添加客户
-      </button>
+      <div class="flex items-center gap-2">
+        <button
+          @click="manualSync"
+          :disabled="syncing"
+          class="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm hover:bg-gray-200 disabled:opacity-50 transition cursor-pointer"
+          title="从订单表同步客户数据"
+        >
+          {{ syncing ? '同步中...' : '🔄 同步客户' }}
+        </button>
+        <button @click="openAddModal" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition cursor-pointer">
+          + 添加客户
+        </button>
+      </div>
     </div>
 
     <!-- 今日新增客户 -->
@@ -79,7 +89,6 @@
             <th class="text-left px-4 py-3 font-medium">最近地址</th>
             <th class="text-right px-4 py-3 font-medium">订单数</th>
             <th class="text-right px-4 py-3 font-medium">总消费</th>
-            <th class="text-left px-4 py-3 font-medium">首次下单</th>
             <th class="text-left px-4 py-3 font-medium">最近下单</th>
             <th class="text-center px-4 py-3 font-medium">状态</th>
           </tr>
@@ -93,16 +102,15 @@
             <td class="px-4 py-3 font-mono text-gray-700">{{ c.phone }}</td>
             <td class="px-4 py-3 text-gray-800">{{ c.name || '-' }}</td>
             <td class="px-4 py-3 text-gray-500 max-w-[180px] truncate">{{ c.address || '-' }}</td>
-            <td class="px-4 py-3 text-right font-medium">{{ c.total_orders }}</td>
+            <td class="px-4 py-3 text-right font-medium">{{ c.order_count }}</td>
             <td class="px-4 py-3 text-right font-medium text-blue-600">¥{{ Number(c.total_amount).toLocaleString() }}</td>
-            <td class="px-4 py-3 text-gray-500 text-xs">{{ formatDate(c.first_order_at) }}</td>
             <td class="px-4 py-3 text-gray-600 text-xs">{{ formatDate(c.last_order_at) }}</td>
             <td class="px-4 py-3 text-center">
               <span class="inline-block px-2 py-0.5 rounded-full text-xs font-medium" :class="statusClass(c.status)">{{ statusLabel(c.status) }}</span>
             </td>
           </tr>
           <tr v-if="customers.length === 0">
-            <td colspan="8" class="px-4 py-12 text-center text-gray-500">暂无客户数据</td>
+            <td colspan="7" class="px-4 py-12 text-center text-gray-500">暂无客户数据</td>
           </tr>
         </tbody>
       </table>
@@ -252,8 +260,7 @@
                 <div class="text-sm font-bold text-red-500">{{ detail.refunds.length }}次 / ¥{{ detail.refunds.reduce((s, r) => s + Number(r.refund_amount), 0).toLocaleString() }}</div>
               </div>
             </div>
-            <div class="flex justify-between text-xs text-gray-500 mt-2 px-1">
-              <span>首次下单：{{ formatDate(detail.customer.first_order_at) }}</span>
+            <div class="flex justify-end text-xs text-gray-500 mt-2 px-1">
               <span>最近下单：{{ formatDate(detail.customer.last_order_at) }}</span>
             </div>
           </div>
@@ -344,6 +351,7 @@ const showDetail = ref(false)
 const detail = ref(null)
 const detailId = ref(null)
 const showTagInput = ref(false)
+const syncing = ref(false)
 const newTag = ref('')
 const newDetailTag = ref('')
 const form = reactive({ phone: '', name: '', address: '', tags: [], note: '' })
@@ -402,14 +410,34 @@ function debouncedSearch() {
   searchTimer = setTimeout(() => loadData(), 300)
 }
 
+function deriveStatus(c) {
+  // 客户端派生状态（customers 表无 status 列）
+  if (c.tags && Array.isArray(c.tags) && c.tags.includes('黑名单')) return 'blacklist'
+  if (!c.last_order_date) return 'churned'
+  const days = (Date.now() - new Date(c.last_order_date).getTime()) / 86400000
+  if (days <= 30) return 'active'
+  if (days <= 90) return 'inactive'
+  return 'churned'
+}
+
 async function loadSummary() {
-  const { data, error } = await supabase.rpc('get_customer_summary')
-  if (error) {
-    console.error('[Customers] loadSummary error:', error)
-    return
-  }
-  if (data) {
-    Object.assign(summary, data)
+  try {
+    const { data, error } = await supabase
+      .from('customers')
+      .select('id, created_at, last_order_date, total_amount, tags')
+      .is('deleted_at', null)
+    if (error) throw error
+    const list = data || []
+    const now = new Date()
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 86400000)
+    summary.total_customers = list.length
+    summary.new_this_month = list.filter(c => new Date(c.created_at) >= monthStart).length
+    summary.active_30d = list.filter(c => c.last_order_date && new Date(c.last_order_date) >= thirtyDaysAgo).length
+    const totalAmt = list.reduce((s, c) => s + Number(c.total_amount || 0), 0)
+    summary.avg_amount = list.length > 0 ? Math.round(totalAmt / list.length) : 0
+  } catch (e) {
+    console.error('[Customers] loadSummary error:', e)
   }
 }
 
@@ -436,24 +464,41 @@ async function loadTodayNewCustomers() {
 }
 
 async function loadData() {
-  const { data, error } = await supabase.rpc('get_customer_stats', {
-    p_search: searchText.value,
-    p_status: currentStatus.value,
-    p_tag: currentTag.value,
-    p_limit: 200,
-    p_offset: 0,
-  })
-  if (error) {
-    console.error('[Customers] loadData error:', error)
-    return
+  try {
+    let query = supabase
+      .from('customers')
+      .select('*')
+      .is('deleted_at', null)
+      .order('last_order_date', { ascending: false, nullsFirst: false })
+      .limit(200)
+    const search = searchText.value.trim()
+    if (search) {
+      query = query.or(`phone.ilike.%${search}%,name.ilike.%${search}%`)
+    }
+    if (currentTag.value) {
+      query = query.contains('tags', [currentTag.value])
+    }
+    const { data, error } = await query
+    if (error) throw error
+    let list = (data || []).map(c => ({
+      ...c,
+      status: deriveStatus(c),
+      total_orders: c.order_count,
+    }))
+    // 客户端过滤 status
+    if (currentStatus.value) {
+      list = list.filter(c => c.status === currentStatus.value)
+    }
+    customers.value = list
+    // Collect all unique tags
+    const tagSet = new Set()
+    list.forEach(c => {
+      if (c.tags && Array.isArray(c.tags)) c.tags.forEach(t => tagSet.add(t))
+    })
+    allTags.value = [...tagSet].sort()
+  } catch (e) {
+    console.error('[Customers] loadData error:', e)
   }
-  customers.value = data || []
-  // Collect all unique tags
-  const tagSet = new Set()
-  ;(data || []).forEach(c => {
-    if (c.tags && Array.isArray(c.tags)) c.tags.forEach(t => tagSet.add(t))
-  })
-  allTags.value = [...tagSet].sort()
 }
 
 function openAddModal() {
@@ -514,17 +559,70 @@ async function openDetail(id) {
   showTagInput.value = false
   newDetailTag.value = ''
   try {
-    const { data, error } = await supabase.rpc('get_customer_detail', { p_customer_id: id })
-    if (error) {
-      console.error('get_customer_detail error:', error)
-      alert('加载客户详情失败: ' + error.message)
-      return
+    // 1) 客户基础信息
+    const { data: cust, error: ce } = await supabase
+      .from('customers')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle()
+    if (ce) throw ce
+    if (!cust) { alert('未找到客户'); return }
+
+    // 2) 按 phone 拉订单
+    let orders = []
+    if (cust.phone) {
+      const { data: ords, error: oe } = await supabase
+        .from('orders')
+        .select('id, order_no, product_name, amount, status, order_source, created_at')
+        .eq('customer_phone', cust.phone)
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false })
+        .limit(200)
+      if (oe) throw oe
+      orders = ords || []
     }
-    if (!data) {
-      alert('未找到客户详情数据')
-      return
+
+    // 3) 按订单 id 拉退款
+    let refunds = []
+    if (orders.length > 0) {
+      const ids = orders.map(o => o.id)
+      const { data: rf, error: re } = await supabase
+        .from('refunds')
+        .select('refund_no, refund_amount, reason, created_at, order_id')
+        .in('order_id', ids)
+      if (!re) refunds = rf || []
     }
-    detail.value = data
+
+    // 4) 按月聚合趋势
+    const monthMap = new Map()
+    for (const o of orders) {
+      const d = new Date(o.created_at)
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      const cur = monthMap.get(key) || { month: key, amount: 0, orders: 0 }
+      cur.amount += Number(o.amount || 0)
+      cur.orders += 1
+      monthMap.set(key, cur)
+    }
+    const trend = [...monthMap.values()].sort((a, b) => a.month.localeCompare(b.month)).slice(-6)
+
+    // 5) 组装返回对象
+    const totalAmt = orders.reduce((s, o) => s + Number(o.amount || 0), 0)
+    const avgOrderAmount = orders.length > 0 ? Math.round(totalAmt / orders.length) : 0
+    detail.value = {
+      customer: {
+        ...cust,
+        total_orders: orders.length,
+        last_order_at: cust.last_order_date,
+        status: deriveStatus(cust),
+        is_student: cust.is_student || false,
+        lesson_count: cust.lesson_count || 0,
+        total_amount: totalAmt || cust.total_amount || 0,
+      },
+      orders,
+      refunds,
+      trend,
+      avg_order_amount: avgOrderAmount,
+    }
   } catch (e) {
     console.error('openDetail exception:', e)
     alert('加载异常: ' + (e.message || '未知错误'))
@@ -555,10 +653,9 @@ async function removeDetailTag(tag) {
   }
 }
 
-async function updateStatus(status) {
-  if (!detailId.value) return
-  await supabase.from('customers').update({ status }).eq('id', detailId.value)
-  await loadData()
+async function updateStatus(_status) {
+  // 客户表无 status 列，状态由 last_order_date 客户端派生，此处不写库
+  // 保留函数签名避免模板报错
 }
 
 async function toggleStudent() {
@@ -574,12 +671,37 @@ async function updateLessonCount(delta) {
   await supabase.from('customers').update({ lesson_count: newCount }).eq('id', detailId.value)
 }
 
+async function manualSync() {
+  if (syncing.value) return
+  syncing.value = true
+  try {
+    const { error } = await supabase.rpc('sync_customers_from_orders')
+    if (error) {
+      console.error('[Customers] sync_customers_from_orders error:', error)
+      alert('同步失败：' + error.message)
+      return
+    }
+    await Promise.all([loadData(), loadSummary(), loadTodayNewCustomers()])
+    alert('同步完成')
+  } catch (e) {
+    console.error('[Customers] sync_customers_from_orders exception:', e)
+    alert('同步异常：' + (e?.message || '未知错误'))
+  } finally {
+    syncing.value = false
+  }
+}
+
 function initLoad() {
   loadSummary()
   loadData()
   loadTodayNewCustomers()
-  // 后台同步（不阻塞页面加载）
-  supabase.rpc('sync_customers_from_orders').then(() => {}).catch(() => {})
+  // 后台同步（不阻塞页面加载，但失败要打印到 console）
+  supabase.rpc('sync_customers_from_orders').then(({ error }) => {
+    if (error) console.error('[Customers] sync_customers_from_orders (background) error:', error)
+    else loadData()
+  }).catch((e) => {
+    console.error('[Customers] sync_customers_from_orders (background) exception:', e)
+  })
 }
 
 onMounted(() => {

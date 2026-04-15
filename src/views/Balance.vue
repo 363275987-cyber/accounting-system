@@ -375,12 +375,27 @@ const periodLabel = computed(() => {
 async function loadSnapshots() {
   loading.value = true
   try {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('balance_snapshots')
-      .select('*, account:account_id(code, ip_code)')
+      .select('*, account:account_id(code, ip_code, account_name, short_name)')
       .eq('period', currentMonth.value)
-      .order('code')
-    snapshots.value = data || []
+    if (error) {
+      console.error('[Balance] loadSnapshots error:', error)
+      snapshots.value = []
+      return
+    }
+    // balance_snapshots 无 code 列,按 account.code 客户端排序
+    const list = (data || []).slice().sort((a, b) => {
+      const ac = a.account?.code || ''
+      const bc = b.account?.code || ''
+      return ac.localeCompare(bc)
+    })
+    // 扁平化一份便于模板访问 account_code
+    snapshots.value = list.map(s => ({
+      ...s,
+      account_code: s.account?.code || '',
+      account_name: s.account?.short_name || s.account?.account_name || '',
+    }))
     if (snapshots.value.length > 0 && !selectedAccountId.value) {
       selectedAccountId.value = snapshots.value[0].account_id
     }

@@ -180,7 +180,7 @@ const ROUTE_TITLES = {
   '/users': '用户管理',
   '/sales-groups': '销售分组',
   '/settings': '系统设置',
-  '/assets': '资产管理',
+  '/assets': '手机管理',
   '/shareholder-loans': '股东垫资',
   '/logs': '操作日志',
   '/warehouses': '仓库管理',
@@ -254,7 +254,6 @@ const menuGroups = computed(() => {
     items: [
       { label: '订单管理', path: '/orders' },
       { label: '收支管理', path: '/expenses' },
-      { label: '支出分类', path: '/expense-categories' },
       { label: '客户管理', path: '/customers' },
     ],
   })
@@ -282,7 +281,7 @@ const menuGroups = computed(() => {
       { label: '余额对账', path: '/balance' },
       { label: '股东垫资', path: '/shareholder-loans' },
       { label: '股东分红', path: '/dividends' },
-      { label: '设备资产', path: '/assets' },
+      { label: '手机管理', path: '/assets' },
     ],
   })
 

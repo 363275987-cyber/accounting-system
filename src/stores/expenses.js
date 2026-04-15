@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { supabase } from '../lib/supabase'
+import { supabase, withTimeout } from '../lib/supabase'
 import { logOperation, getAccountBalance, formatMoneyStr } from '../utils/operationLogger'
 import { dayEnd } from '../utils/dateRange'
 
@@ -33,11 +33,15 @@ export const useExpenseStore = defineStore('expenses', {
             }
           } else {
             // 全部字段或账户名搜索
-            const { data: matchedAccounts } = await supabase
-              .from('accounts')
-              .select('id')
-              .or(`short_name.ilike.%${search}%,code.ilike.%${search}%`)
-              .limit(50)
+            const { data: matchedAccounts } = await withTimeout(
+              supabase
+                .from('accounts')
+                .select('id')
+                .or(`short_name.ilike.%${search}%,code.ilike.%${search}%`)
+                .limit(50),
+              10000,
+              '搜索关联账户'
+            )
             const accIds = (matchedAccounts || []).map(a => a.id)
             if (!field && accIds.length === 0) {
               query = query.or(`payee.ilike.%${search}%,note.ilike.%${search}%,expense_no.ilike.%${search}%`)
@@ -51,7 +55,7 @@ export const useExpenseStore = defineStore('expenses', {
           }
         }
 
-        const { data, error, count } = await query
+        const { data, error, count } = await withTimeout(query, 10000, '加载支出列表')
         if (error) throw error
         this.expenses = data || []
         this.pagination = { total: count || 0, page, pageSize }
@@ -82,7 +86,11 @@ export const useExpenseStore = defineStore('expenses', {
       let paidAt = null
 
       // 获取当前用户角色
-      const { data: profileData } = await supabase.from('profiles').select('role').eq('id', userId).single()
+      const { data: profileData } = await withTimeout(
+        supabase.from('profiles').select('role').eq('id', userId).single(),
+        10000,
+        '加载用户角色'
+      )
       const userRole = profileData?.role || ''
 
       if (userRole === 'admin') {
@@ -99,11 +107,15 @@ export const useExpenseStore = defineStore('expenses', {
         paidAt = new Date().toISOString()
       }
       
-      const { data, error } = await supabase
-        .from('expenses')
-        .insert({ ...payload, status, approver_id: approvedBy, approved_at: approvedAt, paid_at: paidAt, created_by: userId })
-        .select('*, profiles:created_by(name, role)')
-        .single()
+      const { data, error } = await withTimeout(
+        supabase
+          .from('expenses')
+          .insert({ ...payload, status, approver_id: approvedBy, approved_at: approvedAt, paid_at: paidAt, created_by: userId })
+          .select('*, profiles:created_by(name, role)')
+          .single(),
+        10000,
+        '创建支出'
+      )
       if (error) throw error
       this.expenses.unshift(data)
       
@@ -121,16 +133,24 @@ export const useExpenseStore = defineStore('expenses', {
           balAfter = accStore.accounts.find(a => a.id === payload.account_id)?.balance ?? null
           // 余额快照写入支出记录（失败要抛出，别吞）
           if (balAfter != null) {
-            const { error: snapErr } = await supabase
-              .from('expenses')
-              .update({ balance_after: balAfter })
-              .eq('id', data.id)
+            const { error: snapErr } = await withTimeout(
+              supabase
+                .from('expenses')
+                .update({ balance_after: balAfter })
+                .eq('id', data.id),
+              10000,
+              '写入余额快照'
+            )
             if (snapErr) throw snapErr
           }
         } catch (e) {
           // 扣款失败：回滚已插入的 expense，避免账目不一致
           console.error('支出余额扣减失败，回滚 expense:', e)
-          await supabase.from('expenses').delete().eq('id', data.id)
+          await withTimeout(
+            supabase.from('expenses').delete().eq('id', data.id),
+            10000,
+            '回滚支出'
+          )
           this.expenses = this.expenses.filter(ex => ex.id !== data.id)
           throw new Error('扣减账户余额失败，支出已回滚：' + (e.message || e))
         }
@@ -161,7 +181,11 @@ export const useExpenseStore = defineStore('expenses', {
     async approveExpense(id, approved) {
       const userId = (await supabase.auth.getSession()).data.session?.user?.id
       // 安全检查：只有 pending 状态可以审批
-      const { data: current } = await supabase.from('expenses').select('status').eq('id', id).single()
+      const { data: current } = await withTimeout(
+        supabase.from('expenses').select('status').eq('id', id).single(),
+        10000,
+        '查询支出状态'
+      )
       if (!current || current.status !== 'pending') {
         throw new Error('该支出不在待审批状态')
       }
@@ -171,13 +195,17 @@ export const useExpenseStore = defineStore('expenses', {
         approved_at: new Date().toISOString(),
       }
       // 乐观锁：只更新 status='pending' 的记录，防止并发审批
-      const { data, error } = await supabase
-        .from('expenses')
-        .update(updates)
-        .eq('id', id)
-        .eq('status', 'pending')
-        .select()
-        .single()
+      const { data, error } = await withTimeout(
+        supabase
+          .from('expenses')
+          .update(updates)
+          .eq('id', id)
+          .eq('status', 'pending')
+          .select()
+          .single(),
+        10000,
+        '审批支出'
+      )
       if (error) throw error
       if (!data) throw new Error('审批失败：该支出状态已变更，请刷新后重试')
       const idx = this.expenses.findIndex(e => e.id === id)
@@ -187,7 +215,11 @@ export const useExpenseStore = defineStore('expenses', {
 
     async markAsPaid(id, accountId) {
       // 安全检查：只有 approved 状态可以确认付款
-      const { data: current } = await supabase.from('expenses').select('status, amount, account_id').eq('id', id).single()
+      const { data: current } = await withTimeout(
+        supabase.from('expenses').select('status, amount, account_id').eq('id', id).single(),
+        10000,
+        '查询支出详情'
+      )
       if (!current || current.status !== 'approved') {
         throw new Error('该支出未通过审批，无法确认付款')
       }
@@ -199,13 +231,17 @@ export const useExpenseStore = defineStore('expenses', {
         throw new Error('请选择付款账户')
       }
       // 乐观锁：只更新 status='approved' 的记录
-      const { data, error } = await supabase
-        .from('expenses')
-        .update({ status: 'paid', account_id: accountId, paid_at: new Date().toISOString() })
-        .eq('id', id)
-        .eq('status', 'approved')
-        .select()
-        .single()
+      const { data, error } = await withTimeout(
+        supabase
+          .from('expenses')
+          .update({ status: 'paid', account_id: accountId, paid_at: new Date().toISOString() })
+          .eq('id', id)
+          .eq('status', 'approved')
+          .select()
+          .single(),
+        10000,
+        '确认付款'
+      )
       if (error) throw error
       if (!data) throw new Error('付款失败：该支出状态已变更，请刷新后重试')
       // 扣减付款账户余额。失败则回滚 paid 状态，避免账目不一致
@@ -214,18 +250,26 @@ export const useExpenseStore = defineStore('expenses', {
         const { useAccountStore } = await import('./accounts')
         balResult = await useAccountStore().updateBalance(accountId, -amt)
         if (balResult?.new_balance != null) {
-          const { error: snapErr } = await supabase
-            .from('expenses')
-            .update({ balance_after: balResult.new_balance })
-            .eq('id', id)
+          const { error: snapErr } = await withTimeout(
+            supabase
+              .from('expenses')
+              .update({ balance_after: balResult.new_balance })
+              .eq('id', id),
+            10000,
+            '写入付款余额快照'
+          )
           if (snapErr) throw snapErr
         }
       } catch (e) {
         console.error('支出余额扣减失败，回滚 paid 状态:', e)
-        await supabase
-          .from('expenses')
-          .update({ status: 'approved', account_id: current.account_id, paid_at: null })
-          .eq('id', id)
+        await withTimeout(
+          supabase
+            .from('expenses')
+            .update({ status: 'approved', account_id: current.account_id, paid_at: null })
+            .eq('id', id),
+          10000,
+          '回滚付款状态'
+        )
         throw new Error('扣减账户余额失败，付款已撤销：' + (e.message || e))
       }
       const idx = this.expenses.findIndex(e => e.id === id)

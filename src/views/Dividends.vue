@@ -241,6 +241,20 @@
               class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500">
           </div>
           <div>
+            <label class="block text-sm text-gray-600 mb-1">
+              付款账户 <span class="text-red-500">*</span>
+            </label>
+            <SearchableSelect
+              v-model="distForm.account_id"
+              :options="activeAccounts"
+              label-key="code"
+              value-key="id"
+              placeholder="请选择付款账户"
+              search-placeholder="搜索账户名称..."
+            />
+            <p v-if="!distForm.account_id" class="text-xs text-red-500 mt-1">请选择付款账户</p>
+          </div>
+          <div>
             <label class="block text-sm text-gray-600 mb-1">备注</label>
             <textarea v-model="distForm.note" rows="2" placeholder="选填"
               class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 resize-none"></textarea>
@@ -251,8 +265,8 @@
             class="flex-1 bg-gray-100 text-gray-600 py-2.5 rounded-lg text-sm hover:bg-gray-200 transition cursor-pointer">
             取消
           </button>
-          <button @click="handleDistribute" :disabled="distributing"
-            class="flex-1 bg-blue-600 text-white py-2.5 rounded-lg text-sm hover:bg-blue-700 transition cursor-pointer disabled:opacity-50">
+          <button @click="handleDistribute" :disabled="distributing || !distForm.account_id"
+            class="flex-1 bg-blue-600 text-white py-2.5 rounded-lg text-sm hover:bg-blue-700 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
             {{ distributing ? '提交中...' : '确认分红' }}
           </button>
         </div>
@@ -265,9 +279,21 @@
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/auth'
+import { useAccountStore } from '../stores/accounts'
+import SearchableSelect from '../components/SearchableSelect.vue'
 
 const auth = useAuthStore()
+const accountStore = useAccountStore()
 const canEdit = computed(() => ['admin', 'finance', 'manager'].includes(auth.profile?.role || ''))
+
+// 付款账户下拉选项（参考 Expenses.vue 写法）
+const activeAccounts = computed(() => {
+  const accs = accountStore.getActiveAccounts()
+  return accs.map(a => ({
+    ...a,
+    code: `${a.short_name || a.code || a.account_name}（¥${Number(a.balance || 0).toFixed(2)}）`,
+  }))
+})
 
 // --- Toast ---
 const toastMsg = ref('')
@@ -307,6 +333,7 @@ const distForm = reactive({
   totalAmount: '',
   period: '',
   note: '',
+  account_id: '',
 })
 
 // --- Fetch Records ---
@@ -419,6 +446,10 @@ async function handleDistribute() {
     toast('请输入分红期间', 'error')
     return
   }
+  if (!distForm.account_id) {
+    toast('请选择付款账户', 'error')
+    return
+  }
 
   distributing.value = true
   try {
@@ -434,6 +465,7 @@ async function handleDistribute() {
         status: 'pending',
         note: distForm.note?.trim() || null,
         recorded_by: auth.profile?.id || null,
+        account_id: distForm.account_id,
       },
       {
         shareholder_name: '王孟南',
@@ -443,6 +475,7 @@ async function handleDistribute() {
         status: 'pending',
         note: distForm.note?.trim() || null,
         recorded_by: auth.profile?.id || null,
+        account_id: distForm.account_id,
       },
     ]
 
@@ -454,6 +487,7 @@ async function handleDistribute() {
     distForm.totalAmount = ''
     distForm.period = ''
     distForm.note = ''
+    distForm.account_id = ''
     await Promise.all([fetchRecords(), fetchAllRecords()])
   } catch (e) {
     console.error('Failed to create dividends:', e)
@@ -506,6 +540,14 @@ async function softDelete(row) {
 watch(filterYear, () => fetchRecords())
 
 onMounted(async () => {
+  // 拉账户列表（用于"付款账户"下拉），如果 store 已经有数据就不重复拉
+  if (!accountStore.accounts || accountStore.accounts.length === 0) {
+    try {
+      await accountStore.fetchAccounts()
+    } catch (e) {
+      console.warn('Failed to fetch accounts for dividend form:', e)
+    }
+  }
   await Promise.all([fetchRecords(), fetchAllRecords()])
 })
 </script>
