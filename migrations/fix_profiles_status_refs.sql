@@ -1,26 +1,58 @@
--- Fix: profiles 表没有 status 列，但以下对象仍然引用它，导致：
---   1. UserManagement "添加员工" 调用 admin_create_user 失败（column "status" of relation "profiles" does not exist）
---   2. Supabase Auth Admin API 创建用户失败（acct_handle_new_user 触发器同样插入 status）
--- 该补丁把这两个函数里的 status 引用删掉。
+-- Fix: profiles 表没有 status 列；并且 SECURITY DEFINER 触发器在 auth schema
+-- 上下文中执行时，未限定的 `profiles` 解析失败 (relation "profiles" does not exist)。
+-- 该补丁同时修：
+--   1) UserManagement「+添加员工」调用 admin_create_user 失败 (column "status" does not exist)
+--   2) Supabase Auth Admin API 创建用户 → on_auth_user_created 触发器 → handle_new_user
+--      报 "relation profiles does not exist"，因为 search_path 缺 public
+--   3) acct_handle_new_user 同样缺 search_path，且引用 status 列
+--
+-- 已在 2026-04-15 通过 Supabase Management API 执行过；保留此文件作为审计/回滚参考。
 
--- 1) 修复 AFTER INSERT ON auth.users 的触发器函数
-CREATE OR REPLACE FUNCTION acct_handle_new_user()
-RETURNS TRIGGER AS $$
+-- 1) 主触发器：onAuthUserCreated → handle_new_user
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, auth
+AS $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM profiles WHERE id = NEW.id) THEN
-    INSERT INTO profiles (id, name, role)
+  INSERT INTO public.profiles (id, email, name, role)
+  VALUES (
+    NEW.id,
+    NEW.email,
+    COALESCE(NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1)),
+    COALESCE(NEW.raw_user_meta_data->>'role', 'sales')
+  )
+  ON CONFLICT (id) DO NOTHING;
+  RETURN NEW;
+END;
+$$;
+
+-- 2) 备用触发器函数（acct_on_auth_user_created）
+CREATE OR REPLACE FUNCTION public.acct_handle_new_user()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, auth
+AS $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.profiles WHERE id = NEW.id) THEN
+    INSERT INTO public.profiles (id, name, role, email)
     VALUES (
       NEW.id,
       COALESCE(NEW.raw_user_meta_data->>'name', NEW.email),
-      COALESCE(NEW.raw_user_meta_data->>'role', 'sales')
+      COALESCE(NEW.raw_user_meta_data->>'role', 'sales'),
+      NEW.email
     );
   END IF;
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
--- 2) 修复 admin_create_user RPC，去掉 status 字段
-CREATE OR REPLACE FUNCTION admin_create_user(
+-- 3) admin_create_user RPC：去掉 status 字段；仅写 profiles 行
+--    （真实的 auth.users 创建由前端通过 Auth Admin API 调用）
+DROP FUNCTION IF EXISTS public.admin_create_user(text, text, text, text, text, text);
+CREATE OR REPLACE FUNCTION public.admin_create_user(
   p_email      TEXT,
   p_password   TEXT,
   p_name       TEXT,
@@ -31,15 +63,14 @@ CREATE OR REPLACE FUNCTION admin_create_user(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = public
 AS $$
 DECLARE
   v_user_id UUID;
 BEGIN
-  -- 生成一个 UUID 用于 profiles（Auth Admin 创建由前端另行调用）
   v_user_id := gen_random_uuid();
 
-  -- 仅更新/插入 profiles 行；真正的 auth.users 记录由调用方通过 Auth Admin API 创建
-  INSERT INTO profiles (id, name, role, department, phone, email)
+  INSERT INTO public.profiles (id, name, role, department, phone, email)
   VALUES (v_user_id, p_name, p_role, p_department, p_phone, p_email)
   ON CONFLICT (id) DO UPDATE SET
     name       = EXCLUDED.name,
