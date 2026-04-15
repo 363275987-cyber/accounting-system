@@ -475,9 +475,10 @@ function parseCode(code) {
 async function loadData() {
   loading.value = true
   try {
+    // profiles 表无 status 列（BUG-12 同因），仅按角色筛
     const [snRes, salesRes] = await Promise.all([
       supabase.from('service_numbers').select('*').order('code'),
-      supabase.from('profiles').select('*').eq('status', 'active').in('role', ['sales', 'cs', 'manager']).order('name'),
+      supabase.from('profiles').select('*').in('role', ['sales', 'cs', 'manager']).order('name'),
     ])
     serviceNumbers.value = snRes.data || []
     salesList.value = salesRes.data || []
@@ -500,12 +501,14 @@ async function handleBatchCreate() {
 
   creating.value = true
   try {
+    // ⚠️ 参数名必须与 DB 函数签名完全一致：prefix/start/count/sales_id/note
+    // (BUG-13 历史记录称改成 p_ 前缀，但实测云端函数仍是无前缀版本)
     const { data, error } = await supabase.rpc('batch_create_service_numbers', {
-      p_prefix: prefix,
-      p_start: start,
-      p_count: count,
-      p_sales_id: sales_id || null,
-      p_note: note || null,
+      prefix,
+      start,
+      count,
+      sales_id: sales_id || null,
+      note: note || null,
     })
     if (error) throw error
     toast(`成功创建 ${count} 个客服号及对应的微信收款账户`, 'success')

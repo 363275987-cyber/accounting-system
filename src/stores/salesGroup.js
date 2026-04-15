@@ -197,12 +197,12 @@ export const useSalesGroupStore = defineStore('salesGroup', {
     },
 
     // 获取组员列表（用于添加成员选择）
+    // profiles 表无 status 列（BUG-12 同因），仅按角色筛
     async getAvailableUsers() {
       const { data, error } = await withTimeout(
         supabase
           .from('profiles')
           .select('id, name, role')
-          .eq('status', 'active')
           .order('name'),
         10000,
         '加载可用用户列表'

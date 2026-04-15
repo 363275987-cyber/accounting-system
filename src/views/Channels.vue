@@ -203,9 +203,10 @@ const paginatedItems = computed(() => {
 async function loadData() {
   loading.value = true
   try {
+    // profiles 表无 status 列（BUG-12 同因），仅按角色筛
     const [accRes, profRes, caRes] = await Promise.all([
       supabase.from('accounts').select('*').order('ip_code').order('sequence'),
-      supabase.from('profiles').select('*').eq('status', 'active').in('role', ['sales', 'cs']).order('name'),
+      supabase.from('profiles').select('*').in('role', ['sales', 'cs']).order('name'),
       supabase.from('channel_assignments')
         .select('*, accounts!inner(code, ip_code, platform), profiles:sales_id(name)')
         .order('assigned_at', { ascending: false })

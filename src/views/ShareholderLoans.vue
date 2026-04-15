@@ -528,7 +528,8 @@ async function toggleRepayments(loan) {
 // --- Init ---
 onMounted(async () => {
   store.fetchLoans()
-  const { data } = await supabase.from('profiles').select('id, name, role').eq('status', 'active').order('name')
+  // profiles 表无 status 列（BUG-12 同因），仅按角色筛
+  const { data } = await supabase.from('profiles').select('id, name, role').order('name')
   shareholders.value = (data || []).filter(u => ['admin', 'manager'].includes(u.role))
   // 加载账户列表（用于还款时选择付款账户）
   const { data: accData } = await supabase.from('accounts').select('id, short_name, platform, account_name, balance').eq('status', 'active').order('short_name')
