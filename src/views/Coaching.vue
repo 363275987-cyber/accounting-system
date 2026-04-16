@@ -266,7 +266,7 @@
           </div>
           <div class="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
             <button @click="coachModalOpen = false" class="px-4 py-2 rounded-lg text-sm text-gray-500 hover:bg-gray-100 transition">取消</button>
-            <button @click="saveCoach" class="px-4 py-2 rounded-lg text-sm bg-blue-600 text-white hover:bg-blue-700 transition">保存</button>
+            <button @click="saveCoach" :disabled="savingCoaching" class="px-4 py-2 rounded-lg text-sm bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition">{{ savingCoaching ? '保存中...' : '保存' }}</button>
           </div>
         </div>
       </div>
@@ -305,7 +305,7 @@
           </div>
           <div class="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
             <button @click="studentModalOpen = false" class="px-4 py-2 rounded-lg text-sm text-gray-500 hover:bg-gray-100 transition">取消</button>
-            <button @click="saveStudent" class="px-4 py-2 rounded-lg text-sm bg-blue-600 text-white hover:bg-blue-700 transition">保存</button>
+            <button @click="saveStudent" :disabled="savingCoaching" class="px-4 py-2 rounded-lg text-sm bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition">{{ savingCoaching ? '保存中...' : '保存' }}</button>
           </div>
         </div>
       </div>
@@ -351,7 +351,7 @@
           </div>
           <div class="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
             <button @click="courseModalOpen = false" class="px-4 py-2 rounded-lg text-sm text-gray-500 hover:bg-gray-100 transition">取消</button>
-            <button @click="saveCourse" class="px-4 py-2 rounded-lg text-sm bg-blue-600 text-white hover:bg-blue-700 transition">保存</button>
+            <button @click="saveCourse" :disabled="savingCoaching" class="px-4 py-2 rounded-lg text-sm bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition">{{ savingCoaching ? '保存中...' : '保存' }}</button>
           </div>
         </div>
       </div>
@@ -404,7 +404,7 @@
           </div>
           <div class="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
             <button @click="sessionModalOpen = false" class="px-4 py-2 rounded-lg text-sm text-gray-500 hover:bg-gray-100 transition">取消</button>
-            <button @click="saveSession" class="px-4 py-2 rounded-lg text-sm bg-blue-600 text-white hover:bg-blue-700 transition">保存</button>
+            <button @click="saveSession" :disabled="savingCoaching" class="px-4 py-2 rounded-lg text-sm bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition">{{ savingCoaching ? '保存中...' : '保存' }}</button>
           </div>
         </div>
       </div>
@@ -457,7 +457,7 @@
           </div>
           <div class="px-6 py-4 border-t border-gray-100 flex justify-end gap-3">
             <button @click="paymentModalOpen = false" class="px-4 py-2 rounded-lg text-sm text-gray-500 hover:bg-gray-100 transition">取消</button>
-            <button @click="savePayment" class="px-4 py-2 rounded-lg text-sm bg-blue-600 text-white hover:bg-blue-700 transition">保存</button>
+            <button @click="savePayment" :disabled="savingCoaching" class="px-4 py-2 rounded-lg text-sm bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition">{{ savingCoaching ? '保存中...' : '保存' }}</button>
           </div>
         </div>
       </div>
@@ -665,6 +665,8 @@ async function seedIfEmpty() {
 
 // ===== Coach CRUD =====
 const coachModalOpen = ref(false)
+// 5 个模态共享一把保存锁（同时只会有一个模态打开）
+const savingCoaching = ref(false)
 const coachForm = ref({ id: null, name: '', phone: '', specialtiesStr: '', hourly_rate: 500, status: 'active', bio: '' })
 
 function openCoachModal(row) {
@@ -687,23 +689,29 @@ function openCoachModal(row) {
 async function saveCoach() {
   const f = coachForm.value
   if (!f.name) return showToast('请填写教练姓名')
-  const payload = {
-    name: f.name,
-    phone: f.phone || null,
-    specialties: f.specialtiesStr ? f.specialtiesStr.split(',').map(s => s.trim()).filter(Boolean) : [],
-    hourly_rate: f.hourly_rate || 0,
-    status: f.status,
-    bio: f.bio || null
+  if (savingCoaching.value) return
+  savingCoaching.value = true
+  try {
+    const payload = {
+      name: f.name,
+      phone: f.phone || null,
+      specialties: f.specialtiesStr ? f.specialtiesStr.split(',').map(s => s.trim()).filter(Boolean) : [],
+      hourly_rate: f.hourly_rate || 0,
+      status: f.status,
+      bio: f.bio || null
+    }
+    if (f.id) {
+      await supabase.from('coaches').update(payload).eq('id', f.id)
+      showToast('教练已更新')
+    } else {
+      await supabase.from('coaches').insert([payload])
+      showToast('教练已添加')
+    }
+    coachModalOpen.value = false
+    await loadCoaches()
+  } finally {
+    savingCoaching.value = false
   }
-  if (f.id) {
-    await supabase.from('coaches').update(payload).eq('id', f.id)
-    showToast('教练已更新')
-  } else {
-    await supabase.from('coaches').insert([payload])
-    showToast('教练已添加')
-  }
-  coachModalOpen.value = false
-  await loadCoaches()
 }
 
 // ===== Student CRUD =====
@@ -722,16 +730,22 @@ function openStudentModal(row) {
 async function saveStudent() {
   const f = studentForm.value
   if (!f.name) return showToast('请填写学员姓名')
-  const payload = { name: f.name, phone: f.phone || null, level: f.level || null, note: f.note || null }
-  if (f.id) {
-    await supabase.from('students').update(payload).eq('id', f.id)
-    showToast('学员已更新')
-  } else {
-    await supabase.from('students').insert([payload])
-    showToast('学员已添加')
+  if (savingCoaching.value) return
+  savingCoaching.value = true
+  try {
+    const payload = { name: f.name, phone: f.phone || null, level: f.level || null, note: f.note || null }
+    if (f.id) {
+      await supabase.from('students').update(payload).eq('id', f.id)
+      showToast('学员已更新')
+    } else {
+      await supabase.from('students').insert([payload])
+      showToast('学员已添加')
+    }
+    studentModalOpen.value = false
+    await loadStudents()
+  } finally {
+    savingCoaching.value = false
   }
-  studentModalOpen.value = false
-  await loadStudents()
 }
 
 // ===== Course CRUD =====
@@ -753,19 +767,25 @@ function openCourseModal(row) {
 async function saveCourse() {
   const f = courseForm.value
   if (!f.name) return showToast('请填写课程名称')
-  const payload = {
-    name: f.name, duration_hours: f.duration_hours || 1, price: f.price || 0,
-    coach_id: f.coach_id || null, status: f.status
+  if (savingCoaching.value) return
+  savingCoaching.value = true
+  try {
+    const payload = {
+      name: f.name, duration_hours: f.duration_hours || 1, price: f.price || 0,
+      coach_id: f.coach_id || null, status: f.status
+    }
+    if (f.id) {
+      await supabase.from('courses').update(payload).eq('id', f.id)
+      showToast('课程已更新')
+    } else {
+      await supabase.from('courses').insert([payload])
+      showToast('课程已添加')
+    }
+    courseModalOpen.value = false
+    await loadCourses()
+  } finally {
+    savingCoaching.value = false
   }
-  if (f.id) {
-    await supabase.from('courses').update(payload).eq('id', f.id)
-    showToast('课程已更新')
-  } else {
-    await supabase.from('courses').insert([payload])
-    showToast('课程已添加')
-  }
-  courseModalOpen.value = false
-  await loadCourses()
 }
 
 // ===== Session CRUD =====
@@ -782,18 +802,24 @@ async function saveSession() {
   if (!f.student_id || !f.coach_id || !f.course_id || !f.session_date) {
     return showToast('请填写完整信息')
   }
-  await supabase.from('coaching_sessions').insert([{
-    student_id: f.student_id,
-    coach_id: f.coach_id,
-    course_id: f.course_id,
-    session_date: f.session_date,
-    duration_hours: f.duration_hours || 1,
-    status: f.status || 'completed',
-    note: f.note || null
-  }])
-  sessionModalOpen.value = false
-  showToast('上课记录已添加')
-  await loadSessions()
+  if (savingCoaching.value) return
+  savingCoaching.value = true
+  try {
+    await supabase.from('coaching_sessions').insert([{
+      student_id: f.student_id,
+      coach_id: f.coach_id,
+      course_id: f.course_id,
+      session_date: f.session_date,
+      duration_hours: f.duration_hours || 1,
+      status: f.status || 'completed',
+      note: f.note || null
+    }])
+    sessionModalOpen.value = false
+    showToast('上课记录已添加')
+    await loadSessions()
+  } finally {
+    savingCoaching.value = false
+  }
 }
 
 // ===== Payment CRUD =====
@@ -809,16 +835,22 @@ async function savePayment() {
   const f = paymentForm.value
   if (!f.student_id) return showToast('请选择学员')
   if (!f.amount || f.amount <= 0) return showToast('请填写金额')
-  await supabase.from('coaching_payments').insert([{
-    student_id: f.student_id,
-    session_id: f.session_id || null,
-    amount: f.amount,
-    payment_method: f.payment_method || null,
-    status: f.status || 'paid'
-  }])
-  paymentModalOpen.value = false
-  showToast('收款记录已添加')
-  await loadPayments()
+  if (savingCoaching.value) return
+  savingCoaching.value = true
+  try {
+    await supabase.from('coaching_payments').insert([{
+      student_id: f.student_id,
+      session_id: f.session_id || null,
+      amount: f.amount,
+      payment_method: f.payment_method || null,
+      status: f.status || 'paid'
+    }])
+    paymentModalOpen.value = false
+    showToast('收款记录已添加')
+    await loadPayments()
+  } finally {
+    savingCoaching.value = false
+  }
 }
 
 // ===== Init =====

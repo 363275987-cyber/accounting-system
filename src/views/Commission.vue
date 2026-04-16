@@ -258,8 +258,8 @@
             <button @click="showRuleModal = false" class="px-4 py-2 text-gray-500 rounded-lg text-sm hover:bg-gray-50 cursor-pointer">
               取消
             </button>
-            <button @click="saveRule" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 cursor-pointer">
-              保存
+            <button @click="saveRule" :disabled="savingRule" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer">
+              {{ savingRule ? '保存中...' : '保存' }}
             </button>
           </div>
         </div>
@@ -319,6 +319,7 @@ function sourceLabel(type) {
 const rulesLoading = ref(true)
 const rules = ref([])
 const showRuleModal = ref(false)
+const savingRule = ref(false)
 const editingRule = reactive({
   id: null,
   role: '',
@@ -410,6 +411,8 @@ async function saveRule() {
     status: editingRule.active ? 'active' : 'inactive',
   }
 
+  if (savingRule.value) return
+  savingRule.value = true
   try {
     if (editingRule.id) {
       const { error } = await supabase
@@ -430,6 +433,8 @@ async function saveRule() {
   } catch (e) {
     console.error('Failed to save rule:', e)
     toast('保存失败：' + (e.message || '未知错误'), 'error')
+  } finally {
+    savingRule.value = false
   }
 }
 

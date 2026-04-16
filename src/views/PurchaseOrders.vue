@@ -277,7 +277,7 @@
         </div>
         <div class="flex justify-end gap-2 mt-5">
           <button @click="showSupplierModal = false" class="px-4 py-2 text-sm text-gray-500 hover:bg-gray-50 rounded-lg cursor-pointer">取消</button>
-          <button @click="addSupplier" class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 cursor-pointer">保存</button>
+          <button @click="addSupplier" :disabled="addingSupplier" class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer">{{ addingSupplier ? '保存中...' : '保存' }}</button>
         </div>
       </div>
     </div>
@@ -370,6 +370,7 @@ const suppliers = ref([])
 const forecasts = ref([])
 const showCreateModal = ref(false)
 const showSupplierModal = ref(false)
+const addingSupplier = ref(false)
 const showDetailModal = ref(false)
 const detailData = ref(null)
 
@@ -521,19 +522,25 @@ function openCreateModal() {
 
 async function addSupplier() {
   if (!newSupplier.name.trim()) return
-  const { data, error } = await supabase.from('suppliers').insert({
-    name: newSupplier.name.trim(),
-    contact_person: newSupplier.contact_person.trim() || null,
-    phone: newSupplier.phone.trim() || null,
-    wechat: newSupplier.wechat.trim() || null,
-  }).select().single()
-  if (error) return toast('添加供应商失败', 'error')
-  suppliers.value.push(data)
-  form.supplier_id = data.id
-  form.supplier_name = data.name
-  Object.assign(newSupplier, { name: '', contact_person: '', phone: '', wechat: '' })
-  showSupplierModal.value = false
-  toast('供应商已添加', 'success')
+  if (addingSupplier.value) return
+  addingSupplier.value = true
+  try {
+    const { data, error } = await supabase.from('suppliers').insert({
+      name: newSupplier.name.trim(),
+      contact_person: newSupplier.contact_person.trim() || null,
+      phone: newSupplier.phone.trim() || null,
+      wechat: newSupplier.wechat.trim() || null,
+    }).select().single()
+    if (error) return toast('添加供应商失败', 'error')
+    suppliers.value.push(data)
+    form.supplier_id = data.id
+    form.supplier_name = data.name
+    Object.assign(newSupplier, { name: '', contact_person: '', phone: '', wechat: '' })
+    showSupplierModal.value = false
+    toast('供应商已添加', 'success')
+  } finally {
+    addingSupplier.value = false
+  }
 }
 
 async function handleSubmit() {

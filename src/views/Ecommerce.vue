@@ -294,23 +294,12 @@
               <option value="other">其他</option>
             </select>
           </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">负责人代号
-              <span class="text-xs text-gray-400 font-normal">（单字即可，如"南""辉"）</span>
-            </label>
-            <input
-              v-model="storeForm.owner_code"
-              type="text"
-              maxlength="8"
-              class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
-              placeholder="默认 —"
-            />
-          </div>
+          <!-- 负责人代号由后台默认写 '—'，不在此表单暴露 -->
           <!-- 结算周期、提现账户等字段待 DB 加列后启用 -->
         </div>
         <div class="shrink-0 px-6 py-4 border-t border-gray-100 flex justify-end gap-2">
           <button @click="closeStoreModal" class="px-4 py-2 text-gray-600 text-sm rounded-lg hover:bg-gray-100 cursor-pointer">取消</button>
-          <button @click="saveStore" :disabled="!storeForm.name" class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer">{{ showEditStoreModal ? '保存' : '创建' }}</button>
+          <button @click="saveStore" :disabled="!storeForm.name || savingStore" class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer">{{ savingStore ? '保存中...' : (showEditStoreModal ? '保存' : '创建') }}</button>
         </div>
       </div>
     </div>
@@ -411,6 +400,7 @@ const storeDetail = ref({ storeId: '', storeName: '', balance: 0, tab: 'all', lo
 const showAddStore = ref(false)
 const showEditStoreModal = ref(false)
 const editingStoreId = ref(null)
+const savingStore = ref(false)
 const storeForm = ref({ name: '', ecommerce_platform: 'douyin', settlement_days: 15, withdrawal_account_id: '' })
 
 // 计算属性
@@ -711,7 +701,6 @@ function openEditStore(store) {
   storeForm.value = {
     name: store.short_name,
     ecommerce_platform: store.ecommerce_platform,
-    owner_code: store.owner_code || '',
   }
   showEditStoreModal.value = true
 }
@@ -720,7 +709,7 @@ function closeStoreModal() {
   showAddStore.value = false
   showEditStoreModal.value = false
   editingStoreId.value = null
-  storeForm.value = { name: '', ecommerce_platform: 'douyin', owner_code: '' }
+  storeForm.value = { name: '', ecommerce_platform: 'douyin' }
 }
 
 // ecommerce_platform（UI 9 选）→ platform（DB CHECK 7 选）映射
@@ -739,9 +728,12 @@ function mapPlatform(ecom) {
 async function saveStore() {
   const f = storeForm.value
   if (!f.name) return
+  if (savingStore.value) return // 防止双击重复提交
+  savingStore.value = true
 
   const platform = mapPlatform(f.ecommerce_platform)
-  const ownerCode = (f.owner_code || '').trim() || '—'
+  // 电商店铺默认 owner_code = '—'，用户表单不暴露此字段
+  const ownerCode = '—'
 
   try {
     if (showEditStore.value) {
@@ -752,13 +744,25 @@ async function saveStore() {
           short_name: f.name,
           ecommerce_platform: f.ecommerce_platform,
           platform,
-          owner_code: ownerCode,
         })
         .eq('id', editingStoreId.value)
       if (error) throw error
       toast('店铺已更新', 'success')
     } else {
-      // 新建
+      // 新建：先查是否已有同名活跃店铺，避免双击/并发重复
+      const { data: dup, error: dupErr } = await supabase
+        .from('accounts')
+        .select('id')
+        .eq('short_name', f.name)
+        .eq('category', 'ecommerce')
+        .eq('status', 'active')
+        .maybeSingle()
+      if (dupErr) throw dupErr
+      if (dup) {
+        toast(`已存在同名店铺「${f.name}」，请勿重复创建`, 'warning')
+        return
+      }
+
       const { error } = await supabase.from('accounts').insert({
         short_name: f.name,
         code: f.name,
@@ -777,6 +781,8 @@ async function saveStore() {
     await loadData()
   } catch (e) {
     toast('保存失败：' + (e.message || ''), 'error')
+  } finally {
+    savingStore.value = false
   }
 }
 

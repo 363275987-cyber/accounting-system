@@ -157,7 +157,7 @@
         </div>
         <div class="flex justify-end gap-2 mt-5">
           <button @click="showModal = false" class="px-4 py-2 text-sm text-gray-500 hover:bg-gray-50 rounded-lg cursor-pointer transition">取消</button>
-          <button @click="saveCustomer" :disabled="!form.phone.trim()" class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition">保存</button>
+          <button @click="saveCustomer" :disabled="!form.phone.trim() || saving" class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition">{{ saving ? '保存中...' : '保存' }}</button>
         </div>
       </div>
     </div>
@@ -356,6 +356,7 @@ const detail = ref(null)
 const detailId = ref(null)
 const showTagInput = ref(false)
 const syncing = ref(false)
+const saving = ref(false)
 const newTag = ref('')
 const newDetailTag = ref('')
 const form = reactive({ phone: '', name: '', address: '', tags: [], note: '' })
@@ -541,23 +542,29 @@ async function saveCustomer() {
     toast('请输入正确的11位手机号', 'error')
     return
   }
-  const payload = {
-    phone: form.phone.trim(),
-    name: form.name.trim() || null,
-    address: form.address.trim() || null,
-    tags: form.tags,
-    note: form.note.trim() || null,
+  if (saving.value) return
+  saving.value = true
+  try {
+    const payload = {
+      phone: form.phone.trim(),
+      name: form.name.trim() || null,
+      address: form.address.trim() || null,
+      tags: form.tags,
+      note: form.note.trim() || null,
+    }
+    if (editingCustomer.value) {
+      const { error } = await supabase.from('customers').update(payload).eq('id', editingCustomer.value.id)
+      if (error) return alert('保存失败：' + error.message)
+    } else {
+      const { error } = await supabase.from('customers').insert(payload)
+      if (error) return alert('添加失败：' + error.message)
+    }
+    showModal.value = false
+    await loadData()
+    await loadSummary()
+  } finally {
+    saving.value = false
   }
-  if (editingCustomer.value) {
-    const { error } = await supabase.from('customers').update(payload).eq('id', editingCustomer.value.id)
-    if (error) return alert('保存失败：' + error.message)
-  } else {
-    const { error } = await supabase.from('customers').insert(payload)
-    if (error) return alert('添加失败：' + error.message)
-  }
-  showModal.value = false
-  await loadData()
-  await loadSummary()
 }
 
 async function openDetail(id) {

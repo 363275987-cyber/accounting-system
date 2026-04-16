@@ -172,9 +172,9 @@
         </div>
         <div class="px-6 py-4 border-t border-gray-100 flex justify-end gap-2">
           <button @click="closeFormModal" class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-lg transition cursor-pointer">取消</button>
-          <button @click="saveAsset" :disabled="!form.name"
+          <button @click="saveAsset" :disabled="!form.name || savingAsset"
             class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer">
-            {{ editingAsset ? '保存' : '添加' }}
+            {{ savingAsset ? '保存中...' : (editingAsset ? '保存' : '添加') }}
           </button>
         </div>
       </div>
@@ -208,9 +208,9 @@
         </div>
         <div class="px-6 py-4 border-t border-gray-100 flex justify-end gap-2">
           <button @click="showBindModal = false" class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-lg transition cursor-pointer">取消</button>
-          <button @click="createBindGroup" :disabled="!bindForm.name || bindForm.assetIds.length < 2"
+          <button @click="createBindGroup" :disabled="!bindForm.name || bindForm.assetIds.length < 2 || creatingBindGroup"
             class="px-4 py-2 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer">
-            创建绑定
+            {{ creatingBindGroup ? '创建中...' : '创建绑定' }}
           </button>
         </div>
       </div>
@@ -247,6 +247,8 @@ const form = ref({
 // Bind group modal
 const showBindModal = ref(false)
 const bindForm = ref({ name: '', assetIds: [] })
+const savingAsset = ref(false)
+const creatingBindGroup = ref(false)
 
 const allAssets = computed(() => assets.value)
 const filteredAssets = computed(() => {
@@ -365,25 +367,31 @@ async function fetchAssets() {
 
 async function saveAsset() {
   if (!form.value.name) return
-  const payload = {
-    asset_type: form.value.asset_type,
-    name: form.value.name,
-    serial_number: form.value.serial_number || null,
-    monthly_cost: form.value.monthly_cost || 0,
-    status: form.value.status,
-    assigned_to: form.value.assigned_to || null,
-    purchase_date: form.value.purchase_date || null,
-    note: form.value.note || null,
-  }
+  if (savingAsset.value) return
+  savingAsset.value = true
+  try {
+    const payload = {
+      asset_type: form.value.asset_type,
+      name: form.value.name,
+      serial_number: form.value.serial_number || null,
+      monthly_cost: form.value.monthly_cost || 0,
+      status: form.value.status,
+      assigned_to: form.value.assigned_to || null,
+      purchase_date: form.value.purchase_date || null,
+      note: form.value.note || null,
+    }
 
-  if (editingAsset.value) {
-    const { error } = await supabase.from('assets').update(payload).eq('id', editingAsset.value.id)
-    if (!error) closeFormModal()
-  } else {
-    const { error } = await supabase.from('assets').insert(payload)
-    if (!error) closeFormModal()
+    if (editingAsset.value) {
+      const { error } = await supabase.from('assets').update(payload).eq('id', editingAsset.value.id)
+      if (!error) closeFormModal()
+    } else {
+      const { error } = await supabase.from('assets').insert(payload)
+      if (!error) closeFormModal()
+    }
+    await fetchAssets()
+  } finally {
+    savingAsset.value = false
   }
-  await fetchAssets()
 }
 
 async function deleteAsset(asset) {
@@ -399,12 +407,18 @@ function openBindGroupModal() {
 
 async function createBindGroup() {
   if (!bindForm.value.name || bindForm.value.assetIds.length < 2) return
-  // Clear existing bind_group for selected assets
-  await supabase.from('assets').update({ bind_group: null }).in('id', bindForm.value.assetIds)
-  // Set new bind_group
-  await supabase.from('assets').update({ bind_group: bindForm.value.name }).in('id', bindForm.value.assetIds)
-  showBindModal.value = false
-  await fetchAssets()
+  if (creatingBindGroup.value) return
+  creatingBindGroup.value = true
+  try {
+    // Clear existing bind_group for selected assets
+    await supabase.from('assets').update({ bind_group: null }).in('id', bindForm.value.assetIds)
+    // Set new bind_group
+    await supabase.from('assets').update({ bind_group: bindForm.value.name }).in('id', bindForm.value.assetIds)
+    showBindModal.value = false
+    await fetchAssets()
+  } finally {
+    creatingBindGroup.value = false
+  }
 }
 
 async function dissolveGroup(groupName) {

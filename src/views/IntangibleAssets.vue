@@ -205,9 +205,9 @@
         </div>
         <div class="px-6 py-4 border-t border-gray-100 flex justify-end gap-2">
           <button @click="closeFormModal" class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-lg transition cursor-pointer">取消</button>
-          <button @click="saveItem" :disabled="!form.name"
+          <button @click="saveItem" :disabled="!form.name || saving"
             class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer">
-            {{ editingItem ? '保存' : '添加' }}
+            {{ saving ? '保存中...' : (editingItem ? '保存' : '添加') }}
           </button>
         </div>
       </div>
@@ -231,6 +231,7 @@ const isMobile = ref(window.innerWidth < 768)
 
 const showFormModal = ref(false)
 const editingItem = ref(null)
+const saving = ref(false)
 const form = ref({
   name: '', asset_type: '商标', registration_number: '',
   registration_date: '', expiry_date: '', purchase_cost: 0,
@@ -357,6 +358,9 @@ async function fetchItems() {
 
 async function saveItem() {
   if (!form.value.name) return
+  if (saving.value) return
+  saving.value = true
+  try {
   const monthlyAmort = (form.value.purchase_cost > 0 && form.value.useful_life_months > 0)
     ? Number((form.value.purchase_cost / form.value.useful_life_months).toFixed(2))
     : 0
@@ -395,6 +399,9 @@ async function saveItem() {
     if (!error) closeFormModal()
   }
   await fetchItems()
+  } finally {
+    saving.value = false
+  }
 }
 
 async function deleteItem(item) {

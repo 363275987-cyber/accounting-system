@@ -105,7 +105,7 @@
         <div class="flex justify-end gap-2 mt-6">
           <button @click="showCreateModal = false; showEditModal = false; editingGroup = null"
             class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg cursor-pointer">取消</button>
-          <button @click="saveGroup" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 cursor-pointer">
+          <button @click="saveGroup" :disabled="savingGroup" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer">
             {{ showEditModal ? '保存' : '创建' }}
           </button>
         </div>
@@ -171,9 +171,9 @@
                 <div class="text-xs text-gray-500">{{ roleLabel(u.role) }}</div>
               </div>
             </div>
-            <button v-if="!isInGroup(u.id)" @click="addMember(u.id)"
-              class="text-xs px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer">
-              添加
+            <button v-if="!isInGroup(u.id)" @click="addMember(u.id)" :disabled="addingMemberIds.has(u.id)"
+              class="text-xs px-3 py-1 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer">
+              {{ addingMemberIds.has(u.id) ? '添加中...' : '添加' }}
             </button>
             <span v-else class="text-xs text-gray-500">已加入</span>
           </div>
@@ -293,7 +293,7 @@
         </div>
         <div class="flex justify-end gap-2 mt-6">
           <button @click="showTargetModal = false" class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg cursor-pointer">取消</button>
-          <button @click="saveTarget" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 cursor-pointer">保存目标</button>
+          <button @click="saveTarget" :disabled="savingTarget" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer">{{ savingTarget ? '保存中...' : '保存目标' }}</button>
         </div>
       </div>
     </div>
@@ -343,6 +343,9 @@ const perfLoading = ref(false)
 const perfMonth = ref('')
 const availableUsers = ref([])
 const currentGroupId = ref(null)
+const savingGroup = ref(false)
+const savingTarget = ref(false)
+const addingMemberIds = ref(new Set())
 
 const roleLabels = {
   sales: '销售', cs: '客服', finance: '财务', manager: '经理', admin: '管理员', hr: '人事', coach: '教练',
@@ -373,6 +376,8 @@ async function saveGroup() {
     toast('请输入分组名称', 'warning')
     return
   }
+  if (savingGroup.value) return
+  savingGroup.value = true
   try {
     if (showEditModal.value && editingGroup.value) {
       await store.updateGroup(editingGroup.value.id, { name: groupForm.name.trim() })
@@ -387,6 +392,8 @@ async function saveGroup() {
     groupForm.name = ''
   } catch (e) {
     toast('操作失败: ' + (e.message || '未知错误'), 'error')
+  } finally {
+    savingGroup.value = false
   }
 }
 
@@ -450,11 +457,16 @@ async function openAddMember(groupId) {
 }
 
 async function addMember(userId) {
+  // 防止同一用户被双击重复添加
+  if (addingMemberIds.value.has(userId)) return
+  addingMemberIds.value.add(userId)
   try {
     await store.addMember(currentGroupId.value, userId)
     toast('已添加组员', 'success')
   } catch (e) {
     toast('添加失败: ' + (e.message || '未知错误'), 'error')
+  } finally {
+    addingMemberIds.value.delete(userId)
   }
 }
 
@@ -534,6 +546,8 @@ async function saveTarget() {
     toast('请输入目标金额', 'warning')
     return
   }
+  if (savingTarget.value) return
+  savingTarget.value = true
   try {
     // Upsert target
     const { error } = await supabase
@@ -552,6 +566,8 @@ async function saveTarget() {
     showTargetModal.value = false
   } catch (e) {
     toast('保存失败: ' + (e.message || '未知错误'), 'error')
+  } finally {
+    savingTarget.value = false
   }
 }
 
