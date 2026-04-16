@@ -45,6 +45,7 @@ const routes = [
       { path: 'platform-integration', name: 'PlatformIntegration', component: () => import('../views/PlatformIntegration.vue') },
       { path: 'platform-orders', name: 'PlatformOrders', component: () => import('../views/PlatformOrders.vue') },
       { path: 'settings', name: 'Settings', component: () => import('../views/Settings.vue'), meta: { adminOnly: true } },
+      { path: 'data-initialization', name: 'DataInitialization', component: () => import('../views/DataInitialization.vue'), meta: { title: '数据初始化', roles: ['admin', 'finance', 'manager'] } },
       { path: 'accounts/:id', name: 'AccountDetail', component: () => import('../views/AccountDetail.vue') },
       { path: 'warehouses', name: 'Warehouses', component: () => import('../views/Warehouses.vue'), meta: { title: '仓库管理' } },
       { path: 'inventory', name: 'Inventory', component: () => import('../views/Inventory.vue'), meta: { title: '库存管理' } },

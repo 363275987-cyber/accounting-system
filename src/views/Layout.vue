@@ -180,6 +180,7 @@ const ROUTE_TITLES = {
   '/users': '用户管理',
   '/sales-groups': '销售分组',
   '/settings': '系统设置',
+  '/data-initialization': '数据初始化',
   '/assets': '手机管理',
   '/shareholder-loans': '股东垫资',
   '/logs': '操作日志',
@@ -357,6 +358,7 @@ const menuGroups = computed(() => {
         { label: '用户管理', path: '/users' },
         { label: '操作日志', path: '/logs' },
         { label: '系统设置', path: '/settings' },
+        { label: '⚠️ 数据初始化', path: '/data-initialization' },
       ],
     })
   }

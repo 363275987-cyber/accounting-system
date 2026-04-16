@@ -163,6 +163,12 @@
             <td class="px-3 py-2.5 text-right whitespace-nowrap" @click.stop>
               <button @click="openModal(acc)" class="text-blue-500 hover:text-blue-700 text-xs cursor-pointer" title="详情">详情</button>
               <button @click="viewTransactions(acc)" class="text-gray-500 hover:text-purple-500 cursor-pointer text-xs ml-1" title="交易明细">📊</button>
+              <button
+                v-if="authStore.isFinance"
+                @click="openOpeningBalanceModal(acc)"
+                class="text-gray-400 hover:text-blue-600 cursor-pointer text-xs ml-1"
+                title="重设期初余额（新财年/数据清空后校准）"
+              >📌 期初</button>
               <button @click="toggleFreeze(acc)" class="text-gray-500 hover:text-orange-500 cursor-pointer text-xs ml-1">{{ acc.status === 'active' ? '🔒' : '🔓' }}</button>
               <button v-if="canDelete" @click="handleDelete(acc)" class="text-gray-500 hover:text-red-500 cursor-pointer text-xs ml-1">🗑️</button>
             </td>
@@ -400,6 +406,14 @@
       :currentBalance="txnAccountBalance"
       @close="showTxn = false"
     />
+
+    <!-- 期初余额弹窗 -->
+    <OpeningBalanceModal
+      :visible="showOpeningModal"
+      :account="openingAccount"
+      @close="showOpeningModal = false"
+      @saved="onOpeningSaved"
+    />
   </div>
 
   <!-- 排序弹窗 -->
@@ -446,6 +460,7 @@ import { supabase } from '../lib/supabase'
 import { formatMoney, PLATFORM_LABELS, toast, formatDate } from '../lib/utils'
 import Skeleton from '../components/Skeleton.vue'
 import AccountTransactions from '../components/AccountTransactions.vue'
+import OpeningBalanceModal from '../components/OpeningBalanceModal.vue'
 import { usePermission } from '../composables/usePermission'
 
 const { canDelete, isAdmin, loadRole } = usePermission()
@@ -464,6 +479,21 @@ const showTxn = ref(false)
 const txnAccountId = ref('')
 const txnAccountName = ref('')
 const txnAccountBalance = ref(0)
+
+// 期初余额弹窗
+const showOpeningModal = ref(false)
+const openingAccount = ref(null)
+
+function openOpeningBalanceModal(acc) {
+  if (!authStore.isFinance) return
+  openingAccount.value = acc
+  showOpeningModal.value = true
+}
+
+function onOpeningSaved() {
+  // 组件内部已 fetchAccounts + toast，这里留作扩展位
+}
+
 const isEditing = ref(false)
 const editingId = ref(null)
 const flippedCards = reactive({})
