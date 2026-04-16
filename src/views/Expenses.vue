@@ -167,6 +167,7 @@
                   <option value="expense">💸 支出</option>
                   <option value="income">💰 收入</option>
                   <option value="transfer">🔄 转账</option>
+                  <option value="withdrawal">💱 店铺提现</option>
                   <option value="fixed_asset">🏗️ 固定资产</option>
                   <option value="prepaid">📦 预付账款</option>
                   <option value="deferred_revenue">🎓 预收课程费</option>
@@ -206,14 +207,14 @@
             <!-- 通用字段：账户 + 金额 + 日期 -->
             <div class="grid grid-cols-3 gap-2 text-sm mb-2">
               <div>
-                <span class="text-gray-500 text-[10px]">{{ exp._type === 'transfer' ? '转出账户' : exp._type === 'income' || exp._type === 'deferred_revenue' || exp._type === 'other_payable' ? '收款账户' : '付款账户' }}</span>
+                <span class="text-gray-500 text-[10px]">{{ exp._type === 'withdrawal' ? '提现店铺' : exp._type === 'transfer' ? '转出账户' : exp._type === 'income' || exp._type === 'deferred_revenue' || exp._type === 'other_payable' ? '收款账户' : '付款账户' }}</span>
                 <SearchableSelect
                   :model-value="exp.account_id"
                   @update:modelValue="(v) => handleAccountChange(exp, v)"
-                  :options="activeAccounts"
+                  :options="exp._type === 'withdrawal' ? ecommerceAccounts : activeAccounts"
                   label-key="code"
                   value-key="id"
-                  placeholder="选择账户"
+                  :placeholder="exp._type === 'withdrawal' ? '选择店铺' : '选择账户'"
                   search-placeholder="搜索..."
                   drop-up
                 />
@@ -294,6 +295,42 @@
               <div>
                 <span class="text-gray-500 text-[10px]">备注</span>
                 <input v-model="exp.note" class="border border-gray-200 rounded px-2 py-1 text-sm w-full bg-white" />
+              </div>
+            </div>
+
+            <!-- 店铺提现 -->
+            <div v-else-if="exp._type === 'withdrawal'" class="space-y-2">
+              <div class="grid grid-cols-3 gap-2 text-sm">
+                <div>
+                  <span class="text-gray-500 text-[10px]">到账账户</span>
+                  <SearchableSelect
+                    v-model="exp.target_account_id"
+                    :options="nonEcommerceAccounts"
+                    label-key="code"
+                    value-key="id"
+                    placeholder="选择到账账户"
+                    search-placeholder="搜索..."
+                    drop-up
+                  />
+                </div>
+                <div>
+                  <span class="text-gray-500 text-[10px]">手续费</span>
+                  <input v-model.number="exp.fee_amount" type="number" min="0" step="0.01" placeholder="0" class="border border-gray-200 rounded px-2 py-1 text-sm w-full bg-white" />
+                </div>
+                <div>
+                  <span class="text-gray-500 text-[10px]">手续费备注</span>
+                  <input v-model="exp.fee_remark" placeholder="如 平台手续费" class="border border-gray-200 rounded px-2 py-1 text-sm w-full bg-white" />
+                </div>
+              </div>
+              <div class="grid grid-cols-1 gap-2 text-sm">
+                <div>
+                  <span class="text-gray-500 text-[10px]">提现备注</span>
+                  <input v-model="exp.note" placeholder="如 8月提现" class="border border-gray-200 rounded px-2 py-1 text-sm w-full bg-white" />
+                </div>
+              </div>
+              <div class="text-[10px] text-teal-700 bg-teal-50 border border-teal-200 rounded px-2 py-1.5">
+                店铺将扣除 ¥{{ ((Number(exp.amount) || 0) + (Number(exp.fee_amount) || 0)).toFixed(2) }}
+                = 到账 ¥{{ (Number(exp.amount) || 0).toFixed(2) }} + 手续费 ¥{{ (Number(exp.fee_amount) || 0).toFixed(2) }}
               </div>
             </div>
 
@@ -1062,6 +1099,7 @@ import SearchableSelect from '../components/SearchableSelect.vue'
 import { useAuthStore } from '../stores/auth'
 import Skeleton from '../components/Skeleton.vue'
 import { supabase } from '../lib/supabase'
+import { performStoreWithdrawal } from '../lib/storeWithdrawal'
 import { formatMoney, EXPENSE_CATEGORIES, EXPENSE_STATUS, toast, formatDate, debounce } from '../lib/utils'
 import { usePermission } from '../composables/usePermission'
 import { randomPick, randomAmount, todayDate, PAYEES } from '../lib/testDataHelper'
@@ -1137,6 +1175,7 @@ function txnCardClass(type) {
     expense: 'border-purple-100 bg-purple-50/30',
     income: 'border-green-200 bg-green-50/30',
     transfer: 'border-blue-200 bg-blue-50/30',
+    withdrawal: 'border-teal-200 bg-teal-50/30',
     fixed_asset: 'border-orange-200 bg-orange-50/30',
     prepaid: 'border-yellow-200 bg-yellow-50/30',
     deferred_revenue: 'border-emerald-200 bg-emerald-50/30',
@@ -1176,7 +1215,16 @@ function onTypeChange(exp) {
     exp._typeChanged = false
   }
 
-  if (exp._type === 'fixed_asset') {
+  if (exp._type === 'withdrawal') {
+    // 若当前 account_id 不是电商店铺，清空让用户重新选
+    const curAcc = accountStore.accounts.find(a => a.id === exp.account_id)
+    if (!curAcc || curAcc.category !== 'ecommerce') {
+      exp.account_id = ''
+    }
+    exp.fee_amount = exp.fee_amount != null ? exp.fee_amount : 0
+    exp.fee_remark = exp.fee_remark || ''
+    if (!exp.target_account_id) exp.target_account_id = ''
+  } else if (exp._type === 'fixed_asset') {
     exp.asset_name = exp.asset_name || exp.note || ''
     exp.asset_category = exp.asset_category || 'equipment'
     exp.useful_life_years = exp.useful_life_years || 5
@@ -1338,7 +1386,7 @@ const newKwText = ref('')
 const kwManagerError = ref('')
 
 const TYPE_LABELS = {
-  expense: '💸 支出', income: '💰 收入', transfer: '🔄 转账',
+  expense: '💸 支出', income: '💰 收入', transfer: '🔄 转账', withdrawal: '💱 店铺提现',
   fixed_asset: '🏗️ 固定资产', prepaid: '📦 预付账款', deferred_revenue: '🎓 预收账款',
   other_receivable: '💰 押金/借出', other_payable: '📥 收到押金', payable: '📋 应付账款',
   salary: '👥 工资', dividend: '💎 分红',
@@ -1658,8 +1706,12 @@ function parseExpenseText(text) {
         type = 'income'
       }
 
-      // ── 第二优先级：提现类（本质是转账：平台/微信/支付宝 → 银行卡） ──
-      else if (/微信提现|支付宝提现|店铺提现|抖店提现|有赞提现|平台提现|提现到|提现/.test(line)) {
+      // ── 第二优先级：提现类（店铺/平台 → 银行卡，走专用 withdrawal 卡片） ──
+      else if (/店铺提现|抖店提现|有赞提现|平台提现|淘宝提现|拼多多提现/.test(line)) {
+        type = 'withdrawal'
+      }
+      // 通用提现（微信/支付宝/"提现"）仍按转账处理，保持旧行为
+      else if (/微信提现|支付宝提现|提现到|提现/.test(line)) {
         type = 'transfer'
       }
 
@@ -1781,6 +1833,19 @@ function parseExpenseText(text) {
     }
 
     if (type === 'transfer') result.target_account_id = targetAccountId || ''
+    if (type === 'withdrawal') {
+      result.target_account_id = ''
+      result.fee_amount = 0
+      result.fee_remark = ''
+      // 提现 account_id 必须是电商店铺；解析器若匹配到非电商账户，清掉让用户手选
+      if (matchedAccountId) {
+        const acc = accountStore.accounts.find(a => a.id === matchedAccountId)
+        if (!acc || acc.category !== 'ecommerce') {
+          result.account_id = ''
+          result.account_label = '请选择店铺'
+        }
+      }
+    }
     if (type === 'fixed_asset') {
       result.asset_name = note
       result.asset_category = 'equipment'
@@ -1888,6 +1953,28 @@ async function submitOneTransaction(exp) {
       })
       if (trErr) throw new Error('转账写入失败: ' + trErr.message)
       console.log('[智能记账] account_transfers 写入完成')
+      break
+    }
+    case 'withdrawal': {
+      console.log('[智能记账] 执行店铺提现...')
+      if (!accountId) throw new Error('请选择提现店铺')
+      if (!exp.target_account_id) throw new Error('请选择到账账户')
+      const storeAcc = accountStore.accounts.find(a => a.id === accountId)
+      const toAcc = accountStore.accounts.find(a => a.id === exp.target_account_id)
+      if (!storeAcc || storeAcc.category !== 'ecommerce') {
+        throw new Error('所选店铺不是电商账户')
+      }
+      await performStoreWithdrawal({
+        storeId: accountId,
+        storeName: storeAcc.short_name || storeAcc.code || '',
+        toAccountId: exp.target_account_id,
+        toAccountName: toAcc ? (toAcc.short_name || toAcc.code || '') : '',
+        amount,
+        feeAmount: Number(exp.fee_amount) || 0,
+        feeRemark: exp.fee_remark || '',
+        remark: note,
+      })
+      console.log('[智能记账] 店铺提现完成')
       break
     }
     case 'fixed_asset': {
@@ -2266,6 +2353,16 @@ const activeAccounts = computed(() => {
     code: `${a.short_name || a.code}（¥${Number(a.balance || 0).toFixed(2)}）`,
   })).sort((a, b) => (usageCount[b.id] || 0) - (usageCount[a.id] || 0))
 })
+
+// 电商店铺（仅 category='ecommerce'，店铺提现卡片的"提现店铺"候选）
+const ecommerceAccounts = computed(() =>
+  activeAccounts.value.filter(a => a.category === 'ecommerce')
+)
+
+// 非电商账户（店铺提现卡片的"到账账户"候选）
+const nonEcommerceAccounts = computed(() =>
+  activeAccounts.value.filter(a => a.category !== 'ecommerce')
+)
 
 // --- Load data ---
 async function loadPage(page = 1) {

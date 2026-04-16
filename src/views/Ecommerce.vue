@@ -364,8 +364,8 @@ import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabase'
 import { parseEcommerceExcel, importEcommerceOrders } from '../lib/ecommerceOrderImporter'
 import { useAuthStore } from '../stores/auth'
-import { logOperation } from '../utils/operationLogger'
 import { PLATFORM_FEE_RATES, PLATFORM_LABELS, calcWithdrawFees } from '../lib/platformFees'
+import { performStoreWithdrawal } from '../lib/storeWithdrawal'
 
 const auth = useAuthStore()
 const role = computed(() => auth.profile?.role || '')
@@ -579,111 +579,19 @@ async function doWithdraw() {
   if (!f.amount || f.amount <= 0 || !f.toAccountId) return
 
   const feeAmount = Number(f.feeAmount || 0)
-  const totalDeduct = f.amount + feeAmount // 店铺扣除总额 = 到账金额 + 手续费
+  const targetName = cashAccounts.value.find(a => a.id === f.toAccountId)?.short_name || ''
 
   try {
-    // 1. 店铺余额减少（最低为0，不变负）
-    const { data: storeAcc, error: e1 } = await supabase
-      .from('accounts')
-      .select('balance')
-      .eq('id', f.storeId)
-      .single()
-    if (e1) throw e1
-
-    const oldStoreBalance = Number(storeAcc.balance || 0)
-    const newStoreBalance = Math.max(0, oldStoreBalance - totalDeduct)
-    const { error: e2 } = await supabase
-      .from('accounts')
-      .update({ balance: newStoreBalance })
-      .eq('id', f.storeId)
-    if (e2) throw e2
-
-    // 2. 目标账户余额增加（真实收入 = 提现金额）
-    const { data: targetAcc, error: e3 } = await supabase
-      .from('accounts')
-      .select('balance')
-      .eq('id', f.toAccountId)
-      .single()
-    if (e3) throw e3
-
-    const oldTargetBalance = Number(targetAcc.balance || 0)
-    const newTargetBalance = oldTargetBalance + f.amount
-    const { error: e4 } = await supabase
-      .from('accounts')
-      .update({ balance: newTargetBalance })
-      .eq('id', f.toAccountId)
-    if (e4) throw e4
-
-    // 3. 手续费记为支出
-    if (feeAmount > 0) {
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
-        const userId = session?.user?.id
-        const feeNote = f.feeRemark || `${f.storeName} 提现手续费`
-        await supabase.from('expenses').insert({
-          amount: feeAmount,
-          category: '电商手续费',
-          payee: f.storeName,
-          note: feeNote,
-          status: 'paid',
-          account_id: f.storeId,
-          created_by: userId,
-          approver_id: userId,
-          approved_at: new Date().toISOString(),
-          paid_at: new Date().toISOString(),
-        })
-      } catch (feeErr) {
-        console.warn('手续费支出记录失败:', feeErr)
-      }
-    }
-
-    // 4. 写入 withdrawals 表（供财务报表读取）
-    const targetName = cashAccounts.value.find(a => a.id === f.toAccountId)?.short_name || ''
-    try {
-      await supabase.from('withdrawals').insert({
-        account_id: f.storeId,
-        to_account_id: f.toAccountId,
-        amount: totalDeduct,
-        actual_arrival: f.amount,
-        fee_detail: feeAmount > 0 ? [{ amount: feeAmount, label: f.feeRemark || '手续费' }] : [],
-        store_name: f.storeName,
-        remark: f.remark || '',
-        status: 'completed',
-      })
-    } catch (wErr) {
-      console.warn('withdrawals 记录写入失败:', wErr)
-    }
-
-    // 5. 记操作日志
-    const remarkText = f.remark ? `（${f.remark}）` : ''
-    const feeText = feeAmount > 0 ? `，手续费 ¥${feeAmount.toFixed(2)}` : ''
-
-    try {
-      // 店铺扣款日志
-      await logOperation({
-        action: 'ecommerce_withdrawal',
-        module: '电商提现',
-        description: `电商提现：${f.storeName} → ¥${f.amount.toFixed(2)} 到 ${targetName}${feeText}${remarkText}`,
-        amount: -totalDeduct,
-        accountId: f.storeId,
-        accountName: f.storeName,
-        balanceBefore: oldStoreBalance,
-        balanceAfter: newStoreBalance,
-        detail: { type: 'store_deduct', withdrawAmount: f.amount, feeAmount, feeRemark: f.feeRemark, toAccount: targetName, remark: f.remark },
-      })
-      // 目标账户入账日志
-      await logOperation({
-        action: 'ecommerce_withdrawal_income',
-        module: '电商提现',
-        description: `电商提现到账：${targetName} ← ${f.storeName} ¥${f.amount.toFixed(2)}${remarkText}`,
-        amount: f.amount,
-        accountId: f.toAccountId,
-        accountName: targetName,
-        balanceBefore: oldTargetBalance,
-        balanceAfter: newTargetBalance,
-        detail: { type: 'account_income', fromStore: f.storeName, fromStoreId: f.storeId, remark: f.remark },
-      })
-    } catch (_) { /* 日志失败不阻断 */ }
+    await performStoreWithdrawal({
+      storeId: f.storeId,
+      storeName: f.storeName,
+      toAccountId: f.toAccountId,
+      toAccountName: targetName,
+      amount: f.amount,
+      feeAmount,
+      feeRemark: f.feeRemark,
+      remark: f.remark,
+    })
 
     showWithdrawModal.value = false
     const feeMsg = feeAmount > 0 ? `（手续费 ¥${feeAmount.toFixed(2)} 已计入支出）` : ''
