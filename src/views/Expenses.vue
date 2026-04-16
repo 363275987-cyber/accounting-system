@@ -1216,6 +1216,9 @@ function onTypeChange(exp) {
   }
 
   if (exp._type === 'withdrawal') {
+    // 切到店铺提现时，强制拉一次最新账户，防止新建的店铺没出现在下拉里
+    accountStore._forceRefresh = true
+    accountStore.fetchAccounts()
     // 若当前 account_id 不是电商店铺，清空让用户重新选
     const curAcc = accountStore.accounts.find(a => a.id === exp.account_id)
     if (!curAcc || curAcc.category !== 'ecommerce') {
@@ -1263,6 +1266,41 @@ function extractLearnKeyword(rawText, note) {
 async function learnKeyword(exp) {
   const kw = (exp._learnKeyword || '').trim()
   if (!kw) { toast('请输入要记住的关键词', 'warning'); return }
+
+  // 店铺提现：关键词挂在选中店铺的 withdraw_keywords 字段上（按店铺区分），
+  // 不进全局 transaction_type_keywords 表
+  if (exp._type === 'withdrawal') {
+    if (!exp.account_id) { toast('请先选择提现店铺', 'warning'); return }
+    const store = accountStore.accounts.find(a => a.id === exp.account_id)
+    if (!store) { toast('店铺不存在', 'error'); return }
+    if (store.category !== 'ecommerce') { toast('所选账户不是电商店铺', 'warning'); return }
+
+    const existingKws = Array.isArray(store.withdraw_keywords) ? store.withdraw_keywords : []
+    if (existingKws.some(k => (k || '').toLowerCase() === kw.toLowerCase())) {
+      toast(`「${kw}」已在 ${store.short_name || store.code} 的提现关键词里`, 'warning')
+      exp._typeChanged = false
+      return
+    }
+    // 检查冲突：同一关键词挂在别的店铺上会导致解析歧义
+    const conflict = accountStore.accounts.find(a => {
+      if (a.id === store.id) return false
+      const kws = Array.isArray(a.withdraw_keywords) ? a.withdraw_keywords : []
+      return kws.some(k => (k || '').toLowerCase() === kw.toLowerCase())
+    })
+    if (conflict) {
+      if (!confirm(`⚠️ 关键词「${kw}」已挂在另一个店铺「${conflict.short_name || conflict.code}」上。\n继续可能导致解析匹配错店铺。\n\n是否仍要添加？`)) return
+    }
+    try {
+      await accountStore.updateAccount(store.id, { withdraw_keywords: [...existingKws, kw] })
+      exp._typeChanged = false
+      toast(`已记住：「${kw}」→ ${store.short_name || store.code}（店铺提现），下次自动识别`, 'success')
+    } catch (e) {
+      toast('保存失败: ' + (e.message || ''), 'error')
+    }
+    return
+  }
+
+  // 其余类型：走全局 transaction_type_keywords 表
   if (typeKeywords.value.some(t => t.keyword === kw)) {
     toast(`「${kw}」已存在`, 'warning')
     exp._typeChanged = false
@@ -1313,6 +1351,13 @@ function handleAccountChange(exp, newAccountId) {
     }
   } else {
     exp._accountChanged = false
+  }
+  // 店铺提现：切换店铺时，若该店铺有默认提现账户且当前未指定目标，自动预选
+  if (exp._type === 'withdrawal' && newAccountId && !exp.target_account_id) {
+    const acc = accountStore.accounts.find(a => a.id === newAccountId)
+    if (acc && acc.default_withdraw_account_id) {
+      exp.target_account_id = acc.default_withdraw_account_id
+    }
   }
 }
 
@@ -1606,10 +1651,12 @@ function parseExpenseText(text) {
   }
   const accountNames = Object.keys(accountNameMap).sort((a, b) => b.length - a.length)
 
-  // 2. 收入/支出/转账关键词索引（从 accounts 的 JSONB 字段读取）
+  // 2. 收入/支出/转账/提现关键词索引（从 accounts 的 JSONB 字段读取）
   const expenseKwMap = {}
   const incomeKwMap = {}
   const transferKwMap = {}
+  const withdrawKwMap = {}              // 关键词 → 电商店铺
+  const ecommerceNameMap = {}           // 电商店铺名 → 店铺（用于"搜到对应名称自动匹配"）
   for (const a of activeAccs) {
     const label = a.short_name || a.code
     for (const kw of (a.expense_keywords || [])) {
@@ -1621,10 +1668,21 @@ function parseExpenseText(text) {
     for (const rule of (a.transfer_rules || [])) {
       transferKwMap[rule.keyword] = { source_id: a.id, source_label: label, target_id: rule.target_account_id }
     }
+    if (a.category === 'ecommerce') {
+      for (const kw of (a.withdraw_keywords || [])) {
+        withdrawKwMap[kw] = { source_id: a.id, source_label: label, target_id: a.default_withdraw_account_id || '' }
+      }
+      // 店铺名本身（以及 short_name 的中文主体）也纳入识别
+      if (a.short_name && a.short_name.length >= 2) {
+        ecommerceNameMap[a.short_name] = { source_id: a.id, source_label: label, target_id: a.default_withdraw_account_id || '' }
+      }
+    }
   }
   const allExpKws = Object.keys(expenseKwMap).sort((a, b) => b.length - a.length)
   const allIncKws = Object.keys(incomeKwMap).sort((a, b) => b.length - a.length)
   const allTransKws = Object.keys(transferKwMap).sort((a, b) => b.length - a.length)
+  const allWithdrawKws = Object.keys(withdrawKwMap).sort((a, b) => b.length - a.length)
+  const allEcommerceNames = Object.keys(ecommerceNameMap).sort((a, b) => b.length - a.length)
 
   // ══ Step 0: 拆分条目 ══
   // 格式：描述部分 ￥X,XXX.XX（一行可能多条，用 ￥ 金额作为分隔锚点）
@@ -1654,16 +1712,42 @@ function parseExpenseText(text) {
     let matchedAccount = ''
     let targetAccountId = ''
 
-    // ── Step 1: 关键词匹配（优先级：转账 > 收入 > 支出） ──
+    // ── Step 1: 关键词匹配（优先级：店铺提现 > 店铺名 > 转账 > 收入 > 支出） ──
     let matchedKw = ''
-    for (const kw of allTransKws) {
+    // 店铺自定义的提现关键词优先（最精确）
+    for (const kw of allWithdrawKws) {
       if (line.includes(kw)) {
-        type = 'transfer'
-        matchedAccountId = transferKwMap[kw].source_id
-        matchedAccount = transferKwMap[kw].source_label
-        targetAccountId = transferKwMap[kw].target_id
+        type = 'withdrawal'
+        matchedAccountId = withdrawKwMap[kw].source_id
+        matchedAccount = withdrawKwMap[kw].source_label
+        targetAccountId = withdrawKwMap[kw].target_id
         matchedKw = kw
         break
+      }
+    }
+    // 命中店铺名 + "提现"字样 → withdrawal
+    if (!matchedKw && /提现/.test(line)) {
+      for (const name of allEcommerceNames) {
+        if (line.includes(name)) {
+          type = 'withdrawal'
+          matchedAccountId = ecommerceNameMap[name].source_id
+          matchedAccount = ecommerceNameMap[name].source_label
+          targetAccountId = ecommerceNameMap[name].target_id
+          matchedKw = name
+          break
+        }
+      }
+    }
+    if (!matchedKw) {
+      for (const kw of allTransKws) {
+        if (line.includes(kw)) {
+          type = 'transfer'
+          matchedAccountId = transferKwMap[kw].source_id
+          matchedAccount = transferKwMap[kw].source_label
+          targetAccountId = transferKwMap[kw].target_id
+          matchedKw = kw
+          break
+        }
       }
     }
     if (!matchedKw) {
@@ -1834,7 +1918,6 @@ function parseExpenseText(text) {
 
     if (type === 'transfer') result.target_account_id = targetAccountId || ''
     if (type === 'withdrawal') {
-      result.target_account_id = ''
       result.fee_amount = 0
       result.fee_remark = ''
       // 提现 account_id 必须是电商店铺；解析器若匹配到非电商账户，清掉让用户手选
@@ -1843,7 +1926,13 @@ function parseExpenseText(text) {
         if (!acc || acc.category !== 'ecommerce') {
           result.account_id = ''
           result.account_label = '请选择店铺'
+          result.target_account_id = ''
+        } else {
+          // 店铺已识别：用 targetAccountId（店铺配的默认提现账户）预选
+          result.target_account_id = targetAccountId || acc.default_withdraw_account_id || ''
         }
+      } else {
+        result.target_account_id = ''
       }
     }
     if (type === 'fixed_asset') {
@@ -1964,7 +2053,7 @@ async function submitOneTransaction(exp) {
       if (!storeAcc || storeAcc.category !== 'ecommerce') {
         throw new Error('所选店铺不是电商账户')
       }
-      await performStoreWithdrawal({
+      const wdRes = await performStoreWithdrawal({
         storeId: accountId,
         storeName: storeAcc.short_name || storeAcc.code || '',
         toAccountId: exp.target_account_id,
@@ -1974,6 +2063,11 @@ async function submitOneTransaction(exp) {
         feeRemark: exp.fee_remark || '',
         remark: note,
       })
+      // 首次提现已自动写默认到账账户 → 同步到本地 Pinia 避免下次还要重选
+      if (wdRes?.defaultTargetSaved) {
+        const idx = accountStore.accounts.findIndex(a => a.id === accountId)
+        if (idx >= 0) accountStore.accounts[idx].default_withdraw_account_id = exp.target_account_id
+      }
       console.log('[智能记账] 店铺提现完成')
       break
     }

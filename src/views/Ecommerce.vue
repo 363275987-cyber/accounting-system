@@ -295,7 +295,48 @@
             </select>
           </div>
           <!-- 负责人代号由后台默认写 '—'，不在此表单暴露 -->
-          <!-- 结算周期、提现账户等字段待 DB 加列后启用 -->
+
+          <!-- 智能记账：提现关键词 -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+              提现关键词
+              <span class="text-xs text-gray-400 font-normal">（智能记账识别该店铺提现，用逗号/空格分隔录入）</span>
+            </label>
+            <div class="flex items-center gap-2">
+              <input
+                v-model="newWithdrawKw"
+                @keydown.enter.prevent="addWithdrawKeyword"
+                type="text"
+                class="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                placeholder="如：抖店提现、小店提现"
+              />
+              <button @click="addWithdrawKeyword" type="button" class="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm rounded-lg cursor-pointer shrink-0">+ 添加</button>
+            </div>
+            <div v-if="storeForm.withdraw_keywords && storeForm.withdraw_keywords.length" class="flex flex-wrap gap-1.5 mt-2">
+              <span v-for="(kw, i) in storeForm.withdraw_keywords" :key="'wk'+i"
+                class="inline-flex items-center gap-1 bg-teal-50 text-teal-700 text-xs px-2 py-1 rounded border border-teal-200">
+                {{ kw }}
+                <button @click="removeWithdrawKeyword(i)" type="button" class="hover:text-teal-900 cursor-pointer">&times;</button>
+              </span>
+            </div>
+          </div>
+
+          <!-- 默认提现账户 -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+              默认提现账户
+              <span class="text-xs text-gray-400 font-normal">（智能记账时自动预选，留空则第一次提现后自动记住）</span>
+            </label>
+            <select
+              v-model="storeForm.default_withdraw_account_id"
+              class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm cursor-pointer bg-white"
+            >
+              <option value="">不设默认</option>
+              <option v-for="a in cashAccounts" :key="a.id" :value="a.id">
+                {{ a.short_name || a.code }}
+              </option>
+            </select>
+          </div>
         </div>
         <div class="shrink-0 px-6 py-4 border-t border-gray-100 flex justify-end gap-2">
           <button @click="closeStoreModal" class="px-4 py-2 text-gray-600 text-sm rounded-lg hover:bg-gray-100 cursor-pointer">取消</button>
@@ -364,10 +405,12 @@ import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabase'
 import { parseEcommerceExcel, importEcommerceOrders } from '../lib/ecommerceOrderImporter'
 import { useAuthStore } from '../stores/auth'
+import { useAccountStore } from '../stores/accounts'
 import { PLATFORM_FEE_RATES, PLATFORM_LABELS, calcWithdrawFees } from '../lib/platformFees'
 import { performStoreWithdrawal } from '../lib/storeWithdrawal'
 
 const auth = useAuthStore()
+const accountStore = useAccountStore()
 const role = computed(() => auth.profile?.role || '')
 const canEdit = computed(() => ['admin', 'finance', 'manager'].includes(role.value))
 
@@ -401,7 +444,15 @@ const showAddStore = ref(false)
 const showEditStoreModal = ref(false)
 const editingStoreId = ref(null)
 const savingStore = ref(false)
-const storeForm = ref({ name: '', ecommerce_platform: 'douyin', settlement_days: 15, withdrawal_account_id: '' })
+const storeForm = ref({
+  name: '',
+  ecommerce_platform: 'douyin',
+  settlement_days: 15,
+  withdrawal_account_id: '',
+  withdraw_keywords: [],          // 店铺提现关键词（JSONB 数组，智能记账自动匹配用）
+  default_withdraw_account_id: '',// 默认提现到账账户
+})
+const newWithdrawKw = ref('')
 
 // 计算属性
 const storesByPlatform = computed(() => {
@@ -582,7 +633,7 @@ async function doWithdraw() {
   const targetName = cashAccounts.value.find(a => a.id === f.toAccountId)?.short_name || ''
 
   try {
-    await performStoreWithdrawal({
+    const result = await performStoreWithdrawal({
       storeId: f.storeId,
       storeName: f.storeName,
       toAccountId: f.toAccountId,
@@ -593,9 +644,16 @@ async function doWithdraw() {
       remark: f.remark,
     })
 
+    // 同步 Pinia：这次如果自动写了默认提现账户，本地也更新
+    if (result?.defaultTargetSaved) {
+      const idx = accountStore.accounts.findIndex(a => a.id === f.storeId)
+      if (idx >= 0) accountStore.accounts[idx].default_withdraw_account_id = f.toAccountId
+    }
+
     showWithdrawModal.value = false
     const feeMsg = feeAmount > 0 ? `（手续费 ¥${feeAmount.toFixed(2)} 已计入支出）` : ''
-    toast(`提现成功！¥${f.amount.toFixed(2)} 已转入 ${targetName}${feeMsg}`, 'success')
+    const defMsg = result?.defaultTargetSaved ? `，已记为 ${f.storeName} 的默认提现账户` : ''
+    toast(`提现成功！¥${f.amount.toFixed(2)} 已转入 ${targetName}${feeMsg}${defMsg}`, 'success')
     await loadData()
     await loadMonthlyWithdrawn()
   } catch (e) {
@@ -606,10 +664,15 @@ async function doWithdraw() {
 // 店铺管理
 function openEditStore(store) {
   editingStoreId.value = store.id
+  // 编辑时 short_name 在 accounts.short_name；提现关键词/默认账户直接从 accountStore 取最新值
+  const acc = accountStore.accounts.find(a => a.id === store.id) || store
   storeForm.value = {
     name: store.short_name,
     ecommerce_platform: store.ecommerce_platform,
+    withdraw_keywords: Array.isArray(acc.withdraw_keywords) ? [...acc.withdraw_keywords] : [],
+    default_withdraw_account_id: acc.default_withdraw_account_id || '',
   }
+  newWithdrawKw.value = ''
   showEditStoreModal.value = true
 }
 
@@ -617,7 +680,30 @@ function closeStoreModal() {
   showAddStore.value = false
   showEditStoreModal.value = false
   editingStoreId.value = null
-  storeForm.value = { name: '', ecommerce_platform: 'douyin' }
+  storeForm.value = {
+    name: '',
+    ecommerce_platform: 'douyin',
+    withdraw_keywords: [],
+    default_withdraw_account_id: '',
+  }
+  newWithdrawKw.value = ''
+}
+
+function addWithdrawKeyword() {
+  const kw = (newWithdrawKw.value || '').trim()
+  if (!kw) return
+  const list = storeForm.value.withdraw_keywords || []
+  if (list.some(k => (k || '').toLowerCase() === kw.toLowerCase())) {
+    toast(`关键词「${kw}」已存在`, 'warning')
+    return
+  }
+  list.push(kw)
+  storeForm.value.withdraw_keywords = list
+  newWithdrawKw.value = ''
+}
+
+function removeWithdrawKeyword(i) {
+  storeForm.value.withdraw_keywords.splice(i, 1)
 }
 
 // ecommerce_platform（UI 9 选）→ platform（DB CHECK 7 选）映射
@@ -645,16 +731,14 @@ async function saveStore() {
 
   try {
     if (showEditStore.value) {
-      // 编辑
-      const { error } = await supabase
-        .from('accounts')
-        .update({
-          short_name: f.name,
-          ecommerce_platform: f.ecommerce_platform,
-          platform,
-        })
-        .eq('id', editingStoreId.value)
-      if (error) throw error
+      // 编辑：走 Pinia store，保证本页本地列表 + 全局 accountStore 同步更新
+      await accountStore.updateAccount(editingStoreId.value, {
+        short_name: f.name,
+        ecommerce_platform: f.ecommerce_platform,
+        platform,
+        withdraw_keywords: f.withdraw_keywords || [],
+        default_withdraw_account_id: f.default_withdraw_account_id || null,
+      })
       toast('店铺已更新', 'success')
     } else {
       // 新建：先查是否已有同名活跃店铺，避免双击/并发重复
@@ -671,7 +755,9 @@ async function saveStore() {
         return
       }
 
-      const { error } = await supabase.from('accounts').insert({
+      // 走 Pinia accountStore.createAccount：插入后立刻 push 进共享账户数组，
+      // 其他已挂载的视图（如智能记账的"店铺提现"）能即时看到新店铺
+      await accountStore.createAccount({
         short_name: f.name,
         code: f.name,
         owner_code: ownerCode,
@@ -681,8 +767,9 @@ async function saveStore() {
         balance: 0,
         opening_balance: 0,
         status: 'active',
+        withdraw_keywords: f.withdraw_keywords || [],
+        default_withdraw_account_id: f.default_withdraw_account_id || null,
       })
-      if (error) throw error
       toast('店铺已创建', 'success')
     }
     closeStoreModal()

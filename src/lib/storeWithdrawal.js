@@ -51,9 +51,10 @@ export async function performStoreWithdrawal({
   const totalDeduct = arriveAmount + fee
 
   // ── 1. 店铺余额扣款（底线 0）─────────────────────────
+  // 顺便读出 default_withdraw_account_id，用于"第一次提现自动记默认"
   const { data: storeAcc, error: e1 } = await supabase
     .from('accounts')
-    .select('balance')
+    .select('balance, default_withdraw_account_id')
     .eq('id', storeId)
     .single()
   if (e1) throw new Error('读取店铺余额失败: ' + (e1.message || ''))
@@ -166,11 +167,27 @@ export async function performStoreWithdrawal({
     // 日志失败不阻断主流程
   }
 
+  // ── 6. 首次提现自动记忆默认到账账户 ─────────────────
+  // 店铺之前从未设过默认提现账户 → 把这次选的账户写入 default_withdraw_account_id
+  let defaultTargetSaved = false
+  if (!storeAcc.default_withdraw_account_id) {
+    try {
+      const { error: dfErr } = await supabase
+        .from('accounts')
+        .update({ default_withdraw_account_id: toAccountId })
+        .eq('id', storeId)
+      if (!dfErr) defaultTargetSaved = true
+    } catch (_) {
+      // 记忆失败不影响主流程
+    }
+  }
+
   return {
     totalDeduct,
     oldStoreBalance,
     newStoreBalance,
     oldTargetBalance,
     newTargetBalance,
+    defaultTargetSaved,
   }
 }
