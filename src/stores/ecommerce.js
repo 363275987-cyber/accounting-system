@@ -152,14 +152,26 @@ export const useEcommerceStore = defineStore('ecommerce', {
 
     // 新建电商店铺
     async createStore(storeData) {
+      // platform CHECK 只允许: alipay / bank / douyin / kuaishou / weixin_video / youzan / other
+      const mapPlatform = (ecom) => {
+        switch (ecom) {
+          case 'douyin':    return 'douyin'
+          case 'kuaishou':  return 'kuaishou'
+          case 'shipinhao': return 'weixin_video'
+          case 'youzan':    return 'youzan'
+          default:          return 'other'
+        }
+      }
       const { data, error } = await withTimeout(
         supabase
           .from('accounts')
           .insert({
             short_name: storeData.name,
             code: storeData.name,
-            platform: storeData.ecommerce_platform === 'shipinhao' ? 'shipinhao' : storeData.ecommerce_platform,
+            owner_code: (storeData.owner_code || '').trim() || '—',
+            platform: mapPlatform(storeData.ecommerce_platform),
             ecommerce_platform: storeData.ecommerce_platform,
+            category: 'ecommerce',
             settlement_days: storeData.settlement_days,
             balance: 0,
             opening_balance: 0,
