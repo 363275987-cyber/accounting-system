@@ -263,7 +263,7 @@
         </div>
         <div class="shrink-0 px-6 py-4 border-t border-gray-100 flex justify-end gap-2">
           <button @click="showWithdrawModal = false" class="px-4 py-2 text-gray-600 text-sm rounded-lg hover:bg-gray-100 cursor-pointer">取消</button>
-          <button @click="doWithdraw" :disabled="!canSubmitWithdraw" class="px-4 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer">确认提现</button>
+          <button @click="doWithdraw" :disabled="!canSubmitWithdraw" class="px-4 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer">{{ withdrawing ? '提交中...' : '确认提现' }}</button>
         </div>
       </div>
     </div>
@@ -433,6 +433,7 @@ const monthlyWithdrawnTotal = computed(() => monthlyWithdrawnData.value.reduce((
 // 提现弹窗
 const showWithdrawModal = ref(false)
 const withdrawForm = ref({ storeId: '', storeName: '', platform: '', withdrawableAmount: 0, amount: null, toAccountId: '', remark: '' })
+const withdrawing = ref(false)
 
 // 店铺明细弹窗
 const showStoreDetail = ref(false)
@@ -488,7 +489,7 @@ const withdrawFees = computed(() => {
 })
 
 const canSubmitWithdraw = computed(() => {
-  return withdrawForm.value.amount > 0 && withdrawForm.value.toAccountId
+  return withdrawForm.value.amount > 0 && withdrawForm.value.toAccountId && !withdrawing.value
 })
 
 // 方法
@@ -626,12 +627,14 @@ async function openStoreDetail(store) {
 }
 
 async function doWithdraw() {
+  if (withdrawing.value) return  // 双击/快速重复点击保护
   const f = withdrawForm.value
   if (!f.amount || f.amount <= 0 || !f.toAccountId) return
 
   const feeAmount = Number(f.feeAmount || 0)
   const targetName = cashAccounts.value.find(a => a.id === f.toAccountId)?.short_name || ''
 
+  withdrawing.value = true
   try {
     const result = await performStoreWithdrawal({
       storeId: f.storeId,
@@ -658,6 +661,8 @@ async function doWithdraw() {
     await loadMonthlyWithdrawn()
   } catch (e) {
     toast('提现失败：' + (e.message || ''), 'error')
+  } finally {
+    withdrawing.value = false
   }
 }
 

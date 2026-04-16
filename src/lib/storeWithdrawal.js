@@ -60,7 +60,13 @@ export async function performStoreWithdrawal({
   if (e1) throw new Error('读取店铺余额失败: ' + (e1.message || ''))
 
   const oldStoreBalance = Number(storeAcc.balance || 0)
-  const newStoreBalance = Math.max(0, oldStoreBalance - totalDeduct)
+  // ⚠️ 余额不足直接拒绝，不能地板到 0 —— 否则目标账户会凭空加钱
+  if (totalDeduct > oldStoreBalance + 0.0001) {
+    throw new Error(
+      `店铺余额不足：当前 ¥${oldStoreBalance.toFixed(2)}，本次需扣 ¥${totalDeduct.toFixed(2)}`
+    )
+  }
+  const newStoreBalance = oldStoreBalance - totalDeduct
   const { error: e2 } = await supabase
     .from('accounts')
     .update({ balance: newStoreBalance })

@@ -183,10 +183,10 @@
                 <button @click="parsedExpenses.splice(idx, 1)" class="px-2 py-1 text-gray-400 hover:text-red-500 text-xs cursor-pointer">🗑️</button>
                 <button
                   @click="submitParsedExpense(idx)"
-                  :disabled="submittingParsed"
+                  :disabled="submittingParsed || exp._submitting"
                   class="px-3 py-1 bg-green-600 text-white rounded-md text-xs hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition"
                 >
-                  ✅ 提交
+                  {{ exp._submitting ? '提交中...' : '✅ 提交' }}
                 </button>
               </div>
             </div>
@@ -2282,6 +2282,12 @@ async function submitParsedExpense(idx) {
     toast('请填写金额', 'warning')
     return
   }
+  // 行级锁：已经提交中就拦掉，防止双击造成重复入账（提现场景尤其致命）
+  if (exp._submitting) {
+    console.warn('[智能记账] 该条已在提交中，忽略重复点击')
+    return
+  }
+  exp._submitting = true
   submittingParsed.value = true
   try {
     console.log('[智能记账] 单条提交, type:', exp._type, 'amount:', exp.amount)
@@ -2293,6 +2299,7 @@ async function submitParsedExpense(idx) {
   } catch (e) {
     console.error('[智能记账] 单条提交失败:', e?.message || e)
     toast('创建失败：' + (e.message || ''), 'error')
+    exp._submitting = false  // 失败才解锁，成功已经被 splice 掉
   } finally {
     submittingParsed.value = false
   }
