@@ -6,6 +6,12 @@
       <div class="flex items-center gap-2">
         <button v-if="canManage" @click="openSortModal" class="px-3 py-2 bg-white text-gray-500 rounded-lg text-sm border border-gray-200 hover:bg-gray-50 transition cursor-pointer">🔀 排序</button>
         <button
+          v-if="authStore.isFinance"
+          @click="showBatchOpeningModal = true"
+          class="px-3 py-2 bg-white text-amber-600 rounded-lg text-sm border border-amber-200 hover:bg-amber-50 transition cursor-pointer"
+          title="批量重设所有账户的期初余额"
+        >🔢 批量期初</button>
+        <button
           v-if="canManage"
           @click="openModal()"
           class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition cursor-pointer"
@@ -414,6 +420,13 @@
       @close="showOpeningModal = false"
       @saved="onOpeningSaved"
     />
+
+    <!-- 批量期初弹窗 -->
+    <BatchOpeningBalanceModal
+      :visible="showBatchOpeningModal"
+      @close="showBatchOpeningModal = false"
+      @saved="onBatchOpeningSaved"
+    />
   </div>
 
   <!-- 排序弹窗 -->
@@ -461,6 +474,7 @@ import { formatMoney, PLATFORM_LABELS, toast, formatDate } from '../lib/utils'
 import Skeleton from '../components/Skeleton.vue'
 import AccountTransactions from '../components/AccountTransactions.vue'
 import OpeningBalanceModal from '../components/OpeningBalanceModal.vue'
+import BatchOpeningBalanceModal from '../components/BatchOpeningBalanceModal.vue'
 import { usePermission } from '../composables/usePermission'
 
 const { canDelete, isAdmin, loadRole } = usePermission()
@@ -494,6 +508,12 @@ function onOpeningSaved() {
   // 组件内部已 fetchAccounts + toast，这里留作扩展位
 }
 
+// 批量期初弹窗
+const showBatchOpeningModal = ref(false)
+function onBatchOpeningSaved() {
+  // 组件内部已 fetchAccounts + toast
+}
+
 const isEditing = ref(false)
 const editingId = ref(null)
 const flippedCards = reactive({})
@@ -520,6 +540,7 @@ async function loadTodayTransfers() {
     const { data } = await supabase
       .from('account_transfers')
       .select('amount')
+      .is('deleted_at', null)
       .gte('created_at', startISO)
       .lte('created_at', endISO)
     if (data && data.length > 0) {

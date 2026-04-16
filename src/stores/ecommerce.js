@@ -111,6 +111,7 @@ export const useEcommerceStore = defineStore('ecommerce', {
         let query = supabase
           .from('withdrawals')
           .select('*, from_store:accounts!withdrawals_account_id_fkey(id, short_name, ecommerce_platform), to_account:accounts!withdrawals_to_account_id_fkey(id, short_name)')
+          .is('deleted_at', null)
           .order('created_at', { ascending: false })
           .limit(100)
 

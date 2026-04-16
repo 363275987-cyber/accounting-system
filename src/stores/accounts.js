@@ -148,6 +148,7 @@ export const useAccountStore = defineStore('accounts', {
         supabase
           .from('account_transfers')
           .select('*', { count: 'exact', head: true })
+          .is('deleted_at', null)
           .or(`from_account_id.eq.${id},to_account_id.eq.${id}`),
         10000,
         '检查转账关联'

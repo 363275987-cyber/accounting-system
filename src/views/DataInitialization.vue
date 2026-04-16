@@ -187,8 +187,8 @@ const TABLE_GROUPS = [
       { table: 'expenses',          label: '支出记录',              supported: true },
       { table: 'other_income',      label: '其他收入',              supported: true },
       { table: 'refunds',           label: '退款记录',              supported: true },
-      { table: 'account_transfers', label: '账户转账',              supported: false, unsupportReason: '无 deleted_at · 建议 DB 备份后在 SQL 手动处理' },
-      { table: 'withdrawals',       label: '电商提现',              supported: false, unsupportReason: '无 deleted_at · 建议 DB 手动处理' },
+      { table: 'account_transfers', label: '账户转账',              supported: true },
+      { table: 'withdrawals',       label: '电商提现',              supported: true },
     ],
   },
   {

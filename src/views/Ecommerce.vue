@@ -999,6 +999,7 @@ async function loadMonthlyWithdrawn() {
     const { data, error } = await supabase
       .from('withdrawals')
       .select('actual_arrival, amount, store_name, created_at')
+      .is('deleted_at', null)
       .gte('created_at', startISO)
       .lte('created_at', endISO)
     if (error) {

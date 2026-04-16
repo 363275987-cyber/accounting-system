@@ -600,6 +600,7 @@ onMounted(async () => {
     const { data } = await supabase
       .from('account_transfers')
       .select('*, from_account:from_account_id(code, short_name, ip_code), to_account:to_account_id(code, short_name, ip_code), creator:created_by(name)')
+      .is('deleted_at', null)
       .order('created_at', { ascending: false })
     transfers.value = (data || []).map(t => ({
       ...t,

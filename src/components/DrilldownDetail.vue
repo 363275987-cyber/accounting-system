@@ -186,6 +186,7 @@ async function loadTransfers() {
     const { data: outData } = await supabase
       .from('account_transfers')
       .select('id, transfer_no, from_account_id, to_account_id, amount, fee, created_at, from_account:from_account_id(code), to_account:to_account_id(code)')
+      .is('deleted_at', null)
       .eq('from_account_id', props.accountId)
       .eq('status', 'completed')
       .gte('created_at', periodStart.value)
@@ -194,6 +195,7 @@ async function loadTransfers() {
     const { data: inData } = await supabase
       .from('account_transfers')
       .select('id, transfer_no, from_account_id, to_account_id, amount, fee, created_at, from_account:from_account_id(code), to_account:to_account_id(code)')
+      .is('deleted_at', null)
       .eq('to_account_id', props.accountId)
       .eq('status', 'completed')
       .gte('created_at', periodStart.value)

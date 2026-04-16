@@ -935,6 +935,7 @@ async function loadTransferFees(startISO, endISO) {
     const { data, error } = await supabase
       .from('account_transfers')
       .select('fee')
+      .is('deleted_at', null)
       .gt('fee', 0)
       .gte('transfer_date', startISO)
       .lte('transfer_date', endISO)
@@ -1066,6 +1067,7 @@ async function loadWithdrawals(startISO, endISO) {
     const { data, error } = await supabase
       .from('withdrawals')
       .select('amount, actual_arrival, created_at, account_id')
+      .is('deleted_at', null)
       .gte('created_at', startISO)
       .lte('created_at', endISO)
     if (error) throw error
