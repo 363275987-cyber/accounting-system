@@ -51,10 +51,10 @@ export async function performStoreWithdrawal({
   const totalDeduct = arriveAmount + fee
 
   // ── 1. 店铺余额扣款（底线 0）─────────────────────────
-  // 顺便读出 default_withdraw_account_id，用于"第一次提现自动记默认"
+  // 只读 balance，保持查询最小面，避免 PostgREST schema 缓存落后导致 400
   const { data: storeAcc, error: e1 } = await supabase
     .from('accounts')
-    .select('balance, default_withdraw_account_id')
+    .select('balance')
     .eq('id', storeId)
     .single()
   if (e1) throw new Error('读取店铺余额失败: ' + (e1.message || ''))
@@ -169,17 +169,23 @@ export async function performStoreWithdrawal({
 
   // ── 6. 首次提现自动记忆默认到账账户 ─────────────────
   // 店铺之前从未设过默认提现账户 → 把这次选的账户写入 default_withdraw_account_id
+  // 新字段查询失败（schema cache 未同步等）时静默跳过，不影响主流程
   let defaultTargetSaved = false
-  if (!storeAcc.default_withdraw_account_id) {
-    try {
+  try {
+    const { data: metaRow, error: metaErr } = await supabase
+      .from('accounts')
+      .select('default_withdraw_account_id')
+      .eq('id', storeId)
+      .single()
+    if (!metaErr && metaRow && !metaRow.default_withdraw_account_id) {
       const { error: dfErr } = await supabase
         .from('accounts')
         .update({ default_withdraw_account_id: toAccountId })
         .eq('id', storeId)
       if (!dfErr) defaultTargetSaved = true
-    } catch (_) {
-      // 记忆失败不影响主流程
     }
+  } catch (_) {
+    // 记忆失败不影响主流程
   }
 
   return {
