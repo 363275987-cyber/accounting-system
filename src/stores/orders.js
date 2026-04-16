@@ -319,7 +319,7 @@ export const useOrderStore = defineStore('orders', {
           const accInfo = await getAccountBalance(order.account_id)
           balBefore = accInfo?.balance
           accName = accInfo?.name || ''
-        } catch (_) {}
+        } catch (e) { console.warn("[silent catch]", e?.message || e) }
       }
 
       // 通过 RPC 软删除（RPC 内部已处理余额扣回）
@@ -335,7 +335,7 @@ export const useOrderStore = defineStore('orders', {
         try {
           const { useAccountStore } = await import('./accounts')
           useAccountStore().refreshBalance(order.account_id)
-        } catch (_) {}
+        } catch (e) { console.warn("[silent catch]", e?.message || e) }
       }
 
       // 记录删除后的账户余额并写操作日志

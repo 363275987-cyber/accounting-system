@@ -69,10 +69,8 @@
 
     <!-- Desktop Table -->
     <div class="bg-white rounded-xl border border-gray-100 overflow-hidden hidden md:block">
-      <!-- Loading skeleton -->
-      <div v-if="loading && records.length === 0" class="p-6 space-y-3">
-        <div v-for="i in 5" :key="i" class="h-10 bg-gray-100 rounded animate-pulse"></div>
-      </div>
+      <!-- Loading skeleton (BUG-6) -->
+      <Skeleton v-if="loading && records.length === 0" type="table" :rows="6" :columns="6" />
 
       <table v-else class="w-full text-sm">
         <thead>
@@ -180,12 +178,7 @@
 
     <!-- Mobile Card List -->
     <div class="md:hidden space-y-2">
-      <div v-if="loading && records.length === 0" class="space-y-2">
-        <div v-for="i in 5" :key="i" class="bg-white rounded-xl border border-gray-100 p-4">
-          <div class="h-4 w-24 bg-gray-100 rounded animate-pulse mb-2"></div>
-          <div class="h-6 w-32 bg-gray-100 rounded animate-pulse"></div>
-        </div>
-      </div>
+      <Skeleton v-if="loading && records.length === 0" type="card" :count="5" card-grid-class="grid-cols-1" />
       <div
         v-for="record in records"
         :key="'m-' + record.id"
@@ -329,6 +322,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
+import Skeleton from '../components/Skeleton.vue'
 import { supabase } from '../lib/supabase'
 import { useAccountStore } from '../stores/accounts'
 import { useAuthStore } from '../stores/auth'

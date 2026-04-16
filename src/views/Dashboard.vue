@@ -130,6 +130,10 @@ import { ref, computed, onMounted } from 'vue'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/auth'
 import { formatMoney, formatDate, PLATFORM_LABELS, PRODUCT_CATEGORIES, ECOMMERCE_PLATFORMS, EXPENSE_STATUS, EXPENSE_CATEGORIES } from '../lib/utils'
+// BUG-4 残留修复：Dashboard 的"本月利润"原本和 Reports Overview tab 不一致
+//（Dashboard 用 approved+paid、不算工资和转账费），导致用户看两个地方的利润
+// 数字对不上。改为统一调用 computeOverviewProfit。
+import { computeOverviewProfit } from '../utils/financialMetrics'
 
 const authStore = useAuthStore()
 
@@ -166,12 +170,16 @@ const todayLabel = computed(() => {
 })
 
 // --- 本月时间范围 ---
+//
+// 返回 [本月 1 号 00:00:00, 本月最后一天 23:59:59]，对应 Reports.Overview 的
+// 区间口径（gte + lte），让两边数字完全一致。注意：computeOverviewProfit 用 lte，
+// 不能传"下月 1 号 00:00"否则会重复包含下月第一秒的数据。
 function getMonthRange() {
   const now = new Date()
   const year = now.getFullYear()
   const month = now.getMonth()
-  const start = new Date(year, month, 1)
-  const end = new Date(year, month + 1, 1)
+  const start = new Date(year, month, 1, 0, 0, 0)
+  const end = new Date(year, month + 1, 0, 23, 59, 59)
   return { start: start.toISOString(), end: end.toISOString() }
 }
 
@@ -244,36 +252,11 @@ async function loadTodayStats() {
 async function loadFinanceDashboard() {
   const { start, end } = getMonthRange()
   try {
-  const [incRes, expRes, withdrawRes, otherIncRes, recentRes, accountsRes] = await Promise.all([
-    // 本月已到账收入（私域订单，platform_type IS NULL）
-    supabase
-      .from('orders')
-      .select('amount, payment_amount')
-      .in('status', ['completed', 'partially_refunded'])
-      .gte('created_at', start)
-      .lt('created_at', end)
-      .is('platform_type', null),
-    // 本月已审批/已付支出
-    supabase
-      .from('expenses')
-      .select('amount')
-      .in('status', ['approved', 'paid'])
-      .is('deleted_at', null)
-      .gte('created_at', start)
-      .lt('created_at', end),
-    // 本月电商提现到账金额
-    supabase
-      .from('withdrawals')
-      .select('actual_arrival')
-      .gte('created_at', start)
-      .lt('created_at', end),
-    // 本月其他收入
-    supabase
-      .from('other_income')
-      .select('amount')
-      .is('deleted_at', null)
-      .gte('created_at', start)
-      .lt('created_at', end),
+  // BUG-4 残留修复：现金口径"本月经营盈余"统一从 computeOverviewProfit 取，
+  // 与 Reports.Overview tab 完全一致。本函数只额外查最近订单和账户余额（这两个
+  // 不在 financialMetrics 范围内）。
+  const [overviewProfit, recentRes, accountsRes] = await Promise.all([
+    computeOverviewProfit(supabase, start, end),
     // 最近10笔订单（全部，包含电商）
     supabase
       .from('orders')
@@ -289,16 +272,9 @@ async function loadFinanceDashboard() {
       .is('ecommerce_platform', null),
   ])
 
-  // 汇总统计
-  const privateIncome = incRes.data?.reduce((s, r) => s + (Number(r.payment_amount) || Number(r.amount) || 0), 0) ?? 0
-  const ecommerceIncome = withdrawRes.data?.reduce((s, r) => s + (Number(r.actual_arrival) || 0), 0) ?? 0
-  const otherIncome = (!otherIncRes.error && otherIncRes.data) ? otherIncRes.data.reduce((s, r) => s + (Number(r.amount) || 0), 0) : 0
-  const totalIncome = privateIncome + ecommerceIncome + otherIncome
-  const totalExpense = expRes.data?.reduce((s, r) => s + (Number(r.amount) || 0), 0) ?? 0
-
-  stats.value.totalIncome = totalIncome
-  stats.value.totalExpense = totalExpense
-  stats.value.profit = totalIncome - totalExpense
+  stats.value.totalIncome = overviewProfit.totalIncome
+  stats.value.totalExpense = overviewProfit.totalExpense
+  stats.value.profit = overviewProfit.profit
 
   recentOrders.value = recentRes.data || []
 

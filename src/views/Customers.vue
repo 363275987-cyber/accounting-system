@@ -81,7 +81,9 @@
 
     <!-- Customer Table -->
     <div class="bg-white rounded-xl border border-gray-100 overflow-hidden">
-      <table class="w-full text-sm">
+      <!-- BUG-6: 首次加载骨架屏 -->
+      <Skeleton v-if="loading && customers.length === 0" type="table" :rows="8" :columns="7" />
+      <table v-else class="w-full text-sm">
         <thead>
           <tr class="border-b border-gray-100 text-xs text-gray-500">
             <th class="text-left px-4 py-3 font-medium">手机号</th>
@@ -334,10 +336,12 @@ import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { supabase } from '../lib/supabase'
 import { usePermission } from '../composables/usePermission'
 import { useAuthStore } from '../stores/auth'
+import Skeleton from '../components/Skeleton.vue'
 
 const auth = useAuthStore()
 const { canDelete, loadRole } = usePermission()
 
+const loading = ref(true)
 const customers = ref([])
 const summary = reactive({ total_customers: 0, new_this_month: 0, active_30d: 0, avg_amount: 0 })
 const todayNewCustomers = ref(0)
@@ -455,6 +459,7 @@ async function loadTodayNewCustomers() {
     const { count } = await supabase
       .from('customers')
       .select('id', { count: 'exact', head: true })
+      .is('deleted_at', null)
       .gte('created_at', dayStart.toISOString())
       .lte('created_at', dayEnd.toISOString())
     todayNewCustomers.value = count || 0
@@ -464,6 +469,7 @@ async function loadTodayNewCustomers() {
 }
 
 async function loadData() {
+  loading.value = true
   try {
     let query = supabase
       .from('customers')
@@ -498,6 +504,8 @@ async function loadData() {
     allTags.value = [...tagSet].sort()
   } catch (e) {
     console.error('[Customers] loadData error:', e)
+  } finally {
+    loading.value = false
   }
 }
 
@@ -589,6 +597,7 @@ async function openDetail(id) {
       const { data: rf, error: re } = await supabase
         .from('refunds')
         .select('refund_no, refund_amount, reason, created_at, order_id')
+        .is('deleted_at', null)
         .in('order_id', ids)
       if (!re) refunds = rf || []
     }

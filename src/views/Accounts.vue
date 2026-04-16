@@ -762,7 +762,7 @@ async function approveLog(log) {
       accountId: log.account_id,
       accountName: log.account_name,
     })
-  } catch (_) {}
+  } catch (e) { console.warn("[silent catch]", e?.message || e) }
   // 刷新列表
   await accountStore.fetchAccounts()
   log.status = 'approved'
@@ -939,7 +939,7 @@ async function saveAccount() {
               accountId: editingId.value,
               accountName: form.short_name.trim(),
             })
-          } catch (_) {}
+          } catch (e) { console.warn("[silent catch]", e?.message || e) }
         } else {
           // finance发起审核请求，余额不改
           await supabase.from('balance_change_logs').insert({

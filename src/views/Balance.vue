@@ -19,11 +19,15 @@
       </span>
     </div>
 
-    <!-- Loading -->
-    <div v-if="loading" class="bg-white rounded-xl border border-gray-100 p-12 text-center">
-      <div class="text-2xl mb-2 animate-pulse">📊</div>
-      <div class="text-gray-500">加载快照数据...</div>
-    </div>
+    <!-- Loading skeleton (BUG-6: 替代 emoji 等待) -->
+    <template v-if="loading">
+      <div class="bg-white rounded-xl border border-gray-100 p-4 mb-6">
+        <Skeleton type="table" :rows="1" :columns="6" />
+      </div>
+      <div class="bg-white rounded-xl border border-gray-100 p-6 mb-6">
+        <Skeleton type="form" :fields="6" />
+      </div>
+    </template>
 
     <template v-else>
       <!-- No snapshot -->
@@ -333,6 +337,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue'
+import Skeleton from '../components/Skeleton.vue'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/auth'
 import { formatMoney, toast, formatDate } from '../lib/utils'
@@ -401,6 +406,7 @@ async function loadSnapshots() {
     }
   } catch (e) {
     console.error('Failed to load snapshots:', e)
+    toast('加载余额快照失败：' + (e?.message || e?.code || '未知错误'), 'error')
   } finally {
     loading.value = false
   }
@@ -600,8 +606,8 @@ async function loadHistory(page = 0) {
       .from('balance_snapshots')
       .select('*, account:account_id(code, ip_code)')
       .eq('status', 'confirmed')
-      .order('settlement_date', { ascending: false })
-      .order('account_code')
+      .order('period', { ascending: false })
+      .order('account_id')
       .range(page * pageSize, (page + 1) * pageSize - 1)
 
     if (error) throw error
@@ -616,6 +622,7 @@ async function loadHistory(page = 0) {
   } catch (e) {
     console.error('Failed to load history:', e)
     settlementHistory.value = []
+    toast('加载结算历史失败：' + (e?.message || e?.code || '未知错误'), 'error')
   } finally {
     historyLoading.value = false
   }

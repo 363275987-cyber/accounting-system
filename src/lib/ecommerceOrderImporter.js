@@ -677,7 +677,7 @@ export async function importEcommerceOrders({ salesOrders, afterSalesOrders, sup
           if (row.refund_no) existingRefundNos.add(row.refund_no)
         }
       }
-    } catch (_) {}
+    } catch (e) { console.warn("[silent catch]", e?.message || e) }
 
     for (let i = 0; i < unmatchedRefunds.length; i++) {
       const refund = unmatchedRefunds[i]
@@ -696,6 +696,7 @@ export async function importEcommerceOrders({ salesOrders, afterSalesOrders, sup
         let matchedOrder = null
         const { data: exact } = await sb.from('orders')
           .select('id, account_id, payment_amount')
+          .is('deleted_at', null)
           .eq('external_order_no', refund.external_order_no)
           .eq('platform_type', refund.platform_type)
           .maybeSingle()
@@ -705,6 +706,7 @@ export async function importEcommerceOrders({ salesOrders, afterSalesOrders, sup
         } else {
           const { data: fuzzy } = await sb.from('orders')
             .select('id, account_id, payment_amount')
+            .is('deleted_at', null)
             .like('external_order_no', `${refund.external_order_no}%`)
             .eq('platform_type', refund.platform_type)
             .limit(1).maybeSingle()
@@ -767,7 +769,7 @@ export async function importEcommerceOrders({ salesOrders, afterSalesOrders, sup
         if (matchedOrder) {
           try {
             await sb.from('orders').update({ status: 'refunded' }).eq('id', matchedOrder.id)
-          } catch (_) {}
+          } catch (e) { console.warn("[silent catch]", e?.message || e) }
         }
 
         result.success++

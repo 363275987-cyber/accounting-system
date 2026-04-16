@@ -1114,6 +1114,7 @@ async function loadTodayExpense() {
       .from('expenses')
       .select('amount')
       .eq('status', 'paid')
+      .is('deleted_at', null)
       .gte('paid_at', startISO)
       .lte('paid_at', endISO)
     if (data && data.length > 0) {
@@ -2540,7 +2541,7 @@ async function handleCreate() {
         accountId: form.account_id || null,
         accountName: accName,
       })
-    } catch (_) {}
+    } catch (e) { console.warn("[silent catch]", e?.message || e) }
 
     showCreateModal.value = false
     editingExpenseId.value = null
@@ -2640,7 +2641,7 @@ async function handleDeleteExpense(expense) {
         accountId: expense.account_id,
         accountName: accName,
       })
-    } catch (_) {}
+    } catch (e) { console.warn("[silent catch]", e?.message || e) }
     toast('支出已删除', 'success')
     expenses.value = expenses.value.filter(e => e.id !== expense.id)
     selectedExpenses.value = selectedExpenses.value.filter(id => id !== expense.id)
@@ -2663,7 +2664,7 @@ async function handleBatchDeleteExpenses() {
     const { logOperation, getAccountBalance } = await import('../utils/operationLogger')
     for (const exp of paidExpenses) {
       let balResult = null
-      try { balResult = await useAccountStore().updateBalance(exp.account_id, Number(exp.amount)) } catch (_) {}
+      try { balResult = await useAccountStore().updateBalance(exp.account_id, Number(exp.amount)) } catch (e) { console.error('[Expenses] 已付款支出回滚账户余额失败 — 数据可能不一致', e); toast('账户余额回滚失败,请手动核对', 'error') }
       try {
         const accInfo = exp.account_id ? await getAccountBalance(exp.account_id) : null
         const accName = accInfo?.name || ''
@@ -2679,7 +2680,7 @@ async function handleBatchDeleteExpenses() {
           accountId: exp.account_id,
           accountName: accName,
         })
-      } catch (_) {}
+      } catch (e) { console.warn("[silent catch]", e?.message || e) }
     }
     toast(`已删除 ${data?.deleted || 0} 条支出记录`, 'success')
     selectedExpenses.value = []
@@ -2801,6 +2802,7 @@ async function handleDeleteCategory(item) {
     const { count, error: countError } = await supabase
       .from('expenses')
       .select('id', { count: 'exact', head: true })
+      .is('deleted_at', null)
       .eq('category', item.name)
     if (countError) throw countError
     if (count > 0) {

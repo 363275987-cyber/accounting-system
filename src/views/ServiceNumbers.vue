@@ -484,7 +484,7 @@ async function loadData() {
     salesList.value = salesRes.data || []
   } catch (e) {
     console.error('加载客服号失败:', e)
-    toast('加载失败', 'error')
+    toast('加载客服号失败：' + (e?.message || e?.code || '未知错误'), 'error')
   } finally {
     loading.value = false
   }

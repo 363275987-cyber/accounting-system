@@ -580,7 +580,7 @@ async function generateTestData(count) {
           detail: { amount: amt, from_account_id: fromAcc.id, to_account_id: toAcc.id, from_name: fromInfo?.name, to_name: toInfo?.name },
           amount: amt,
         })
-      } catch (_) {}
+      } catch (e) { console.warn("[silent catch]", e?.message || e) }
       success++
     }
     toast(`成功生成 ${success} 条测试转账`, 'success')
@@ -611,6 +611,7 @@ onMounted(async () => {
     }))
   } catch (e) {
     console.error('Failed to load transfers:', e)
+    toast('加载转账记录失败：' + (e?.message || e?.code || '未知错误'), 'error')
   } finally {
     loading.value = false
   }
@@ -726,7 +727,7 @@ async function handleTransfer() {
         accountId: form.to_account_id,
         accountName: toName,
       })
-    } catch (_) {}
+    } catch (e) { console.warn("[silent catch]", e?.message || e) }
 
     // 刷新账户余额
     const { useAccountStore: _accStore } = await import('../stores/accounts')
@@ -790,7 +791,7 @@ async function handleDeleteTransfer(t) {
           accountName: toName,
         })
       }
-    } catch (_) {}
+    } catch (e) { console.warn("[silent catch]", e?.message || e) }
     toast('转账已删除', 'success')
     transfers.value = transfers.value.filter(x => x.id !== t.id)
     selectedIds.value = selectedIds.value.filter(id => id !== t.id)
@@ -812,10 +813,10 @@ async function handleBatchDelete() {
     for (const t of selectedTransfers) {
       let fromBal = null, toBal = null
       if (t.from_account_id && t.amount) {
-        try { fromBal = await useAccountStore().updateBalance(t.from_account_id, Number(t.amount)) } catch (_) {}
+        try { fromBal = await useAccountStore().updateBalance(t.from_account_id, Number(t.amount)) } catch (e) { console.error('[Transfers] 转出账户余额回滚失败 — 数据可能不一致', e); toast('转出账户余额回滚失败,请手动核对账户余额', 'error') }
       }
       if (t.to_account_id && t.amount) {
-        try { toBal = await useAccountStore().updateBalance(t.to_account_id, -Number(t.amount)) } catch (_) {}
+        try { toBal = await useAccountStore().updateBalance(t.to_account_id, -Number(t.amount)) } catch (e) { console.error('[Transfers] 转入账户余额回滚失败 — 数据可能不一致', e); toast('转入账户余额回滚失败,请手动核对账户余额', 'error') }
       }
       try {
         const fromAcc = t.from_account_id ? await getAccountBalance(t.from_account_id) : null
@@ -827,7 +828,7 @@ async function handleBatchDelete() {
           detail: { transfer_id: t.id, amount: t.amount, from_account: fromAcc?.name, to_account: toAcc?.name, from_balance_before: fromBal?.old_balance, from_balance_after: fromBal?.new_balance, to_balance_before: toBal?.old_balance, to_balance_after: toBal?.new_balance },
           amount: t.amount,
         })
-      } catch (_) {}
+      } catch (e) { console.warn("[silent catch]", e?.message || e) }
     }
     toast(`已删除 ${data?.deleted || 0} 条转账记录`, 'success')
     transfers.value = transfers.value.filter(x => !selectedIds.value.includes(x.id))
@@ -1151,7 +1152,7 @@ async function submitParsedTransfer(idx) {
         detail: { amount: tr.amount, from_account_id: tr.from_account_id, to_account_id: tr.to_account_id, from_name: fromInfo?.name, to_name: toInfo?.name },
         amount: tr.amount,
       })
-    } catch (_) {}
+    } catch (e) { console.warn("[silent catch]", e?.message || e) }
 
     parsedTransfers.value.splice(idx, 1)
     toast('转账记录已保存', 'success')
@@ -1228,7 +1229,7 @@ async function submitAllParsedTransfers() {
             detail: { amount: tr.amount, from_account_id: tr.from_account_id, to_account_id: tr.to_account_id, from_name: fromInfo?.name, to_name: toInfo?.name },
             amount: tr.amount,
           })
-        } catch (_) {}
+        } catch (e) { console.warn("[silent catch]", e?.message || e) }
 
         successCount++
       } catch (e) {

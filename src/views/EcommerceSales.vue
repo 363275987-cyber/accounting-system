@@ -334,6 +334,7 @@ async function loadData() {
   const { data: ordersRaw } = await supabase
     .from('orders')
     .select('id, amount, payment_amount, account_id, status, platform_type, platform_store, created_at')
+    .is('deleted_at', null)
     .not('platform_type', 'is', null)
     .gte('created_at', rangeStart.value + 'T00:00:00')
     .lte('created_at', rangeEnd.value + 'T23:59:59')
@@ -350,6 +351,7 @@ async function loadData() {
       const { data: refundsRaw } = await supabase
         .from('refunds')
         .select('order_id, refund_amount')
+        .is('deleted_at', null)
         .in('order_id', batch)
         .eq('status', 'completed')
       if (refundsRaw) {

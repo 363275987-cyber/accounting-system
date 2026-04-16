@@ -21,11 +21,20 @@
       </button>
     </div>
 
-    <!-- Loading -->
-    <div v-if="loading" class="bg-white rounded-xl border border-gray-100 p-12 text-center">
-      <div class="text-2xl mb-2 animate-pulse">📊</div>
-      <div class="text-gray-500 text-sm">加载业绩数据...</div>
+    <!-- 加载错误提示（方便定位是 RPC 未部署还是无权限等）-->
+    <div v-if="loadError && !loading" class="bg-red-50 border border-red-200 rounded-2xl p-3 mb-3 text-sm">
+      <div class="font-medium text-red-700 mb-1">⚠️ {{ loadError }}</div>
+      <div class="text-xs text-red-500 mb-2">如持续无法加载，请联系管理员检查 get_performance_data / sales_targets 权限。</div>
+      <button @click="loadData" class="px-3 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600 cursor-pointer">重试</button>
     </div>
+
+    <!-- Loading skeleton (BUG-6: 替代 emoji 等待) -->
+    <template v-if="loading">
+      <Skeleton type="stats" :count="4" stats-grid-class="grid-cols-2 lg:grid-cols-4" class="mb-6" />
+      <div class="bg-white rounded-xl border border-gray-100 overflow-hidden">
+        <Skeleton type="table" :rows="6" :columns="8" />
+      </div>
+    </template>
 
     <template v-else>
       <!-- Team Summary -->
@@ -190,9 +199,11 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/auth'
 import { formatMoney, toast } from '../lib/utils'
+import Skeleton from '../components/Skeleton.vue'
 
 const auth = useAuthStore()
 const loading = ref(true)
+const loadError = ref('') // 显示给用户的具体错误信息（而不是 only 吐到 console）
 
 const filters = reactive({
   periodType: 'monthly',
@@ -250,36 +261,53 @@ function getDefaultPeriod() {
 
 async function loadData() {
   loading.value = true
+  loadError.value = ''
   try {
-    // Determine date filter based on period
-    let startDate = ''
-    if (filters.periodType === 'monthly' && filters.periodValue) {
-      const [y, m] = filters.periodValue.split('-')
-      const monthStr = `${y}-${m}`
-      
-      // Load performance data via RPC (SECURITY DEFINER bypasses RLS)
-      const { data: perfData, error: perfError } = await supabase
-        .rpc('get_performance_data', { p_period: monthStr })
-      if (perfError) console.error('RPC error:', perfError)
-      performanceData.value = (perfData || []).map(p => ({
-        ...p,
-        completion_rate: p.user_id ? (getTargetAmount(p.user_id) > 0 ? (p.total_amount || 0) / getTargetAmount(p.user_id) : 0) : 0,
-      }))
+    if (filters.periodType !== 'monthly' || !filters.periodValue) {
+      loadError.value = '请选择月份'
+      return
+    }
+    const [y, m] = filters.periodValue.split('-')
+    const monthStr = `${y}-${m}`
 
-      // Load targets
-      const { data: targetData } = await supabase
-        .from('sales_targets')
-        .select('*')
-        .eq('period_type', 'monthly')
-        .eq('period_value', monthStr)
+    // 并行拉取业绩数据和目标表（之前串行且目标后加载，导致 completion_rate 一直按空目标算 → 全是 0%）
+    const [perfResult, targetResult] = await Promise.all([
+      supabase.rpc('get_performance_data', { p_period: monthStr }),
+      supabase.from('sales_targets').select('*').eq('period_type', 'monthly').eq('period_value', monthStr),
+    ])
+
+    const { data: targetData, error: targetError } = targetResult
+    if (targetError) {
+      console.error('[Performance] sales_targets error:', targetError)
+      // 业绩目标表不是强依赖，失败只记不阻塞
+      loadError.value = `业绩目标表加载失败：${targetError.message || targetError.code}`
+      targets.value = []
+    } else {
       targets.value = (targetData || []).map(t => ({
         ...t,
         completion_rate: t.target_amount > 0 ? (t.actual_amount || 0) / t.target_amount : 0,
       }))
     }
+
+    // 先把 targets.value 赋完值，再计算 perf 的 completion_rate（依赖 getTargetAmount）
+    const { data: perfData, error: perfError } = perfResult
+    if (perfError) {
+      // 之前这里只 console.error 后继续，导致"没数据"但表象像加载失败
+      // 现在把具体错误告诉用户，常见：RPC 未部署 / 无权限 / 网络断
+      console.error('[Performance] get_performance_data RPC error:', perfError)
+      // 业绩数据是主要依赖，优先用它的错误信息覆盖目标表的错误
+      loadError.value = `业绩数据加载失败：${perfError.message || perfError.code || '未知错误'}`
+      performanceData.value = []
+    } else {
+      performanceData.value = (perfData || []).map(p => ({
+        ...p,
+        completion_rate: p.user_id ? (getTargetAmount(p.user_id) > 0 ? (p.total_amount || 0) / getTargetAmount(p.user_id) : 0) : 0,
+      }))
+    }
   } catch (e) {
-    console.error('Failed to load performance data:', e)
-    toast('加载失败', 'error')
+    console.error('[Performance] load fatal:', e)
+    loadError.value = `加载失败：${e?.message || String(e)}`
+    toast(loadError.value, 'error')
   } finally {
     loading.value = false
   }

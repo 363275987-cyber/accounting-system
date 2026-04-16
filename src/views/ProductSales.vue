@@ -88,7 +88,7 @@
 
       <!-- 销量排行表 -->
       <div class="bg-white rounded-xl border border-gray-100 overflow-hidden">
-        <div v-if="loading" class="p-16 text-center text-gray-500">加载中...</div>
+        <Skeleton v-if="loading" type="table" :rows="6" :columns="8" />
         <table v-else class="w-full text-sm">
           <thead>
             <tr class="bg-gray-50 text-gray-600">
@@ -205,7 +205,7 @@
         <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
           <h3 class="text-sm font-medium text-gray-700">店铺销售明细</h3>
         </div>
-        <div v-if="loading" class="p-16 text-center text-gray-500">加载中...</div>
+        <Skeleton v-if="loading" type="table" :rows="6" :columns="7" />
         <div v-else class="overflow-x-auto">
           <table class="w-full text-sm">
             <thead>
@@ -273,6 +273,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import Skeleton from '../components/Skeleton.vue'
 import { supabase } from '../lib/supabase'
 import { formatMoney, PRODUCT_ITEM_CATEGORIES, PLATFORM_LABELS, toast } from '../lib/utils'
 import { useAuthStore } from '../stores/auth'
@@ -352,6 +353,7 @@ async function loadPrivateData() {
       const { data: refunds } = await supabase
         .from('refunds')
         .select('order_id, refund_amount, status')
+        .is('deleted_at', null)
         .eq('status', 'completed')
         .or(orFilter)
       ;(refunds || []).forEach(r => {
@@ -438,6 +440,7 @@ async function loadEcommerceData() {
       const { data: refunds } = await supabase
         .from('refunds')
         .select('order_id, refund_amount')
+        .is('deleted_at', null)
         .in('order_id', batch)
         .eq('status', 'completed')
       if (refunds) {

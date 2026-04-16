@@ -147,6 +147,7 @@ async function loadExpenses() {
       .select('id, expense_no, payee, amount, paid_at, created_at')
       .eq('account_id', props.accountId)
       .eq('status', 'paid')
+      .is('deleted_at', null)
       .gte('paid_at', periodStart.value)
       .lt('paid_at', periodEnd.value)
       .order('paid_at', { ascending: false })

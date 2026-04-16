@@ -168,7 +168,7 @@ async function loadData() {
     categories.value = data || []
   } catch (e) {
     console.error('加载支出类别失败:', e)
-    toast('加载失败', 'error')
+    toast('加载支出类别失败：' + (e?.message || e?.code || '未知错误'), 'error')
   } finally {
     loading.value = false
   }
@@ -281,6 +281,7 @@ async function handleDelete(item) {
     const { count, error: countError } = await supabase
       .from('expenses')
       .select('id', { count: 'exact', head: true })
+      .is('deleted_at', null)
       .eq('category', item.name)
     if (countError) throw countError
 

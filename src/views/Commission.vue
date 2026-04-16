@@ -367,7 +367,7 @@ async function loadRules() {
     rules.value = data || []
   } catch (e) {
     console.error('Failed to load commission rules:', e)
-    toast('加载规则失败', 'error')
+    toast('加载提成规则失败：' + (e?.message || e?.code || '未知错误'), 'error')
   } finally {
     rulesLoading.value = false
   }
@@ -504,7 +504,7 @@ async function loadSummary() {
     }))
   } catch (e) {
     console.error('Failed to load summary:', e)
-    toast('加载提成汇总失败', 'error')
+    toast('加载提成汇总失败：' + (e?.message || e?.code || '未知错误'), 'error')
   } finally {
     summaryLoading.value = false
   }

@@ -675,7 +675,7 @@ async function loadSummary() {
     summary.cue = list.filter(p => ['cue', 'shaft'].includes(p.category)).length
     summary.accessory = list.filter(p => ['tip', 'accessory', 'chalk', 'glue', 'maintenance', 'glove'].includes(p.category)).length
     summary.bundle = list.filter(p => ['bundle', 'gift_bag'].includes(p.product_type)).length
-  } catch (e) {}
+  } catch (e) { console.warn("[silent catch]", e?.message || e) }
 }
 
 function toggleExpand(pid) {
@@ -753,7 +753,7 @@ async function loadExistingGifts(productId) {
     if (bundle?.gifts?.length > 0) {
       pform.gifts = bundle.gifts.map(g => ({ name: g.gift_name || g.name, quantity: g.quantity || 1 }))
     }
-  } catch (e) {}
+  } catch (e) { console.warn("[silent catch]", e?.message || e) }
 }
 
 function addGiftRow() {
@@ -786,7 +786,7 @@ async function handleSaveProduct() {
         await productStore.saveBundle(editingProduct.value.id, giftsData, null, authStore.user?.id)
       } else {
         // Clear existing gifts
-        try { await productStore.saveBundle(editingProduct.value.id, [], null, authStore.user?.id) } catch(e) {}
+        try { await productStore.saveBundle(editingProduct.value.id, [], null, authStore.user?.id) } catch (e) { console.warn("[silent catch]", e?.message || e) }
       }
       // Save bundle items
       if (pform.product_type === 'bundle') {
@@ -962,7 +962,7 @@ async function openBundleModal(p) {
   try {
     const bundle = await productStore.fetchBundleForProduct(p.id)
     if (bundle?.gifts?.length > 0) existingGifts = bundle.gifts
-  } catch (e) {}
+  } catch (e) { console.warn("[silent catch]", e?.message || e) }
   giftTarget.productId = p.id
   giftTarget.name = p.name
   giftTarget.costPrice = p.cost_price

@@ -1558,6 +1558,7 @@ async function handleExportOrders() {
     let query = supabase
       .from('orders')
       .select('id, order_no, customer_name, customer_phone, product_name, amount, status, created_at, order_source, service_number_code, note, product_category, platform_type, platform_store, external_order_no, sku_code, payment_amount, account_code, order_time, sales_profile:sales_id(name), shared_sales_profile:shared_sales_id(name)')
+      .is('deleted_at', null)
       .order('created_at', { ascending: false })
       .limit(5000)
 
@@ -2105,7 +2106,7 @@ async function generateTestData(count) {
           accountId: acc.id,
           accountName: accName,
         })
-      } catch (_) {}
+      } catch (e) { console.warn("[silent catch]", e?.message || e) }
       success++
     }
     await orderStore.fetchOrders()
@@ -2496,6 +2497,7 @@ async function autoFillCustomer() {
     const { data: customers } = await supabase
       .from('customers')
       .select('id, name, phone, address')
+      .is('deleted_at', null)
       .eq('phone', phone)
       .limit(1)
     if (customers?.length > 0) {
@@ -2504,7 +2506,7 @@ async function autoFillCustomer() {
       if (c.address && !form.customer_address) form.customer_address = c.address
       toast(`已匹配老客户：${c.name}`, 'info')
     }
-  } catch (_) {}
+  } catch (e) { console.warn("[silent catch]", e?.message || e) }
 }
 
 // 列表模式下某行的自动填充
@@ -2520,6 +2522,7 @@ async function autoFillRowCustomer(order) {
     const { data: customers } = await supabase
       .from('customers')
       .select('id, name, phone, address')
+      .is('deleted_at', null)
       .eq('phone', phone)
       .limit(1)
     if (customers?.length > 0) {
@@ -2527,7 +2530,7 @@ async function autoFillRowCustomer(order) {
       if (c.name && !order.customer_name) order.customer_name = c.name
       if (c.address && !order.customer_address) order.customer_address = c.address
     }
-  } catch (_) {}
+  } catch (e) { console.warn("[silent catch]", e?.message || e) }
 }
 
 
@@ -2651,7 +2654,7 @@ async function handleSubmit() {
         balanceBefore: accInfo?.balance ?? null,
         balanceAfter: accInfo?.balance != null ? accInfo.balance + Number(form.amount) : null,
       })
-    } catch (_) {}
+    } catch (e) { console.warn("[silent catch]", e?.message || e) }
 
     showModal.value = false
     loadStats()

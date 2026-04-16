@@ -754,6 +754,9 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/auth'
 import * as XLSX from 'xlsx'
+// BUG-4 修复：所有"账面净利润"统一从 financialMetrics.computeIncomeStatement 取
+// loadIncome 和 loadEquity 都调用此函数，确保跨 tab 数字一致
+import { computeIncomeStatement } from '../utils/financialMetrics'
 
 const auth = useAuthStore()
 
@@ -899,15 +902,25 @@ async function loadOtherIncome(startISO, endISO) {
   }
 }
 
-// ── 公共：加载员工工资数据 ──
+// ── 公共：加载员工工资数据(现金口径，按 pay_date 过滤) ──
+//
+// 用于 loadOverview / loadCashflow 这种"实际发生现金流"的口径。
+// 利润表(loadIncome)和所有者权益(loadEquity)走 financialMetrics.computeIncomeStatement，
+// 那里用的是按 pay_month 的权责发生制，不走这个函数。
+//
+// 之前这里按 created_at 过滤是错的：salaries 上传时间和实际发薪日完全不相关，
+// 导致 8 月发的 7 月工资会被算到 8 月的现金流里。
 async function loadSalaries(startISO, endISO) {
   try {
+    const startDate = (startISO || '').slice(0, 10)
+    const endDate = (endISO || '').slice(0, 10)
     const { data, error } = await supabase
       .from('salaries')
-      .select('actual_amount, employee_name, pay_month')
+      .select('actual_amount, employee_name, pay_date')
       .is('deleted_at', null)
-      .gte('created_at', startISO)
-      .lte('created_at', endISO)
+      .not('pay_date', 'is', null)
+      .gte('pay_date', startDate)
+      .lte('pay_date', endDate)
     if (error) { console.warn('salaries query error:', error.message); return [] }
     return data || []
   } catch (e) {
@@ -1171,46 +1184,26 @@ async function loadOverview() {
 }
 
 // ── Tab 2: 利润表 ──
+//
+// BUG-4 修复：原本这里有 ~150 行的 SQL+计算逻辑，且 loadEquity tab 的"净利润"
+// 用了独立的简化公式，导致两个 tab 的"净利润"数字不一致。
+// 现在统一调用 financialMetrics.computeIncomeStatement，loadEquity 也调同一个函数，
+// 跨 tab 数字必然一致。本函数只负责把结果拼装成 incomeData 的 UI 结构。
 async function loadIncome() {
   const startISO = startDate.value + 'T00:00:00'
   const endISO = endDate.value + 'T23:59:59'
 
-  // 1. 私域订单收入
-  const { data: privateOrders, error: ordErr } = await supabase
-    .from('orders')
-    .select('id, amount, payment_amount')
-    .in('status', ['completed', 'partially_refunded'])
-    .is('deleted_at', null)
-    .is('platform_type', null)
-    .gte('created_at', startISO)
-    .lte('created_at', endISO)
-  if (ordErr) { console.error('orders error:', ordErr); return }
-
-  const privateRevenue = (privateOrders || []).reduce((s, o) => s + orderAmt(o), 0)
-  const orderIds = (privateOrders || []).map(o => o.id)
-
-  // 2. 私域产品成本
-  let privateCost = 0
-  if (orderIds.length > 0) {
-    const { data: items, error: itemErr } = await supabase
-      .from('order_items')
-      .select('unit_cost, quantity, order_id')
-      .in('order_id', orderIds)
-    if (itemErr) { console.error('order_items error:', itemErr) }
-    else {
-      privateCost = (items || []).reduce((s, i) => s + num(i.unit_cost) * num(i.quantity), 0)
-    }
+  let result
+  try {
+    result = await computeIncomeStatement(supabase, startISO, endISO)
+  } catch (e) {
+    console.error('computeIncomeStatement error:', e)
+    return
   }
 
-  // 3. 电商提现
-  const withdrawals = await loadWithdrawals(startISO, endISO)
-  const ecommerceRevenue = withdrawals.reduce((s, w) => s + num(w.actual_arrival), 0)
-  const ecommerceTotalAmount = withdrawals.reduce((s, w) => s + num(w.amount), 0)
-  const ecommerceFees = ecommerceTotalAmount - ecommerceRevenue // 手续费 = 提现金额 - 到账金额
-
-  // 提现明细按店铺汇总
+  // 提现明细按店铺汇总（UI 表格用，computeIncomeStatement 只返回原始 withdrawals）
   const storeMap = {}
-  for (const w of withdrawals) {
+  for (const w of result.withdrawals) {
     const name = w.from_store?.short_name || '未知店铺'
     if (!storeMap[name]) storeMap[name] = { storeName: name, arrival: 0, fee: 0 }
     storeMap[name].arrival += num(w.actual_arrival)
@@ -1218,115 +1211,28 @@ async function loadIncome() {
   }
   const withdrawalDetail = Object.values(storeMap).sort((a, b) => b.arrival - a.arrival)
 
-  // 4. 其他收入
-  const otherIncomeRows = await loadOtherIncome(startISO, endISO)
-  const otherIncome = otherIncomeRows.reduce((s, oi) => s + num(oi.amount), 0)
-
-  // 4.5 员工工资（从 salaries 表）
-  const salaryData = await loadSalaries(startISO, endISO)
-  const totalSalary = salaryData.reduce((s, r) => s + num(r.actual_amount), 0)
-
-  // 4.6 转账手续费（从 account_transfers 表）
-  const transferFees = await loadTransferFees(startISO, endISO)
-
-  // 总收入 & 总成本（直播成本从费用中提取归入营业成本）
-  const revenue = privateRevenue + ecommerceRevenue + otherIncome
-
-  // 5. 费用按分类
-  const { data: expenseRows, error: expErr } = await supabase
-    .from('expenses')
-    .select('amount, category')
-    .eq('status', 'paid')
-    .is('deleted_at', null)
-    .gte('created_at', startISO)
-    .lte('created_at', endISO)
-  if (expErr) { console.error('expenses error:', expErr); return }
-
-  // 按报表分组归类
-  const groupedExpenses = { cogs: {}, labor: {}, operating: {}, financial: {}, admin: {}, investing: {}, other: {} }
-  const groupTotals = { cogs: 0, labor: 0, operating: 0, financial: 0, admin: 0, investing: 0, other: 0 }
-  for (const e of (expenseRows || [])) {
-    const cat = normalizeCategory(e.category)
-    const group = REPORT_GROUP[cat] || 'operating'
-    const amt = num(e.amount)
-    groupedExpenses[group][cat] = (groupedExpenses[group][cat] || 0) + amt
-    groupTotals[group] = (groupTotals[group] || 0) + amt
-  }
-
-  function groupDetail(group) {
-    return Object.entries(groupedExpenses[group] || {})
-      .map(([category, amount]) => ({ category, amount }))
-      .sort((a, b) => b.amount - a.amount)
-  }
-
-  const livestreamCost = groupTotals.cogs
-  const cost = privateCost + Math.max(0, ecommerceFees) + livestreamCost
-  const grossProfit = revenue - cost
-
-  // 人工成本 = expenses 里 labor 类 + salaries 表的员工工资
-  const laborCost = groupTotals.labor + totalSalary
-  const laborDetail = groupDetail('labor')
-  if (totalSalary > 0) {
-    laborDetail.unshift({ category: '_salary_system', amount: totalSalary })
-  }
-  const operatingCost = groupTotals.operating
-  const operatingDetail = groupDetail('operating')
-  const adminCost = groupTotals.admin
-  const adminDetail = groupDetail('admin')
-  // 财务费用 = expenses 里 financial 类 + 转账手续费
-  const financialCost = groupTotals.financial + transferFees
-  const financialDetail = groupDetail('financial')
-  if (transferFees > 0) {
-    financialDetail.push({ category: '_transfer_fee', amount: transferFees })
-  }
-
-  // 6. 退款（私域 + 电商分开）
-  const { data: refundRows, error: refErr } = await supabase
-    .from('refunds')
-    .select('refund_amount, order_id')
-    .eq('status', 'completed')
-    .is('deleted_at', null)
-    .gte('created_at', startISO)
-    .lte('created_at', endISO)
-  if (refErr) { console.error('refunds error:', refErr); return }
-
-  // 查退款关联的订单，区分私域和电商
-  const refundOrderIds = (refundRows || []).map(r => r.order_id).filter(Boolean)
-  let ecommerceOrderIdSet = new Set()
-  if (refundOrderIds.length > 0) {
-    const { data: refundOrders } = await supabase
-      .from('orders')
-      .select('id, platform_type')
-      .in('id', refundOrderIds)
-    for (const ro of (refundOrders || [])) {
-      if (ro.platform_type) ecommerceOrderIdSet.add(ro.id)
-    }
-  }
-
-  let privateRefunds = 0
-  let ecommerceRefunds = 0
-  for (const r of (refundRows || [])) {
-    const amt = num(r.refund_amount)
-    if (ecommerceOrderIdSet.has(r.order_id)) {
-      ecommerceRefunds += amt
-    } else {
-      privateRefunds += amt
-    }
-  }
-  const refunds = privateRefunds + ecommerceRefunds
-
-  const netProfit = grossProfit - laborCost - operatingCost - adminCost - financialCost - refunds
-
   incomeData.value = {
-    revenue, privateRevenue, ecommerceRevenue, otherIncome,
-    cost, privateCost, ecommerceFees: Math.max(0, ecommerceFees), livestreamCost,
-    grossProfit,
-    laborCost, laborDetail,
-    operatingCost, operatingDetail,
-    adminCost, adminDetail,
-    financialCost, financialDetail,
-    refunds, privateRefunds, ecommerceRefunds,
-    netProfit,
+    revenue: result.revenue,
+    privateRevenue: result.privateRevenue,
+    ecommerceRevenue: result.ecommerceRevenue,
+    otherIncome: result.otherIncome,
+    cost: result.cost,
+    privateCost: result.privateCost,
+    ecommerceFees: result.ecommerceFees,
+    livestreamCost: result.livestreamCost,
+    grossProfit: result.grossProfit,
+    laborCost: result.laborCost,
+    laborDetail: result.laborDetail,
+    operatingCost: result.operatingCost,
+    operatingDetail: result.operatingDetail,
+    adminCost: result.adminCost,
+    adminDetail: result.adminDetail,
+    financialCost: result.financialCost,
+    financialDetail: result.financialDetail,
+    refunds: result.refunds,
+    privateRefunds: result.privateRefunds,
+    ecommerceRefunds: result.ecommerceRefunds,
+    netProfit: result.netProfit,
     withdrawalDetail,
   }
 }
@@ -1593,6 +1499,11 @@ async function loadCashflow() {
 }
 
 // ── Tab 5: 权益变动表 ──
+//
+// BUG-4 修复：原本这里有自己的"净利润"算法（revenue - privateCost - 全部expenses - 退款），
+// 和利润表 tab 的算法不同（利润表是 grossProfit - 5项费用 - 退款），用户切 tab
+// 看到不一样的"净利润"。现在 netIncome / privateProfit / ecommerceProfit 全部从
+// computeIncomeStatement 取，和利润表 tab 用同一份计算结果。
 async function loadEquity() {
   const startISO = startDate.value + 'T00:00:00'
   const endISO = endDate.value + 'T23:59:59'
@@ -1619,68 +1530,17 @@ async function loadEquity() {
   const currentLiabilities = (loans || []).reduce((s, l) => s + num(l.remaining_principal), 0)
   const endingEquity = currentAssets + fixedAssets - currentLiabilities
 
-  // 私域净利润
-  const { data: privateOrders } = await supabase
-    .from('orders')
-    .select('id, amount, payment_amount')
-    .in('status', ['completed', 'partially_refunded'])
-    .is('deleted_at', null)
-    .is('platform_type', null)
-    .gte('created_at', startISO)
-    .lte('created_at', endISO)
-  const privateRevenue = (privateOrders || []).reduce((s, o) => s + orderAmt(o), 0)
-  const privateOrderIds = (privateOrders || []).map(o => o.id)
-
-  let privateCost = 0
-  if (privateOrderIds.length > 0) {
-    const { data: items } = await supabase
-      .from('order_items')
-      .select('unit_cost, quantity')
-      .in('order_id', privateOrderIds)
-    privateCost = (items || []).reduce((s, i) => s + num(i.unit_cost) * num(i.quantity), 0)
+  // 净利润：复用利润表的完整账面口径，跨 tab 一致
+  let incomeResult
+  try {
+    incomeResult = await computeIncomeStatement(supabase, startISO, endISO)
+  } catch (e) {
+    console.error('computeIncomeStatement error in loadEquity:', e)
+    return
   }
-
-  // 电商提现利润
-  const withdrawals = await loadWithdrawals(startISO, endISO)
-  const ecommerceRevenue = withdrawals.reduce((s, w) => s + num(w.actual_arrival), 0)
-
-  // 其他收入
-  const otherIncomeRows = await loadOtherIncome(startISO, endISO)
-  const otherIncomeTotal = otherIncomeRows.reduce((s, oi) => s + num(oi.amount), 0)
-
-  // 费用
-  const { data: expenseRows } = await supabase
-    .from('expenses')
-    .select('amount')
-    .eq('status', 'paid')
-    .is('deleted_at', null)
-    .gte('created_at', startISO)
-    .lte('created_at', endISO)
-  const expenseTotal = (expenseRows || []).reduce((s, e) => s + num(e.amount), 0)
-
-  // 员工工资
-  const salaryRows = await loadSalaries(startISO, endISO)
-  const salaryTotal = salaryRows.reduce((s, r) => s + num(r.actual_amount), 0)
-
-  // 转账手续费
-  const transferFeesTotal = await loadTransferFees(startISO, endISO)
-
-  const totalExpenses = expenseTotal + salaryTotal + transferFeesTotal
-
-  // 退款
-  const { data: refundRows } = await supabase
-    .from('refunds')
-    .select('refund_amount')
-    .eq('status', 'completed')
-    .is('deleted_at', null)
-    .gte('created_at', startISO)
-    .lte('created_at', endISO)
-  const totalRefunds = (refundRows || []).reduce((s, r) => s + num(r.refund_amount), 0)
-
-  const totalRevenue = privateRevenue + ecommerceRevenue + otherIncomeTotal
-  const netIncome = totalRevenue - privateCost - totalExpenses - totalRefunds
-  const privateProfit = privateRevenue - privateCost - totalRefunds
-  const ecommerceProfit = ecommerceRevenue // 电商提现已经扣除手续费了
+  const netIncome = incomeResult.netProfit
+  const privateProfit = incomeResult.privateProfit
+  const ecommerceProfit = incomeResult.ecommerceProfit
 
   // 垫资变动
   const { data: periodLoans } = await supabase

@@ -477,7 +477,7 @@ async function loadOrders() {
     pagination.total = count || 0
   } catch (e) {
     console.error('加载电商订单失败:', e)
-    toast('加载失败', 'error')
+    toast('加载电商订单失败：' + (e?.message || e?.code || '未知错误'), 'error')
   } finally {
     loading.value = false
   }

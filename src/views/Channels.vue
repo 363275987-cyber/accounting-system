@@ -165,9 +165,10 @@ const pageSize = 20
 const showAssignModal = ref(false)
 const assignForm = ref({ account_id: '', sales_id: '', note: '' })
 
-const wechatAccounts = computed(() => accounts.value.filter(a => a.platform === 'wechat'))
-const alipayAccounts = computed(() => accounts.value.filter(a => a.platform === 'alipay'))
-const bankAccounts = computed(() => accounts.value.filter(a => a.platform === 'bank'))
+// 只展示 active 账户；accountsByIP 已按 status 过滤，这三组之前漏了 → 废弃账户会出现在分配下拉里
+const wechatAccounts = computed(() => accounts.value.filter(a => a.platform === 'wechat' && a.status === 'active'))
+const alipayAccounts = computed(() => accounts.value.filter(a => a.platform === 'alipay' && a.status === 'active'))
+const bankAccounts = computed(() => accounts.value.filter(a => a.platform === 'bank' && a.status === 'active'))
 const accountsByIP = computed(() => {
   const groups = {}
   for (const acc of accounts.value.filter(a => a.status === 'active' && !['wechat','alipay','bank'].includes(a.platform))) {
@@ -220,7 +221,8 @@ async function loadData() {
       sales_name: item.profiles?.name || '',
     }))
   } catch (e) {
-    console.error('Failed to load data:', e)
+    console.error('[Channels] Failed to load data:', e)
+    toast('渠道数据加载失败：' + (e?.message || e?.code || '未知错误'), 'error')
   } finally {
     loading.value = false
   }

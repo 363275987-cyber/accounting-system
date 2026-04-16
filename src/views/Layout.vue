@@ -169,6 +169,7 @@ const ROUTE_TITLES = {
   '/balance': '余额快照',
   '/performance': '业绩统计',
   '/commission': '提成管理',
+  '/salary': '工资管理',
   '/reports': '财务报表',
   '/platforms': '平台收入',
   '/platform-integration': '凭证配置',
@@ -176,7 +177,6 @@ const ROUTE_TITLES = {
   '/products': '产品库',
   '/customers': '客户管理',
   '/coaching': '教练系统',
-  '/legal-reports': '法定报表',
   '/users': '用户管理',
   '/sales-groups': '销售分组',
   '/settings': '系统设置',
@@ -308,6 +308,7 @@ const menuGroups = computed(() => {
     items: [
       { label: '业绩总览', path: '/performance' },
       { label: '提成管理', path: '/commission' },
+      { label: '工资管理', path: '/salary' },
       { label: '销售分组', path: '/sales-groups' },
       { label: '教练管理', path: '/coaching' },
       { label: '客服号管理', path: '/service-numbers' },
@@ -344,7 +345,6 @@ const menuGroups = computed(() => {
     label: '报表',
     items: [
       { label: '财务报表', path: '/reports' },
-      { label: '法务报表', path: '/legal-reports' },
     ],
   })
 
@@ -371,7 +371,7 @@ async function fetchPendingCount() {
     if (!error && data != null) {
       pendingCount.value = Number(data) || 0
     }
-  } catch (e) {}
+  } catch (e) { console.warn("[silent catch]", e?.message || e) }
 }
 
 onMounted(() => {

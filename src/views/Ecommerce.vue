@@ -546,6 +546,7 @@ async function openStoreDetail(store) {
       .select('id, amount, note, payee, created_at')
       .eq('category', '电商手续费')
       .eq('payee', store.short_name)
+      .is('deleted_at', null)
       .order('created_at', { ascending: false })
       .limit(200)
 

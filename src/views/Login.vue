@@ -212,7 +212,7 @@ onMounted(() => {
         rememberMe.value = true
       }
     }
-  } catch (e) {}
+  } catch (e) { console.warn("[silent catch]", e?.message || e) }
 
   // 监听 Supabase PASSWORD_RECOVERY 事件
   // 当用户点击重置链接回到页面时，Supabase 会自动处理 token 并触发此事件
@@ -252,7 +252,7 @@ function saveAccount(emailVal, passwordVal, role) {
     accounts = accounts.slice(0, 5)
     localStorage.setItem(STORAGE_KEY, JSON.stringify(accounts))
     savedAccounts.value = accounts
-  } catch (e) {}
+  } catch (e) { console.warn("[silent catch]", e?.message || e) }
 }
 
 function removeSavedAccount(emailVal) {
@@ -261,7 +261,7 @@ function removeSavedAccount(emailVal) {
     accounts = accounts.filter(a => a.email !== emailVal)
     localStorage.setItem(STORAGE_KEY, JSON.stringify(accounts))
     savedAccounts.value = accounts
-  } catch (e) {}
+  } catch (e) { console.warn("[silent catch]", e?.message || e) }
 }
 
 async function handleLogin() {
