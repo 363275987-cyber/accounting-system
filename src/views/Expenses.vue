@@ -1634,6 +1634,82 @@ function extractPayee(text, matchedKw) {
   return ''
 }
 
+// ══════════════════════════════════════════════════════════
+// 账户模糊匹配：输入"达一般户"能命中"达公户-一般户"
+// 策略：精确 > 子串包含 > 字符按顺序出现（子序列）
+// 归一化：去掉空格/连字符/分隔符，比较更宽松
+// ══════════════════════════════════════════════════════════
+function fuzzyMatchAccount(input, accounts) {
+  if (!input) return null
+  const norm = s => (s || '').replace(/[\s\-_·•・—－]/g, '')
+  const ni = norm(input)
+  if (!ni) return null
+
+  let best = null
+  let bestScore = -1
+  for (const acc of accounts) {
+    const target = norm(acc.short_name || acc.code)
+    if (!target) continue
+    let score = -1
+    if (target === ni) return acc
+    if (target.includes(ni) || ni.includes(target)) {
+      score = 1000 - Math.abs(target.length - ni.length)
+    } else {
+      // 子序列：输入字符按顺序出现在目标里
+      let i = 0
+      for (const c of target) {
+        if (c === ni[i]) i++
+        if (i === ni.length) break
+      }
+      if (i === ni.length) score = 500 - Math.abs(target.length - ni.length)
+    }
+    if (score > bestScore) { bestScore = score; best = acc }
+  }
+  return best
+}
+
+// ══════════════════════════════════════════════════════════
+// 配对转账识别：
+//   输入形如 "达一般户支出300.01，达基本户收到300.01"
+//   → 识别为 一条 transfer：达一般户 → 达基本户 ¥300.01
+// 支持动词：支出/转出/付出/给出/扣款/划出  和  收到/转入/入账/到账/收款
+// 分隔符：中英文逗号/分号/顿号/换行/空格
+// ══════════════════════════════════════════════════════════
+const OUT_VERBS = '支出|转出|付出|给出|扣款|扣除|划出'
+const IN_VERBS  = '收到|转入|入账|到账|收款'
+function tryPairTransfer(line, accounts) {
+  const parts = line.split(/[,，;；、\n]/).map(s => s.trim()).filter(Boolean)
+  if (parts.length < 2) return null
+  const outs = [], ins = []
+  const reOut = new RegExp(`^(.+?)(?:${OUT_VERBS})\\s*([\\d,]+(?:\\.\\d+)?)\\s*(?:元)?$`)
+  const reIn  = new RegExp(`^(.+?)(?:${IN_VERBS})\\s*([\\d,]+(?:\\.\\d+)?)\\s*(?:元)?$`)
+  for (const p of parts) {
+    let m = p.match(reOut)
+    if (m) { outs.push({ name: m[1].trim(), amount: parseFloat(m[2].replace(/,/g, '')) }); continue }
+    m = p.match(reIn)
+    if (m) { ins.push({ name: m[1].trim(), amount: parseFloat(m[2].replace(/,/g, '')) }); continue }
+  }
+  if (outs.length === 0 || ins.length === 0) return null
+  // 按金额等值配对
+  for (const o of outs) {
+    for (const i of ins) {
+      if (Math.abs(o.amount - i.amount) < 0.001) {
+        const fromAcc = fuzzyMatchAccount(o.name, accounts)
+        const toAcc = fuzzyMatchAccount(i.name, accounts)
+        if (fromAcc && toAcc && fromAcc.id !== toAcc.id) {
+          return {
+            amount: o.amount,
+            fromId: fromAcc.id, fromLabel: fromAcc.short_name || fromAcc.code,
+            toId: toAcc.id,     toLabel: toAcc.short_name || toAcc.code,
+            fromInput: o.name, toInput: i.name,
+          }
+        }
+      }
+    }
+  }
+  return null
+}
+
 function parseExpenseText(text) {
   const results = []
 
@@ -1707,6 +1783,39 @@ function parseExpenseText(text) {
 
   for (const { desc, fmtAmount } of entries) {
     const line = desc
+
+    // ── Step 0: 配对转账识别（"A支出N，B收到N"格式） ──
+    // 在走普通识别之前先尝试，命中直接 push 一条 transfer 条目
+    const pair = tryPairTransfer(line, activeAccs)
+    if (pair) {
+      const noteText = `${pair.fromInput} → ${pair.toInput}`.trim()
+      results.push({
+        _rawText: desc,
+        _type: 'transfer',
+        _originalType: 'transfer',
+        _typeChanged: false,
+        _learnKeyword: '',
+        _confidence: 95,
+        _matchSource: 'pair',
+        _uploading: false,
+        _originalAccountId: pair.fromId,
+        _accountChanged: false,
+        _learnAccountKeyword: '',
+        account_id: pair.fromId,
+        account_label: pair.fromLabel,
+        amount: pair.amount,
+        category: '',
+        payee: '',
+        note: noteText,
+        receipt_url: '',
+        _dayOfMonth: null,
+        _monthNum: null,
+        expense_date: new Date().toISOString().slice(0, 10),
+        target_account_id: pair.toId,
+      })
+      continue
+    }
+
     let type = 'expense'
     let matchedAccountId = ''
     let matchedAccount = ''
