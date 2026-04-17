@@ -46,6 +46,8 @@
                       class="text-xs px-2 py-0.5 border border-gray-200 rounded hover:bg-gray-100 cursor-pointer">✏️ 改</button>
                     <button v-if="f.sourceRoute" @click="gotoSource(f)"
                       class="text-xs px-2 py-0.5 border border-blue-200 text-blue-600 rounded hover:bg-blue-50 cursor-pointer">↗ 源页</button>
+                    <button v-if="f.type === 'adjust_in' || f.type === 'adjust_out'" @click="revertAdjustment(f)"
+                      class="text-xs px-2 py-0.5 border border-red-200 text-red-500 rounded hover:bg-red-50 cursor-pointer">撤销</button>
                   </div>
                 </div>
               </div>
@@ -173,6 +175,11 @@ function typeLabel(t) {
     withdrawal_out: '店铺提现',
     withdrawal_in: '提现到账',
     store_deposit: '店铺入账',
+    adjust_in: '调整入账',
+    adjust_out: '调整扣减',
+    loan_in: '股东借入',
+    repay_out: '借款还出',
+    dividend_out: '分红',
   }[t] || t
 }
 function typeClass(t) {
@@ -185,6 +192,11 @@ function typeClass(t) {
     withdrawal_in:   'bg-teal-100 text-teal-700',
     withdrawal_out:  'bg-purple-100 text-purple-700',
     store_deposit:   'bg-emerald-100 text-emerald-700',
+    adjust_in:       'bg-amber-100 text-amber-700',
+    adjust_out:      'bg-amber-100 text-amber-700',
+    loan_in:         'bg-indigo-100 text-indigo-700',
+    repay_out:       'bg-indigo-50 text-indigo-500',
+    dividend_out:    'bg-rose-100 text-rose-600',
   }[t] || 'bg-gray-100 text-gray-600'
 }
 
@@ -267,6 +279,38 @@ async function loadFlows() {
           balanceSync: 'deposit', primaryAcc: acc,
           sourceRoute: { name: 'Ecommerce', query: { store: acc, detail: '1' } },
         }))))
+
+      // 手动调整(amount > 0 入账方向)
+      tasks.push(supabase.from('manual_adjustments')
+        .select('id, amount, adjustment_date, created_at, note')
+        .eq('account_id', acc).eq('status', 'completed').is('deleted_at', null)
+        .gt('amount', 0)
+        .gte('adjustment_date', fromIso.value).lte('adjustment_date', toIso.value)
+        .then(({ data }) => (data || []).map(r => ({
+          key: 'adj-' + r.id, type: 'adjust_in',
+          flow_at: r.adjustment_date || r.created_at,
+          abs_amount: Number(r.amount || 0),
+          summary: r.note || '手动调整',
+          sub: '',
+          editable: true, table: 'manual_adjustments', id: r.id,
+          amountField: 'amount', dateField: 'adjustment_date', noteField: 'note',
+          balanceSync: 'adjust', primaryAcc: acc,
+        }))))
+
+      // 股东借入(收到钱)
+      tasks.push(supabase.from('shareholder_loans')
+        .select('id, loan_amount, start_date, created_at, receive_account_id')
+        .eq('receive_account_id', acc).is('deleted_at', null)
+        .gte('start_date', fromIso.value.slice(0,10)).lte('start_date', toIso.value.slice(0,10))
+        .then(({ data }) => (data || []).map(r => ({
+          key: 'loan-' + r.id, type: 'loan_in',
+          flow_at: r.start_date || r.created_at,
+          abs_amount: Number(r.loan_amount || 0),
+          summary: '股东借款入账',
+          sub: '',
+          editable: false, table: 'shareholder_loans', id: r.id,
+          sourceRoute: { name: 'ShareholderLoans' },
+        }))))
     } else {
       // 支出
       tasks.push(supabase.from('expenses')
@@ -337,6 +381,53 @@ async function loadFlows() {
           _old_actual: Number(r.actual_arrival ?? r.amount ?? 0),
           sourceRoute: { name: 'Ecommerce', query: { store: r.account_id, detail: '1' } },
         }))))
+
+      // 手动调整(amount < 0 扣减方向)
+      tasks.push(supabase.from('manual_adjustments')
+        .select('id, amount, adjustment_date, created_at, note')
+        .eq('account_id', acc).eq('status', 'completed').is('deleted_at', null)
+        .lt('amount', 0)
+        .gte('adjustment_date', fromIso.value).lte('adjustment_date', toIso.value)
+        .then(({ data }) => (data || []).map(r => ({
+          key: 'adjn-' + r.id, type: 'adjust_out',
+          flow_at: r.adjustment_date || r.created_at,
+          abs_amount: Math.abs(Number(r.amount || 0)),
+          summary: r.note || '手动调整',
+          sub: '',
+          editable: true, table: 'manual_adjustments', id: r.id,
+          amountField: 'amount', dateField: 'adjustment_date', noteField: 'note',
+          balanceSync: 'adjust_neg', primaryAcc: acc,
+        }))))
+
+      // 借款还款(公司还股东 → 出账)
+      tasks.push(supabase.from('loan_repayments')
+        .select('id, repayment_amount, repayment_date, created_at, account_id')
+        .eq('account_id', acc).is('deleted_at', null)
+        .gte('repayment_date', fromIso.value.slice(0,10)).lte('repayment_date', toIso.value.slice(0,10))
+        .then(({ data }) => (data || []).map(r => ({
+          key: 'repay-' + r.id, type: 'repay_out',
+          flow_at: r.repayment_date || r.created_at,
+          abs_amount: Number(r.repayment_amount || 0),
+          summary: '股东借款还款',
+          sub: '',
+          editable: false, table: 'loan_repayments', id: r.id,
+          sourceRoute: { name: 'ShareholderLoans' },
+        }))))
+
+      // 分红
+      tasks.push(supabase.from('dividends')
+        .select('id, amount, pay_date, created_at, account_id')
+        .eq('account_id', acc).is('deleted_at', null)
+        .gte('pay_date', fromIso.value.slice(0,10)).lte('pay_date', toIso.value.slice(0,10))
+        .then(({ data }) => (data || []).map(r => ({
+          key: 'div-' + r.id, type: 'dividend_out',
+          flow_at: r.pay_date || r.created_at,
+          abs_amount: Number(r.amount || 0),
+          summary: '股东分红',
+          sub: '',
+          editable: false, table: 'dividends', id: r.id,
+          sourceRoute: { name: 'Dividends' },
+        }))))
     }
 
     const results = await Promise.all(tasks)
@@ -370,7 +461,12 @@ async function saveEdit(f) {
 
     // 1) 构造 patch
     const patch = {}
-    patch[f.amountField] = newAmt
+    // manual_adjustments 扣减方向：DB 里 amount 存负数，UI 展示绝对值
+    if (f.balanceSync === 'adjust_neg') {
+      patch[f.amountField] = -newAmt
+    } else {
+      patch[f.amountField] = newAmt
+    }
     // withdrawal 特殊处理：改 actual_arrival 或 amount 时保持另一侧一致(保留 fee 不变)
     if (f.balanceSync === 'withdrawal') {
       // 改了 actual_arrival → amount = actual_arrival + fee
@@ -395,14 +491,16 @@ async function saveEdit(f) {
       const deltas = {}  // accountId → delta
       const add = (accId, d) => { if (!accId) return; deltas[accId] = (deltas[accId] || 0) + d }
       switch (f.balanceSync) {
-        case 'order':        add(f.primaryAcc, +delta); break   // 订单增加 → 余额加
-        case 'expense':      add(f.primaryAcc, -delta); break   // 支出增加 → 余额减
-        case 'refund':       add(f.primaryAcc, -delta); break   // 退款增加 → 余额减
-        case 'transfer':     add(f.primaryAcc, +delta); add(f.secondaryAcc, -delta); break  // 转入侧 +delta，转出侧 -delta
+        case 'order':        add(f.primaryAcc, +delta); break
+        case 'expense':      add(f.primaryAcc, -delta); break
+        case 'refund':       add(f.primaryAcc, -delta); break
+        case 'transfer':     add(f.primaryAcc, +delta); add(f.secondaryAcc, -delta); break
         case 'transfer_out': add(f.primaryAcc, -delta); add(f.secondaryAcc, +delta); break
-        case 'withdrawal':   add(f.primaryAcc, +delta); add(f.secondaryAcc, -delta); break  // 改到账额：目标+，店铺-
-        case 'withdrawal_out': add(f.primaryAcc, -delta); add(f.secondaryAcc, +delta); break // 改扣款：店铺-，目标+
+        case 'withdrawal':   add(f.primaryAcc, +delta); add(f.secondaryAcc, -delta); break
+        case 'withdrawal_out': add(f.primaryAcc, -delta); add(f.secondaryAcc, +delta); break
         case 'deposit':      add(f.primaryAcc, +delta); break
+        case 'adjust':       add(f.primaryAcc, +delta); break   // manual_adjust 入账：改金额 → 同方向同步
+        case 'adjust_neg':   add(f.primaryAcc, -delta); break   // 出账方向：UI 显绝对值，DB 里是负数，delta 在绝对值上变化 → 余额反向
       }
       // 逐账户更新 balance（读-改-写）
       for (const [accId, d] of Object.entries(deltas)) {
@@ -429,6 +527,19 @@ async function saveEdit(f) {
 function gotoSource(f) {
   if (!f.sourceRoute) return
   router.push(f.sourceRoute)
+}
+
+async function revertAdjustment(f) {
+  if (!confirm(`撤销这笔${f.type === 'adjust_in' ? '调整入账' : '调整扣减'}？该记录会被软删，账户余额同步回滚。`)) return
+  try {
+    const { error } = await supabase.rpc('revert_manual_adjustment', { p_id: f.id })
+    if (error) throw error
+    toast('已撤销', 'success')
+    emit('updated')
+    await loadFlows()
+  } catch (e) {
+    toast('撤销失败：' + (e.message || ''), 'error')
+  }
 }
 
 // ========== 补录流水 ==========

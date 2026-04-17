@@ -9,6 +9,22 @@
       </button>
     </div>
 
+    <!-- 漂移巡检 banner:live_balance 与 RPC closing 不一致时提示 -->
+    <div v-if="drift.length > 0" class="mb-4 bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-3">
+      <div class="text-amber-500 text-lg">⚠️</div>
+      <div class="flex-1 text-sm">
+        <div class="font-medium text-amber-800">{{ drift.length }} 个账户余额对不齐</div>
+        <div class="text-xs text-amber-700 mt-0.5">
+          总差额 {{ totalDrift >= 0 ? '+' : '' }}{{ formatMoney(totalDrift) }} ——
+          <span v-for="(d, i) in drift.slice(0, 3)" :key="d.account_id">
+            {{ d.short_name }} {{ Number(d.diff) >= 0 ? '+' : '' }}{{ formatMoney(d.diff) }}<span v-if="i < Math.min(drift.length, 3) - 1">、</span>
+          </span>
+          <span v-if="drift.length > 3">…</span>
+        </div>
+      </div>
+      <button @click="reloadDrift" class="text-xs px-2 py-1 border border-amber-300 text-amber-700 rounded hover:bg-amber-100 cursor-pointer">重新检查</button>
+    </div>
+
     <!-- Date range picker -->
     <div class="bg-white rounded-xl border border-gray-100 p-4 mb-4 flex flex-wrap items-center gap-3">
       <div class="flex items-center gap-1">
@@ -284,6 +300,20 @@ const loading = ref(false)
 const rows = ref([])   // [{ account_id, short_name, code, ip_code, category, opening, increase, decrease, closing }]
 const hideInactive = ref(false)  // 隐藏本期无变化的账户
 
+// ========== 漂移巡检 ==========
+const drift = ref([])
+const totalDrift = computed(() => drift.value.reduce((s, d) => s + Number(d.diff || 0), 0))
+async function reloadDrift() {
+  try {
+    const { data, error } = await supabase.rpc('check_balance_drift')
+    if (error) throw error
+    drift.value = data || []
+  } catch (e) {
+    console.warn('[drift] check failed', e)
+    drift.value = []
+  }
+}
+
 async function loadMatrix() {
   if (!fromDate.value || !toDate.value) return
   loading.value = true
@@ -473,6 +503,7 @@ onMounted(() => {
   const now = new Date()
   currentMonth.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   applyPreset('thisMonth')  // 默认本月至今
+  reloadDrift()             // 每次进页检查一次余额漂移
 })
 
 watch(() => [fromDate.value, toDate.value], () => {

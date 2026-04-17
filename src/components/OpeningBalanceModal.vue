@@ -235,6 +235,29 @@ async function handleSave() {
       }
     }
 
+    // 2.5 写 manual_adjustments 保证余额对账 RPC 与 live balance 保持一致
+    // 公式：adjust = (delta_balance_live) - (delta_opening)
+    //   让 RPC closing_new = closing_old + delta_balance_live = live_new
+    try {
+      const deltaOpening = newOpening - oldOpening
+      const deltaLive = balanceChanged ? (newOpening - oldBalance) : 0
+      const adjAmt = deltaLive - deltaOpening
+      if (Math.abs(adjAmt) > 0.005) {
+        const { data: { session } } = await supabase.auth.getSession()
+        const userId = session?.user?.id
+        await supabase.from('manual_adjustments').insert({
+          account_id: accountId,
+          amount: adjAmt,
+          adjustment_date: new Date().toISOString(),
+          note: `期初校准补偿 ${accountName}` + (note ? `：${note}` : ''),
+          recorded_by: userId,
+          status: 'completed',
+        })
+      }
+    } catch (e) {
+      console.warn('[OpeningBalance] 写 manual_adjustments 失败（不阻断主流程）', e)
+    }
+
     // 3. 写操作日志
     try {
       const { logOperation } = await import('../utils/operationLogger')

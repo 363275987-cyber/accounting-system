@@ -296,6 +296,12 @@
                 class="text-gray-400 hover:text-blue-600 cursor-pointer text-xs ml-1"
                 title="重设期初余额（新财年/数据清空后校准）"
               >📌 期初</button>
+              <button
+                v-if="authStore.isFinance"
+                @click="openAdjustModal(acc)"
+                class="text-gray-400 hover:text-amber-600 cursor-pointer text-xs ml-1"
+                title="手动调整（写入 manual_adjustments 流水，可审计、可撤销）"
+              >⚖️ 调整</button>
               <button @click="toggleFreeze(acc)" class="text-gray-500 hover:text-orange-500 cursor-pointer text-xs ml-1">{{ acc.status === 'active' ? '🔒' : '🔓' }}</button>
               <button v-if="canDelete" @click="handleDelete(acc)" class="text-gray-500 hover:text-red-500 cursor-pointer text-xs ml-1">🗑️</button>
             </td>
@@ -548,6 +554,60 @@
       @close="showBatchOpeningModal = false"
       @saved="onBatchOpeningSaved"
     />
+
+    <!-- 手动调整余额弹窗 -->
+    <Teleport to="body">
+      <div v-if="showAdjustModal" class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" @click.self="showAdjustModal = false">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+          <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div>
+              <h2 class="font-bold text-gray-800">⚖️ 手动调整余额</h2>
+              <p class="text-[11px] text-gray-500 mt-0.5">账户：{{ adjustForm.accountName }}（当前 ¥{{ formatMoney(adjustForm.currentBalance) }}）</p>
+            </div>
+            <button @click="showAdjustModal = false" class="text-gray-500 hover:text-gray-700 text-xl cursor-pointer">&times;</button>
+          </div>
+          <div class="px-6 py-4 space-y-4">
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">方向</label>
+              <div class="flex gap-2">
+                <button @click="adjustForm.direction = 'in'"
+                  :class="adjustForm.direction === 'in' ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-gray-600 border-gray-200'"
+                  class="flex-1 px-3 py-2 border rounded-lg text-sm cursor-pointer">+ 入账（加余额）</button>
+                <button @click="adjustForm.direction = 'out'"
+                  :class="adjustForm.direction === 'out' ? 'bg-red-500 text-white border-red-500' : 'bg-white text-gray-600 border-gray-200'"
+                  class="flex-1 px-3 py-2 border rounded-lg text-sm cursor-pointer">- 扣减（减余额）</button>
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">金额</label>
+              <input v-model.number="adjustForm.amount" type="number" step="0.01" min="0" placeholder="0.00"
+                class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-amber-500">
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">日期</label>
+              <input v-model="adjustForm.date" type="date"
+                class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-amber-500">
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1">原因/备注（必填）</label>
+              <input v-model="adjustForm.note" type="text" placeholder="例：利息收入 / 银行年费 / 盘点差额"
+                class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-amber-500">
+            </div>
+            <div v-if="adjustForm.amount > 0" class="p-3 rounded-lg text-sm"
+              :class="adjustForm.direction === 'in' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'">
+              调整后余额：<span class="font-bold">¥{{ formatMoney(adjustPreview) }}</span>
+            </div>
+          </div>
+          <div class="px-6 py-3 border-t border-gray-100 flex justify-end gap-2">
+            <button @click="showAdjustModal = false" class="px-4 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50 cursor-pointer">取消</button>
+            <button @click="saveAdjustment" :disabled="adjustSaving || !adjustForm.amount || adjustForm.amount <= 0 || !adjustForm.note.trim()"
+              class="px-4 py-2 bg-amber-500 text-white rounded-lg text-sm hover:bg-amber-600 disabled:opacity-50 cursor-pointer">
+              {{ adjustSaving ? '保存中…' : '保存调整' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 
   <!-- 排序弹窗 -->
@@ -634,6 +694,76 @@ function onOpeningSaved() {
 const showBatchOpeningModal = ref(false)
 function onBatchOpeningSaved() {
   // 组件内部已 fetchAccounts + toast
+}
+
+// 手动调整余额弹窗
+const showAdjustModal = ref(false)
+const adjustSaving = ref(false)
+const adjustForm = reactive({
+  accountId: '',
+  accountName: '',
+  currentBalance: 0,
+  direction: 'in',           // 'in' | 'out'
+  amount: null,
+  date: new Date().toISOString().slice(0, 10),
+  note: '',
+})
+const adjustPreview = computed(() => {
+  const a = Number(adjustForm.amount || 0)
+  return adjustForm.direction === 'in'
+    ? Number(adjustForm.currentBalance) + a
+    : Number(adjustForm.currentBalance) - a
+})
+
+function openAdjustModal(acc) {
+  if (!authStore.isFinance) return
+  Object.assign(adjustForm, {
+    accountId: acc.id,
+    accountName: acc.short_name || acc.code || '',
+    currentBalance: Number(acc.balance || 0),
+    direction: 'in',
+    amount: null,
+    date: new Date().toISOString().slice(0, 10),
+    note: '',
+  })
+  showAdjustModal.value = true
+}
+
+async function saveAdjustment() {
+  if (adjustSaving.value) return
+  const amt = Number(adjustForm.amount || 0)
+  if (amt <= 0) { toast('请填金额', 'warning'); return }
+  if (!adjustForm.note.trim()) { toast('请填调整原因', 'warning'); return }
+  adjustSaving.value = true
+  try {
+    const signed = adjustForm.direction === 'in' ? amt : -amt
+    const { data: { session } } = await supabase.auth.getSession()
+    const userId = session?.user?.id
+    const isoDate = new Date(adjustForm.date + 'T12:00:00+08:00').toISOString()
+    // 1) 写流水
+    const { error: ie } = await supabase.from('manual_adjustments').insert({
+      account_id: adjustForm.accountId,
+      amount: signed,
+      adjustment_date: isoDate,
+      note: adjustForm.note.trim(),
+      recorded_by: userId,
+      status: 'completed',
+    })
+    if (ie) throw ie
+    // 2) 同步 balance
+    const newBal = Number(adjustForm.currentBalance) + signed
+    const { error: ue } = await supabase.from('accounts').update({ balance: newBal }).eq('id', adjustForm.accountId)
+    if (ue) throw ue
+    // 3) 本地 store 同步
+    const idx = accountStore.accounts.findIndex(a => a.id === adjustForm.accountId)
+    if (idx >= 0) accountStore.accounts[idx].balance = newBal
+    toast(`调整成功：${adjustForm.accountName} ${signed >= 0 ? '+' : ''}${signed.toFixed(2)}`, 'success')
+    showAdjustModal.value = false
+  } catch (e) {
+    toast('调整失败：' + (e.message || ''), 'error')
+  } finally {
+    adjustSaving.value = false
+  }
 }
 
 const isEditing = ref(false)
