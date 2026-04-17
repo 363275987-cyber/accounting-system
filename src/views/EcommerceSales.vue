@@ -134,17 +134,23 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
-import { use } from 'echarts/core'
-import { CanvasRenderer } from 'echarts/renderers'
-import { LineChart } from 'echarts/charts'
-import { GridComponent, TooltipComponent, LegendComponent } from 'echarts/components'
-import VChart from 'vue-echarts'
+import { ref, computed, watch, onMounted, defineAsyncComponent } from 'vue'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/auth'
 import { PLATFORM_LABELS } from '../lib/utils'
 
-use([CanvasRenderer, LineChart, GridComponent, TooltipComponent, LegendComponent])
+// ⚠️ echarts + vue-echarts 异步加载(合计 ~430KB),渲染到图表时才下载
+const VChart = defineAsyncComponent(async () => {
+  const [{ use }, { CanvasRenderer }, { LineChart }, { GridComponent, TooltipComponent, LegendComponent }, VueEcharts] = await Promise.all([
+    import('echarts/core'),
+    import('echarts/renderers'),
+    import('echarts/charts'),
+    import('echarts/components'),
+    import('vue-echarts'),
+  ])
+  use([CanvasRenderer, LineChart, GridComponent, TooltipComponent, LegendComponent])
+  return VueEcharts.default || VueEcharts
+})
 
 const auth = useAuthStore()
 
