@@ -1015,6 +1015,7 @@ async function saveAccount() {
         platform: form.platform,
         short_name: form.short_name.trim(),
         code: form.short_name.trim(),
+        owner_code: '—',  // DB NOT NULL，表单不暴露此字段，与电商店铺创建保持一致
         real_name: form.real_name?.trim() || null,
         cert_phone: form.cert_phone?.trim() || null,
         id_number: form.id_number?.trim() || null,
