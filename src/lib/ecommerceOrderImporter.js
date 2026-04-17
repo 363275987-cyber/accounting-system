@@ -423,6 +423,9 @@ export function parseEcommerceExcel(workbook, options = {}) {
  * @param {Function} params.onProgress - 进度回调
  * @returns {{ success, duplicate, skippedRefunded, failures, netSalesAmount, totalRefundAmount }}
  */
+// 让出主线程一瞬间，避免长时间同步阻塞导致浏览器"无响应"
+const yieldToMainThread = () => new Promise(r => setTimeout(r, 0))
+
 export async function importEcommerceOrders({ salesOrders, afterSalesOrders, supabase: sb, onProgress }) {
   const result = { success: 0, duplicate: 0, skippedRefunded: 0, failures: [], netSalesAmount: 0, totalRefundAmount: 0 }
   const BATCH = 100
@@ -457,7 +460,14 @@ export async function importEcommerceOrders({ salesOrders, afterSalesOrders, sup
   const effectiveOrders = [] // 没被退/部分退 -> 要导入
   const fullyRefundedOrders = [] // 被全额退 -> 不导入，但记录退款金额
 
+  let _loopCounter = 0
   for (const order of salesOrders) {
+    // 每 500 条让一次主线程，防止长文件 parse+match 冻结页面
+    if (++_loopCounter % 500 === 0) {
+      onProgress?.({ type: 'prepare', current: _loopCounter, total: salesOrders.length,
+        message: `对冲匹配中 ${_loopCounter}/${salesOrders.length}...` })
+      await yieldToMainThread()
+    }
     const exactKey = `${order.platform_type}:${order.external_order_no}`
 
     // 先精确匹配
@@ -588,6 +598,7 @@ export async function importEcommerceOrders({ salesOrders, afterSalesOrders, sup
     const chunk = toInsert.slice(i, i + BATCH)
     onProgress?.({ type: 'sales', current: i, total: toInsert.length,
       message: `导入有效订单 ${i + 1}-${Math.min(i + BATCH, toInsert.length)} / ${toInsert.length}` })
+    await yieldToMainThread()  // 每批前让主线程喘气
 
     // 为每条构建 payload
     const payloads = []
@@ -782,11 +793,17 @@ export async function importEcommerceOrders({ salesOrders, afterSalesOrders, sup
   // ========== 第五步：一次性更新所有账户余额 ==========
   onProgress?.({ type: 'balance', current: 0, total: balanceDeltas.size, message: '更新账户余额...' })
 
+  let _balIdx = 0
   for (const [accountId, delta] of balanceDeltas) {
+    _balIdx++
     if (delta === 0) continue
     try {
-      const { data: acc } = await sb.from('accounts').select('balance').eq('id', accountId).single()
-      if (acc) {
+      // ⚠️ 电商店铺 balance_method='manual' 不自动累加余额(和 orders.js 的行为保持一致)
+      const { data: acc } = await sb.from('accounts')
+        .select('balance, category, balance_method')
+        .eq('id', accountId)
+        .single()
+      if (acc && !(acc.category === 'ecommerce' && acc.balance_method === 'manual')) {
         await sb.from('accounts')
           .update({ balance: Number(acc.balance) + delta })
           .eq('id', accountId)
@@ -794,6 +811,7 @@ export async function importEcommerceOrders({ salesOrders, afterSalesOrders, sup
     } catch (e) {
       console.warn('余额更新失败:', accountId, e)
     }
+    if (_balIdx % 10 === 0) await yieldToMainThread()
   }
 
   onProgress?.({ type: 'done', current: 1, total: 1,

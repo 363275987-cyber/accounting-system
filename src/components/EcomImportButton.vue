@@ -193,15 +193,22 @@
               </div>
             </div>
 
+            <!-- 导入进度实时显示 -->
+            <div v-if="ecomImporting && ecomImportProgress"
+              class="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700 flex items-center gap-2">
+              <div class="animate-spin text-blue-500">⏳</div>
+              <span class="flex-1 truncate">{{ ecomImportProgress }}</span>
+            </div>
+
             <div class="flex gap-3 pt-2">
-              <button @click="ecomImportStep = 'upload'; resetEcomImport()" class="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 cursor-pointer">← 重新上传</button>
-              <button @click="showEcommerceImportModal = false; resetEcomImport()" class="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 cursor-pointer">取消</button>
+              <button @click="ecomImportStep = 'upload'; resetEcomImport()" :disabled="ecomImporting" class="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-40 cursor-pointer">← 重新上传</button>
+              <button @click="showEcommerceImportModal = false; resetEcomImport()" :disabled="ecomImporting" class="px-4 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-40 cursor-pointer">取消</button>
               <button
                 @click="handleEcomImport"
                 :disabled="selectedEcomCount === 0 || ecomImporting"
                 class="flex-1 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition"
               >
-                {{ ecomImporting ? '⏳ 导入中...' : `✅ 确认导入 ${selectedEcomCount} 条` }}
+                {{ ecomImporting ? '⏳ 导入中...（请勿关闭窗口）' : `✅ 确认导入 ${selectedEcomCount} 条` }}
               </button>
             </div>
           </div>
@@ -268,6 +275,7 @@ const {
   ecomPlatformMode,
   ecomImporting,
   ecomImportError,
+  ecomImportProgress,
   isEcomDragging,
   ecomSalesOrders,
   ecomAfterSalesOrders,

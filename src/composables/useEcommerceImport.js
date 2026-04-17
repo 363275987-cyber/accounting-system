@@ -13,6 +13,7 @@ export function useEcommerceImport({ loadOrders, loadStats, loadTodayOrdersData 
   const ecomPlatformMode = ref('auto') // auto | douyin | kuaishou | shipinhao
   const ecomImporting = ref(false)
   const ecomImportError = ref('')
+  const ecomImportProgress = ref('')   // 导入进度文本，实时显示主线程在做什么
   const isEcomDragging = ref(false)
   const ecomSalesOrders = ref([])
   const ecomAfterSalesOrders = ref([])
@@ -26,6 +27,7 @@ export function useEcommerceImport({ loadOrders, loadStats, loadTodayOrdersData 
     ecomPlatformMode.value = 'auto'
     ecomImporting.value = false
     ecomImportError.value = ''
+    ecomImportProgress.value = ''
     isEcomDragging.value = false
     ecomSalesOrders.value = []
     ecomAfterSalesOrders.value = []
@@ -139,13 +141,14 @@ export function useEcommerceImport({ loadOrders, loadStats, loadTodayOrdersData 
     ecomImporting.value = true
 
     try {
+      ecomImportProgress.value = '正在启动…'
       const result = await importEcommerceOrders({
         salesOrders: selectedSales,
         afterSalesOrders: selectedRefunds,
         supabase,
-        onProgress: ({ type, current, total }) => {
-          const label = type === 'sales' ? '销售' : '售后'
-          console.log(`导入${label}: ${current + 1}/${total}`)
+        onProgress: ({ type, current, total, message }) => {
+          // 把进度直接写到 UI，避免用户看见"假死"
+          ecomImportProgress.value = message || `${type} ${current}/${total}`
         },
       })
 
@@ -174,6 +177,7 @@ export function useEcommerceImport({ loadOrders, loadStats, loadTodayOrdersData 
     ecomPlatformMode,
     ecomImporting,
     ecomImportError,
+    ecomImportProgress,
     isEcomDragging,
     ecomSalesOrders,
     ecomAfterSalesOrders,
