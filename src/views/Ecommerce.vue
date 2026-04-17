@@ -457,7 +457,7 @@
 <script setup>
 import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import * as XLSX from 'xlsx'
+import { loadXLSX } from '../lib/xlsxLoader'
 import { supabase } from '../lib/supabase'
 import { parseEcommerceExcel, importEcommerceOrders } from '../lib/ecommerceOrderImporter'
 import { useAuthStore } from '../stores/auth'
@@ -1052,6 +1052,7 @@ async function processImportFile(file) {
 
   try {
     const data = await file.arrayBuffer()
+    const XLSX = await loadXLSX()
     const workbook = XLSX.read(data, { type: 'array' })
 
     const options = {

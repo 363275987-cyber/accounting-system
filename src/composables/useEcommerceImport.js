@@ -2,7 +2,7 @@ import { ref, computed } from 'vue'
 import { supabase } from '../lib/supabase'
 import { parseEcommerceExcel, importEcommerceOrders, platformTypeName } from '../lib/ecommerceOrderImporter'
 import { useAccountStore } from '../stores/accounts'
-import * as XLSX from 'xlsx'
+import { loadXLSX } from '../lib/xlsxLoader'
 
 export function useEcommerceImport({ loadOrders, loadStats, loadTodayOrdersData }) {
   const accountStore = useAccountStore()
@@ -98,8 +98,9 @@ export function useEcommerceImport({ loadOrders, loadStats, loadTodayOrdersData 
     ecomImporting.value = true
 
     try {
-      // 解析 Excel
+      // 解析 Excel(懒加载 xlsx 420KB)
       const data = new Uint8Array(await file.arrayBuffer())
+      const XLSX = await loadXLSX()
       const workbook = XLSX.read(data, { type: 'array' })
       const sheetNames = workbook.SheetNames
 

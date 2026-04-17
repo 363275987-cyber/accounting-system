@@ -354,7 +354,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue'
-import * as XLSX from 'xlsx'
+import { loadXLSX } from '../lib/xlsxLoader'
 import { supabase } from '../lib/supabase'
 import { parseEcommerceExcel, importEcommerceOrders } from '../lib/ecommerceOrderImporter'
 import { formatMoney, PLATFORM_LABELS, toast } from '../lib/utils'
@@ -680,6 +680,7 @@ async function processImportFile(file) {
 
   try {
     const data = await file.arrayBuffer()
+    const XLSX = await loadXLSX()
     const workbook = XLSX.read(data, { type: 'array' })
 
     const options = {

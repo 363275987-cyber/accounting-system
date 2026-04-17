@@ -29,7 +29,7 @@ export const useOrderStore = defineStore('orders', {
         const keywordParams = { searchField }
         let query = supabase
           .from('orders')
-          .select('*', { count: 'exact' })
+          .select('*', { count: 'estimated' })   // 估算行数,翻页时不全表扫
           .is('deleted_at', null)
           .order('created_at', { ascending: false })
           .range((page - 1) * pageSize, page * pageSize - 1)

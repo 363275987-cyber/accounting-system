@@ -753,7 +753,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/auth'
-import * as XLSX from 'xlsx'
+import { loadXLSX } from '../lib/xlsxLoader'
 // BUG-4 修复：所有"账面净利润"统一从 financialMetrics.computeIncomeStatement 取
 // loadIncome 和 loadEquity 都调用此函数，确保跨 tab 数字一致
 import { computeIncomeStatement } from '../utils/financialMetrics'
@@ -1565,7 +1565,8 @@ async function loadEquity() {
 }
 
 // ── Excel Export ──
-function exportExcel() {
+async function exportExcel() {
+  const XLSX = await loadXLSX()
   try {
     const wb = XLSX.utils.book_new()
 

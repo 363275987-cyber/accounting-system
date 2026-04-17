@@ -875,7 +875,9 @@
 
 <script setup>
 import { ref, reactive, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
-import * as XLSX from 'xlsx'
+import { loadXLSX } from '../lib/xlsxLoader'
+// 懒加载 xlsx 后赋值到模块级变量,保持同步函数 (tryParseWorkbook) 可用
+let XLSX = null
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/auth'
 import { useAccountStore } from '../stores/accounts'
@@ -2230,9 +2232,10 @@ function fillPreviewFromWorkbook(wb) {
   }
 }
 
-function handleFile(e) {
+async function handleFile(e) {
   const file = e.target.files?.[0]
   if (!file) return
+  if (!XLSX) XLSX = await loadXLSX()
   const reader = new FileReader()
   reader.onload = (ev) => {
     const binary = ev.target.result
@@ -2262,11 +2265,12 @@ function handleFile(e) {
 }
 
 // 密码输入后重试
-function submitPwd() {
+async function submitPwd() {
   if (!pendingFileBinary.value) {
     showPwdModal.value = false
     return
   }
+  if (!XLSX) XLSX = await loadXLSX()
   try {
     const wb = tryParseWorkbook(pendingFileBinary.value, pwdInput.value)
     if (!wb || !wb.SheetNames || wb.SheetNames.length === 0) {
@@ -2333,7 +2337,8 @@ async function confirmImport() {
 }
 
 // ─── 模板下载 ───
-function downloadTemplate() {
+async function downloadTemplate() {
+  if (!XLSX) XLSX = await loadXLSX()
   // 发薪月份/发薪日期 为可选列：留空则按界面当前月份导入；填写则覆盖
   const wsData = [
     ['姓名', '基本工资', '实发金额', '发薪月份(可选)', '发薪日期(可选)', '备注'],

@@ -568,7 +568,7 @@ import { usePermission } from '../composables/usePermission'
 import { useProductStore } from '../stores/products'
 import { formatMoney, PRODUCT_ITEM_CATEGORIES, toast } from '../lib/utils'
 import GiftSelector from '../components/GiftSelector.vue'
-import * as XLSX from 'xlsx'
+import { loadXLSX } from '../lib/xlsxLoader'
 
 const authStore = useAuthStore()
 const productStore = useProductStore()
@@ -1000,6 +1000,7 @@ const exportColumns = ref([
 // ========== 导出逻辑 ==========
 async function doExport() {
   try {
+    const XLSX = await loadXLSX()
     const isBundle = exportType.value === 'bundle'
     const pType = isBundle ? 'bundle' : 'single'
     const { data: products } = await supabase.from('products').select('id, name, product_type, category, brand, cost_price, retail_price').eq('status', 'active').eq('product_type', pType).order('name')
@@ -1140,7 +1141,8 @@ const importUpdateCount = computed(() => {
   return importPreview.value.filter(r => !r._isNew).length
 })
 
-function downloadSingleTemplate() {
+async function downloadSingleTemplate() {
+  const XLSX = await loadXLSX()
   const rows = [
     { 'SKU编码': 'DAA001', '产品名称': '示例球杆', '分类': '球杆', '品牌': 'DBA', '成本价': 334, '零售价': 1555, '库存': 50 },
     { 'SKU编码': 'DAB001', '产品名称': '示例杆桶', '分类': '包装', '品牌': 'DBA', '成本价': 90, '零售价': 425, '库存': 30 },
@@ -1152,7 +1154,8 @@ function downloadSingleTemplate() {
   XLSX.writeFile(wb, '单品导入模板.xlsx')
 }
 
-function downloadBundleTemplate() {
+async function downloadBundleTemplate() {
+  const XLSX = await loadXLSX()
   // 模板格式：左侧A-G为子商品明细，右侧I-K为套装价格
   const rows = [
     { '套装SKU编码': 'TA001', '套装名称': '破晓风暴套装', '子商品SKU编码': '', '子商品名称': '', '数量': '', '子商品零售价': '', '子商品成本价': '', '套装编码': 'TA001', '套装销售价': 2010.53, '套装成本价': 432.02 },
@@ -1193,6 +1196,7 @@ async function parseImportFile() {
   importParsing.value = true
   try {
     const buf = await importFile.value.arrayBuffer()
+    const XLSX = await loadXLSX()
     const wb = XLSX.read(buf)
     const ws = wb.Sheets[wb.SheetNames[0]]
     const rows = XLSX.utils.sheet_to_json(ws)
