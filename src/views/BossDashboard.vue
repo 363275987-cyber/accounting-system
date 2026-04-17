@@ -41,27 +41,45 @@
         <div class="flex-1 text-sm text-emerald-700">所有账户余额对齐,数据健康</div>
       </div>
 
-      <!-- 核心三指标:收入 / 支出 / 净利润 -->
+      <!-- 核心三指标:收入 / 支出 / 净利润(带同比/环比) -->
       <div class="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-        <div class="text-xs text-gray-500 mb-1">{{ rangeLabel }} 净利润</div>
+        <div class="flex items-baseline justify-between mb-1">
+          <div class="text-xs text-gray-500">{{ rangeLabel }} 净利润</div>
+          <div v-if="prevLabel" class="text-[11px] text-gray-400">vs {{ prevLabel }}</div>
+        </div>
         <div class="text-4xl font-bold"
           :class="profit >= 0 ? 'text-emerald-600' : 'text-red-500'">
           {{ profit >= 0 ? '+' : '' }}¥{{ formatMoney(profit) }}
         </div>
-        <div class="mt-2 text-xs text-gray-500">
-          收入 - 支出 - 退款 - 分红
+        <div v-if="profitDelta !== null" class="mt-1 text-xs flex items-center gap-1">
+          <span :class="profitDeltaPct >= 0 ? 'text-emerald-600' : 'text-red-500'">
+            {{ profitDeltaPct >= 0 ? '↑' : '↓' }} {{ formatDelta(profitDelta) }}
+            <span v-if="profitDeltaPct !== Infinity && profitDeltaPct !== -Infinity">({{ (profitDeltaPct >= 0 ? '+' : '') + profitDeltaPct.toFixed(1) + '%' }})</span>
+          </span>
         </div>
+        <div class="mt-2 text-[11px] text-gray-400">收入 - 支出 - 退款 - 分红</div>
+
         <div class="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-gray-100">
           <div>
             <div class="text-[11px] text-gray-500 mb-1">收入</div>
             <div class="text-xl font-semibold text-emerald-600">+{{ formatMoney(summary.income_total) }}</div>
-            <div class="text-[11px] text-gray-400 mt-0.5">{{ summary.orders_count }} 笔订单</div>
+            <div class="text-[11px] mt-0.5">
+              <span class="text-gray-400">{{ summary.orders_count }} 笔</span>
+              <span v-if="incomeDeltaPct !== null" class="ml-1"
+                :class="incomeDeltaPct >= 0 ? 'text-emerald-600' : 'text-red-500'">
+                {{ incomeDeltaPct >= 0 ? '↑' : '↓' }}{{ Math.abs(incomeDeltaPct).toFixed(0) }}%
+              </span>
+            </div>
           </div>
           <div>
             <div class="text-[11px] text-gray-500 mb-1">支出</div>
             <div class="text-xl font-semibold text-red-500">-{{ formatMoney(summary.expense_total) }}</div>
-            <div class="text-[11px] text-gray-400 mt-0.5">
-              退款 ¥{{ formatMoney(summary.refund_total) }}<span v-if="Number(summary.dividend_total) > 0"> · 分红 ¥{{ formatMoney(summary.dividend_total) }}</span>
+            <div class="text-[11px] mt-0.5">
+              <span class="text-gray-400">退款 ¥{{ formatMoney(summary.refund_total) }}</span>
+              <span v-if="expenseDeltaPct !== null" class="ml-1"
+                :class="expenseDeltaPct <= 0 ? 'text-emerald-600' : 'text-red-500'">
+                {{ expenseDeltaPct >= 0 ? '↑' : '↓' }}{{ Math.abs(expenseDeltaPct).toFixed(0) }}%
+              </span>
             </div>
           </div>
         </div>
@@ -202,23 +220,55 @@ const ranges = [
 const activeRange = ref('month')
 const rangeLabel = computed(() => ranges.find(r => r.key === activeRange.value)?.label || '')
 
+const TZ = '+08:00'
+const pad = n => String(n).padStart(2, '0')
 function getRangeIso() {
   const now = new Date()
-  const tz = '+08:00'
   let fromStr
   if (activeRange.value === 'today') {
     fromStr = now.toISOString().slice(0, 10)
   } else if (activeRange.value === 'month') {
-    fromStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+    fromStr = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`
   } else {
     fromStr = `${now.getFullYear()}-01-01`
   }
   const toStr = now.toISOString().slice(0, 10)
   return {
-    from: new Date(fromStr + 'T00:00:00' + tz).toISOString(),
-    to:   new Date(toStr   + 'T23:59:59' + tz).toISOString(),
+    from: new Date(fromStr + 'T00:00:00' + TZ).toISOString(),
+    to:   new Date(toStr   + 'T23:59:59' + TZ).toISOString(),
   }
 }
+// 对比用上一个同等区间：
+//   今日 → 昨日;   本月 → 上月同天数;   本年 → 去年同天数
+function getPrevRangeIso() {
+  const now = new Date()
+  if (activeRange.value === 'today') {
+    const y = new Date(now); y.setDate(y.getDate() - 1)
+    const s = `${y.getFullYear()}-${pad(y.getMonth() + 1)}-${pad(y.getDate())}`
+    return {
+      from: new Date(s + 'T00:00:00' + TZ).toISOString(),
+      to:   new Date(s + 'T23:59:59' + TZ).toISOString(),
+    }
+  }
+  if (activeRange.value === 'month') {
+    const d = now.getDate()
+    const pm = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    const lastDay = new Date(pm.getFullYear(), pm.getMonth() + 1, 0).getDate()
+    const dayEnd = Math.min(d, lastDay)
+    const prefix = `${pm.getFullYear()}-${pad(pm.getMonth() + 1)}`
+    return {
+      from: new Date(`${prefix}-01T00:00:00${TZ}`).toISOString(),
+      to:   new Date(`${prefix}-${pad(dayEnd)}T23:59:59${TZ}`).toISOString(),
+    }
+  }
+  // year
+  const py = now.getFullYear() - 1
+  return {
+    from: new Date(`${py}-01-01T00:00:00${TZ}`).toISOString(),
+    to:   new Date(`${py}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T23:59:59${TZ}`).toISOString(),
+  }
+}
+const prevLabel = computed(() => ({ today: '昨日', month: '上月同期', year: '去年同期' })[activeRange.value] || '')
 
 function switchRange(key) {
   activeRange.value = key
@@ -229,17 +279,30 @@ function switchRange(key) {
 const loading = ref(false)
 const lastUpdate = ref(null)
 const summary = ref({ income_total: 0, expense_total: 0, refund_total: 0, dividend_total: 0, orders_count: 0 })
+const prevSummary = ref({ income_total: 0, expense_total: 0, refund_total: 0, dividend_total: 0, orders_count: 0 })
 const topStores = ref([])
 const cashFlowData = ref([])
 const bigEvents = ref([])
 const drift = ref([])
 
-const profit = computed(() =>
-  Number(summary.value.income_total || 0)
-  - Number(summary.value.expense_total || 0)
-  - Number(summary.value.refund_total || 0)
-  - Number(summary.value.dividend_total || 0)
-)
+function calcProfit(s) {
+  return Number(s.income_total || 0)
+    - Number(s.expense_total || 0)
+    - Number(s.refund_total || 0)
+    - Number(s.dividend_total || 0)
+}
+const profit = computed(() => calcProfit(summary.value))
+const prevProfit = computed(() => calcProfit(prevSummary.value))
+function pctChange(cur, prev) {
+  const c = Number(cur || 0), p = Number(prev || 0)
+  if (Math.abs(p) < 0.001) return c === 0 ? null : (c > 0 ? Infinity : -Infinity)
+  return (c - p) / Math.abs(p) * 100
+}
+const profitDelta = computed(() => prevProfit.value === 0 && profit.value === 0 ? null : profit.value - prevProfit.value)
+const profitDeltaPct = computed(() => pctChange(profit.value, prevProfit.value))
+const incomeDeltaPct = computed(() => pctChange(summary.value.income_total, prevSummary.value.income_total))
+const expenseDeltaPct = computed(() => pctChange(summary.value.expense_total, prevSummary.value.expense_total))
+function formatDelta(v) { return (v >= 0 ? '+' : '-') + '¥' + formatMoney(Math.abs(v)) }
 
 const cashFlow30Total = computed(() =>
   cashFlowData.value.reduce((s, d) => s + Number(d.net || 0), 0)
@@ -293,9 +356,15 @@ function platformLabel(k) { return PLATFORM_LABELS[k] || k || '—' }
 // ========== 数据加载 ==========
 async function loadSummary() {
   const { from, to } = getRangeIso()
-  const { data, error } = await supabase.rpc('get_boss_summary', { p_from: from, p_to: to })
-  if (error) throw error
-  summary.value = data || summary.value
+  const { from: pf, to: pt } = getPrevRangeIso()
+  const [cur, prev] = await Promise.all([
+    supabase.rpc('get_boss_summary', { p_from: from, p_to: to }),
+    supabase.rpc('get_boss_summary', { p_from: pf, p_to: pt }),
+  ])
+  if (cur.error) throw cur.error
+  if (prev.error) throw prev.error
+  summary.value = cur.data || summary.value
+  prevSummary.value = prev.data || prevSummary.value
 }
 
 async function loadTopStores() {

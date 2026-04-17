@@ -1,0 +1,14 @@
+{
+  "name": "台球公司账目系统",
+  "short_name": "账目系统",
+  "description": "经营看板 · 财务与销售一览",
+  "start_url": "/accounting-system/#/boss",
+  "scope": "/accounting-system/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "icons": [
+    { "src": "/accounting-system/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
