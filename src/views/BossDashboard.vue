@@ -63,7 +63,7 @@
         </div>
         <div class="text-4xl font-bold"
           :class="profit >= 0 ? 'text-emerald-600' : 'text-red-500'">
-          {{ profit >= 0 ? '+' : '' }}¥{{ formatMoney(profit) }}
+          {{ profit >= 0 ? '+' : '' }}{{ formatMoney(profit) }}
         </div>
         <div v-if="profitDelta !== null" class="mt-1 text-xs flex items-center gap-1">
           <span :class="profitDeltaPct >= 0 ? 'text-emerald-600' : 'text-red-500'">
@@ -89,7 +89,7 @@
             <div class="text-[11px] text-gray-500 mb-1">支出</div>
             <div class="text-xl font-semibold text-red-500">-{{ formatMoney(summary.expense_total) }}</div>
             <div class="text-[11px] mt-0.5">
-              <span class="text-gray-400">退款 ¥{{ formatMoney(summary.refund_total) }}</span>
+              <span class="text-gray-400">退款 {{ formatMoney(summary.refund_total) }}</span>
               <span v-if="expenseDeltaPct !== null" class="ml-1"
                 :class="expenseDeltaPct <= 0 ? 'text-emerald-600' : 'text-red-500'">
                 {{ expenseDeltaPct >= 0 ? '↑' : '↓' }}{{ Math.abs(expenseDeltaPct).toFixed(0) }}%
@@ -105,7 +105,7 @@
           <h2 class="text-sm font-semibold text-gray-700">近 30 天现金流</h2>
           <div class="text-xs text-gray-500">
             净流入 <span :class="cashFlow30Total >= 0 ? 'text-emerald-600 font-medium' : 'text-red-500 font-medium'">
-              {{ cashFlow30Total >= 0 ? '+' : '' }}¥{{ formatMoney(cashFlow30Total) }}
+              {{ cashFlow30Total >= 0 ? '+' : '' }}{{ formatMoney(cashFlow30Total) }}
             </span>
           </div>
         </div>
@@ -130,14 +130,14 @@
               <span class="text-[11px] text-gray-400">{{ g.count }} 个</span>
             </div>
             <span class="font-semibold" :class="g.total >= 0 ? 'text-gray-800' : 'text-red-500'">
-              ¥{{ formatMoney(g.total) }}
+              {{ formatMoney(g.total) }}
             </span>
           </div>
           <div class="flex items-center justify-between pt-3 mt-1 border-t-2 border-gray-200">
             <span class="text-sm font-medium text-gray-700">总计</span>
             <span class="text-lg font-bold"
               :class="allAccountsTotal >= 0 ? 'text-gray-800' : 'text-red-500'">
-              ¥{{ formatMoney(allAccountsTotal) }}
+              {{ formatMoney(allAccountsTotal) }}
             </span>
           </div>
         </div>
@@ -163,7 +163,7 @@
               <div class="text-sm font-medium text-gray-800 truncate">{{ s.short_name }}</div>
               <div class="text-[11px] text-gray-400">{{ platformLabel(s.platform) }} · {{ s.orders_count }} 笔</div>
             </div>
-            <span class="font-semibold text-emerald-600">¥{{ formatMoney(s.sales) }}</span>
+            <span class="font-semibold text-emerald-600">{{ formatMoney(s.sales) }}</span>
           </div>
         </div>
       </div>
@@ -189,7 +189,7 @@
             </div>
             <span class="text-sm font-semibold shrink-0"
               :class="e.kind === 'income' ? 'text-emerald-600' : 'text-red-500'">
-              {{ Number(e.amount) >= 0 ? '+' : '' }}¥{{ formatMoney(Math.abs(Number(e.amount))) }}
+              {{ Number(e.amount) >= 0 ? '+' : '' }}{{ formatMoney(Math.abs(Number(e.amount))) }}
             </span>
           </div>
         </div>
@@ -316,7 +316,7 @@ const profitDelta = computed(() => prevProfit.value === 0 && profit.value === 0 
 const profitDeltaPct = computed(() => pctChange(profit.value, prevProfit.value))
 const incomeDeltaPct = computed(() => pctChange(summary.value.income_total, prevSummary.value.income_total))
 const expenseDeltaPct = computed(() => pctChange(summary.value.expense_total, prevSummary.value.expense_total))
-function formatDelta(v) { return (v >= 0 ? '+' : '-') + '¥' + formatMoney(Math.abs(v)) }
+function formatDelta(v) { return (v >= 0 ? '+' : '-') + formatMoney(Math.abs(v)) }
 
 const cashFlow30Total = computed(() =>
   cashFlowData.value.reduce((s, d) => s + Number(d.net || 0), 0)

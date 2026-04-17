@@ -562,7 +562,7 @@
           <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
             <div>
               <h2 class="font-bold text-gray-800">⚖️ 手动调整余额</h2>
-              <p class="text-[11px] text-gray-500 mt-0.5">账户：{{ adjustForm.accountName }}（当前 ¥{{ formatMoney(adjustForm.currentBalance) }}）</p>
+              <p class="text-[11px] text-gray-500 mt-0.5">账户：{{ adjustForm.accountName }}（当前 {{ formatMoney(adjustForm.currentBalance) }}）</p>
             </div>
             <button @click="showAdjustModal = false" class="text-gray-500 hover:text-gray-700 text-xl cursor-pointer">&times;</button>
           </div>
@@ -595,7 +595,7 @@
             </div>
             <div v-if="adjustForm.amount > 0" class="p-3 rounded-lg text-sm"
               :class="adjustForm.direction === 'in' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'">
-              调整后余额：<span class="font-bold">¥{{ formatMoney(adjustPreview) }}</span>
+              调整后余额：<span class="font-bold">{{ formatMoney(adjustPreview) }}</span>
             </div>
           </div>
           <div class="px-6 py-3 border-t border-gray-100 flex justify-end gap-2">

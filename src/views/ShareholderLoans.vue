@@ -247,7 +247,7 @@
             <select v-model="repayForm.account_id"
               class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer">
               <option value="">请选择付款账户</option>
-              <option v-for="acc in accounts" :key="acc.id" :value="acc.id">{{ acc.short_name || acc.platform || acc.account_name }}（余额 ¥{{ formatMoney(acc.balance) }}）</option>
+              <option v-for="acc in accounts" :key="acc.id" :value="acc.id">{{ acc.short_name || acc.platform || acc.account_name }}（余额 {{ formatMoney(acc.balance) }}）</option>
             </select>
           </div>
           <div>

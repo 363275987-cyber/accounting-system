@@ -42,7 +42,7 @@
       </div>
       <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
         <div class="text-xs text-gray-500 mb-1">总金额</div>
-        <div class="text-xl font-bold text-blue-600">¥{{ formatMoney(stats.totalAmount) }}</div>
+        <div class="text-xl font-bold text-blue-600">{{ formatMoney(stats.totalAmount) }}</div>
       </div>
     </div>
 
