@@ -77,7 +77,7 @@
             ¥{{ formatNum(platformStores.reduce((s, d) => s + getStoreDaySales(d.id), 0)) }}
           </span>
         </div>
-        <div v-show="expandedPlatforms[platform]" class="border border-t-0 border-gray-200 rounded-b-lg overflow-hidden">
+        <div v-show="expandedPlatforms[platform] !== false" class="border border-t-0 border-gray-200 rounded-b-lg overflow-hidden">
           <table class="w-full text-sm">
             <thead>
               <tr class="bg-gray-50 text-gray-500 text-xs">
@@ -480,7 +480,8 @@ const stores = ref([])
 const dailyStats = ref([])
 const withdrawals = ref([])
 const cashAccounts = ref([])
-const expandedPlatforms = ref({ douyin: true, kuaishou: true, shipinhao: true })
+// 平台展开状态：默认全部展开(包括新增平台如 weixin_video / other)，显式 false 时才折叠
+const expandedPlatforms = ref({})
 const loading = ref(false)
 
 // 已提现月度汇总
@@ -690,7 +691,9 @@ function formatDate(d) {
 }
 
 function togglePlatform(key) {
-  expandedPlatforms.value[key] = !expandedPlatforms.value[key]
+  // undefined/true 认作展开，点击变 false；false 点击变 true
+  const cur = expandedPlatforms.value[key] !== false
+  expandedPlatforms.value[key] = !cur
 }
 
 function getStoreDayStat(accountId, field) {

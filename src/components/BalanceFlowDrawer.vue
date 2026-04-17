@@ -18,7 +18,7 @@
         </div>
 
         <!-- Body -->
-        <div class="flex-1 overflow-y-auto px-5 py-4">
+        <div class="flex-1 overflow-y-auto px-5 py-4 pb-24">
           <div v-if="loading" class="text-center py-12 text-gray-500">加载中…</div>
           <div v-else-if="flows.length === 0" class="text-center py-12 text-gray-400">
             <div class="text-3xl mb-2">📭</div>
@@ -81,6 +81,54 @@
             </div>
           </div>
         </div>
+
+        <!-- Footer: 补录流水 -->
+        <div class="shrink-0 border-t border-gray-100 bg-gray-50/50 px-5 py-3">
+          <button v-if="!showAddForm" @click="openAddForm"
+            class="w-full py-2 text-sm border border-dashed border-gray-300 rounded-lg text-gray-500 hover:bg-white hover:border-blue-300 hover:text-blue-600 cursor-pointer transition">
+            + 补录一条{{ direction === 'in' ? addLabelIn : '支出' }}
+          </button>
+          <div v-else class="bg-white border border-amber-200 rounded-lg p-3 space-y-2">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-xs font-medium text-gray-700">{{ direction === 'in' ? addLabelIn : '补录支出' }}</span>
+              <button @click="showAddForm = false" class="text-xs text-gray-400 hover:text-gray-600 cursor-pointer">取消</button>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="text-[11px] text-gray-500">金额</label>
+                <input v-model.number="addBuf.amount" type="number" step="0.01" min="0" placeholder="0.00"
+                  class="w-full px-2 py-1 border border-gray-200 rounded text-sm outline-none focus:ring-1 focus:ring-amber-400" />
+              </div>
+              <div>
+                <label class="text-[11px] text-gray-500">日期</label>
+                <input v-model="addBuf.date" type="date"
+                  class="w-full px-2 py-1 border border-gray-200 rounded text-sm outline-none focus:ring-1 focus:ring-amber-400" />
+              </div>
+            </div>
+            <div v-if="direction === 'in' && accountCategory !== 'ecommerce'">
+              <label class="text-[11px] text-gray-500">客户名（选填）</label>
+              <input v-model="addBuf.customerName" type="text" placeholder="客户名"
+                class="w-full px-2 py-1 border border-gray-200 rounded text-sm outline-none focus:ring-1 focus:ring-amber-400" />
+            </div>
+            <div v-if="direction === 'out'">
+              <label class="text-[11px] text-gray-500">收款方（选填）</label>
+              <input v-model="addBuf.payee" type="text" placeholder="收款方"
+                class="w-full px-2 py-1 border border-gray-200 rounded text-sm outline-none focus:ring-1 focus:ring-amber-400" />
+            </div>
+            <div>
+              <label class="text-[11px] text-gray-500">备注</label>
+              <input v-model="addBuf.note" type="text"
+                class="w-full px-2 py-1 border border-gray-200 rounded text-sm outline-none focus:ring-1 focus:ring-amber-400" />
+            </div>
+            <div class="flex items-center gap-2">
+              <button @click="saveAdd" :disabled="addSaving || !addBuf.amount || addBuf.amount <= 0"
+                class="px-3 py-1 bg-amber-500 text-white rounded text-xs hover:bg-amber-600 disabled:opacity-50 cursor-pointer">
+                {{ addSaving ? '保存中…' : '保存补录' }}
+              </button>
+              <span class="text-[11px] text-gray-400 ml-auto">{{ addHint }}</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </Teleport>
@@ -95,6 +143,7 @@ import { formatMoney, formatDate, toast } from '../lib/utils'
 const props = defineProps({
   accountId: { type: String, required: true },
   accountName: { type: String, default: '' },
+  accountCategory: { type: String, default: '' },
   from: { type: String, required: true },        // 'YYYY-MM-DD'
   to:   { type: String, required: true },
   direction: { type: String, required: true },   // 'in' | 'out'
@@ -380,6 +429,106 @@ async function saveEdit(f) {
 function gotoSource(f) {
   if (!f.sourceRoute) return
   router.push(f.sourceRoute)
+}
+
+// ========== 补录流水 ==========
+const showAddForm = ref(false)
+const addSaving = ref(false)
+const addBuf = ref({ amount: null, date: '', customerName: '', payee: '', note: '' })
+
+const addLabelIn = computed(() => props.accountCategory === 'ecommerce' ? '店铺入账' : '订单收入')
+const addHint = computed(() => {
+  if (props.direction === 'in') {
+    return props.accountCategory === 'ecommerce' ? '写入 store_deposits' : '写入 orders (status=completed)'
+  }
+  return '写入 expenses (status=paid)'
+})
+
+function openAddForm() {
+  addBuf.value = {
+    amount: null,
+    date: new Date().toISOString().slice(0, 10),
+    customerName: '',
+    payee: '',
+    note: '',
+  }
+  showAddForm.value = true
+}
+
+async function saveAdd() {
+  if (addSaving.value) return
+  const amt = Number(addBuf.value.amount)
+  if (amt <= 0) { toast('请填入大于 0 的金额', 'warning'); return }
+  addSaving.value = true
+  try {
+    const isoDate = new Date(addBuf.value.date + 'T12:00:00+08:00').toISOString()
+    const { data: { session } } = await supabase.auth.getSession()
+    const userId = session?.user?.id
+
+    if (props.direction === 'in') {
+      if (props.accountCategory === 'ecommerce') {
+        // 补录店铺入账
+        const { error } = await supabase.from('store_deposits').insert({
+          account_id: props.accountId,
+          amount: amt,
+          deposit_date: isoDate,
+          note: addBuf.value.note || null,
+          recorded_by: userId,
+          status: 'completed',
+        })
+        if (error) throw error
+        await adjustAccountBalance(props.accountId, +amt)
+      } else {
+        // 补录订单收入
+        const { error } = await supabase.from('orders').insert({
+          account_id: props.accountId,
+          amount: amt,
+          customer_name: addBuf.value.customerName || '补录',
+          status: 'completed',
+          paid_at: isoDate,
+          note: addBuf.value.note || '（对账补录）',
+        })
+        if (error) throw error
+        await adjustAccountBalance(props.accountId, +amt)
+      }
+    } else {
+      // 补录支出
+      const { error } = await supabase.from('expenses').insert({
+        account_id: props.accountId,
+        amount: amt,
+        payee: addBuf.value.payee || '补录',
+        status: 'paid',
+        paid_at: isoDate,
+        approved_at: isoDate,
+        approver_id: userId,
+        created_by: userId,
+        note: addBuf.value.note || '（对账补录）',
+      })
+      if (error) throw error
+      await adjustAccountBalance(props.accountId, -amt)
+    }
+
+    toast('补录成功', 'success')
+    showAddForm.value = false
+    emit('updated')
+    await loadFlows()
+  } catch (e) {
+    toast('补录失败：' + (e.message || ''), 'error')
+  } finally {
+    addSaving.value = false
+  }
+}
+
+async function adjustAccountBalance(accId, delta) {
+  const { data: row, error } = await supabase.from('accounts').select('balance, category, balance_method').eq('id', accId).single()
+  if (error) throw error
+  // 店铺 manual 模式下，订单补录不改 balance（和普通订单导入逻辑对齐）
+  if (row.category === 'ecommerce' && row.balance_method === 'manual' && delta > 0 && props.accountCategory !== 'ecommerce' /* 订单路径 */) {
+    return
+  }
+  const newBal = Number(row.balance || 0) + delta
+  const { error: ue } = await supabase.from('accounts').update({ balance: newBal }).eq('id', accId)
+  if (ue) throw ue
 }
 
 onMounted(loadFlows)

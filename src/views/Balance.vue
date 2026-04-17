@@ -29,8 +29,12 @@
         <input type="date" v-model="toDate" :min="fromDate" :max="todayStr"
           class="px-2 py-1.5 border border-gray-200 rounded-lg outline-none focus:ring-1 focus:ring-blue-400" />
       </div>
+      <label class="ml-auto flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none">
+        <input type="checkbox" v-model="hideInactive" class="rounded cursor-pointer" />
+        仅看有变化的账户
+      </label>
       <button @click="loadMatrix" :disabled="loading"
-        class="ml-auto px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 cursor-pointer">
+        class="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 cursor-pointer">
         {{ loading ? '加载中…' : '🔄 刷新' }}
       </button>
     </div>
@@ -124,6 +128,7 @@
     <BalanceFlowDrawer v-if="drawer.open"
       :account-id="drawer.accountId"
       :account-name="drawer.accountName"
+      :account-category="drawer.accountCategory"
       :from="fromDate"
       :to="toDate"
       :direction="drawer.direction"
@@ -277,6 +282,7 @@ function applyPreset(key) {
 // ========== 矩阵数据 ==========
 const loading = ref(false)
 const rows = ref([])   // [{ account_id, short_name, code, ip_code, category, opening, increase, decrease, closing }]
+const hideInactive = ref(false)  // 隐藏本期无变化的账户
 
 async function loadMatrix() {
   if (!fromDate.value || !toDate.value) return
@@ -310,9 +316,7 @@ async function loadMatrix() {
           closing: Number(m.closing || 0),
         }
       })
-      // 过滤掉既无期初也无本期变动的僵尸账户
-      .filter(r => r.opening !== 0 || r.increase !== 0 || r.decrease !== 0 || r.closing !== 0)
-
+    // 默认全显；用户可通过"仅看有变化的账户"checkbox 过滤
     rows.value = merged
   } catch (e) {
     console.error('[Balance] loadMatrix failed:', e)
@@ -328,9 +332,13 @@ const GROUP_DEF = [
   { key: 'company',  label: '企业账户', matches: c => c === 'company' },
   { key: 'ecommerce', label: '店铺账户', matches: c => c === 'ecommerce' },
 ]
+const visibleRows = computed(() => {
+  if (!hideInactive.value) return rows.value
+  return rows.value.filter(r => r.increase !== 0 || r.decrease !== 0)
+})
 const groupedRows = computed(() => {
   const groups = GROUP_DEF.map(g => ({ ...g, accounts: [], subtotal: { opening: 0, increase: 0, decrease: 0, closing: 0 } }))
-  for (const r of rows.value) {
+  for (const r of visibleRows.value) {
     const g = groups.find(gg => gg.matches(r.category)) || groups[0]
     g.accounts.push(r)
     g.subtotal.opening += r.opening
@@ -353,13 +361,14 @@ function categoryLabel(c) {
 }
 
 // ========== 抽屉 ==========
-const drawer = ref({ open: false, accountId: '', accountName: '', direction: 'in' })
+const drawer = ref({ open: false, accountId: '', accountName: '', accountCategory: '', direction: 'in' })
 
 function openDrawer(r, direction) {
   drawer.value = {
     open: true,
     accountId: r.account_id,
     accountName: r.short_name || r.code || '',
+    accountCategory: r.category || '',
     direction,
   }
 }
