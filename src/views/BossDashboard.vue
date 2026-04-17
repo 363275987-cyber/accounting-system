@@ -1,5 +1,19 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 pb-24">
+  <div class="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 pb-24"
+    @touchstart.passive="onTouchStart"
+    @touchmove.passive="onTouchMove"
+    @touchend.passive="onTouchEnd">
+
+    <!-- 下拉刷新指示条 -->
+    <div class="fixed top-0 left-0 right-0 z-30 flex justify-center overflow-hidden pointer-events-none"
+      :style="{ height: pullDist + 'px', transition: pullAnimating ? 'height 0.25s ease' : 'none' }">
+      <div class="flex items-center gap-2 text-xs text-blue-600 pt-4">
+        <span v-if="refreshing" class="inline-block animate-spin">🔄</span>
+        <span v-else :style="{ transform: `rotate(${pullDist >= 60 ? 180 : 0}deg)`, transition: 'transform 0.15s' }">↓</span>
+        <span>{{ refreshing ? '刷新中…' : (pullDist >= 60 ? '松开立即刷新' : '下拉刷新') }}</span>
+      </div>
+    </div>
+
     <!-- Header -->
     <div class="sticky top-0 z-20 bg-white/80 backdrop-blur border-b border-gray-100 px-4 py-3">
       <div class="flex items-center justify-between mb-2">
@@ -427,4 +441,38 @@ async function reloadAll() {
 }
 
 onMounted(reloadAll)
+
+// ========== 下拉刷新 ==========
+const pullDist = ref(0)
+const pullAnimating = ref(false)
+const refreshing = ref(false)
+let _startY = 0
+let _pulling = false
+
+function onTouchStart(e) {
+  if (window.scrollY > 0) return
+  _startY = e.touches[0].clientY
+  _pulling = true
+  pullAnimating.value = false
+}
+function onTouchMove(e) {
+  if (!_pulling) return
+  const dy = e.touches[0].clientY - _startY
+  if (dy <= 0) { pullDist.value = 0; return }
+  // 阻尼曲线：前 60px 线性，超过加阻尼
+  pullDist.value = dy < 60 ? dy : 60 + (dy - 60) * 0.3
+  if (pullDist.value > 100) pullDist.value = 100
+}
+async function onTouchEnd() {
+  if (!_pulling) return
+  _pulling = false
+  pullAnimating.value = true
+  if (pullDist.value >= 60 && !refreshing.value) {
+    refreshing.value = true
+    try { await reloadAll() } finally {
+      refreshing.value = false
+    }
+  }
+  pullDist.value = 0
+}
 </script>
