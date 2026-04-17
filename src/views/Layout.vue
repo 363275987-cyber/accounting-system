@@ -160,6 +160,7 @@ function closeSidebar() {
 // Route title mapping
 const ROUTE_TITLES = {
   '/': '收支总览',
+  '/boss': '经营看板',
   '/orders': '订单登记',
   '/expenses': '收支管理',
   '/service-numbers': '客服号管理',
@@ -247,6 +248,15 @@ const menuGroups = computed(() => {
   if (!['admin', 'finance', 'manager'].includes(r)) {
     return []
   }
+
+  // 📊 经营看板(手机端老板首选)
+  groups.push({
+    icon: '📊',
+    label: '经营看板',
+    items: [
+      { label: '老板看板', path: '/boss' },
+    ],
+  })
 
   // ✏️ 业务登记
   groups.push({

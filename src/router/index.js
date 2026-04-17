@@ -54,6 +54,7 @@ const routes = [
       { path: 'ecommerce', name: 'Ecommerce', component: () => import('../views/Ecommerce.vue') },
       { path: 'ecommerce-orders', name: 'EcommerceOrders', component: () => import('../views/EcommerceOrders.vue') },
       { path: 'channels', name: 'Channels', component: () => import('../views/Channels.vue'), meta: { roles: ['admin', 'finance', 'manager'] } },
+      { path: 'boss', name: 'BossDashboard', component: () => import('../views/BossDashboard.vue'), meta: { title: '经营看板', roles: ['admin', 'finance', 'manager'] } },
     ]
   },
   // 404
