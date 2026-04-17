@@ -1,36 +1,58 @@
 import { defineStore } from 'pinia'
 import { supabase, withTimeout } from '../lib/supabase'
 
+// 账户列表缓存 TTL(毫秒)。30 秒内重入不触发网络
+const ACCOUNTS_TTL_MS = 30_000
+
 export const useAccountStore = defineStore('accounts', {
   state: () => ({
     accounts: [],
     loading: false,
     _forceRefresh: false,
+    _lastFetch: 0,   // 最后一次成功拉取的时间戳
+    _inflight: null, // 正在进行中的 promise(防并发重复请求)
   }),
   actions: {
     async fetchAccounts() {
-      // 数据缓存：已有数据且非强制刷新时跳过
-      if (this.accounts.length > 0 && !this._forceRefresh) return
+      // 正在请求中：直接 await 同一个 promise(防并发)
+      if (this._inflight) return this._inflight
+
+      // TTL 缓存：有数据、未强制刷新、未过期 → 跳过
+      const isFresh = this.accounts.length > 0
+        && !this._forceRefresh
+        && (Date.now() - this._lastFetch) < ACCOUNTS_TTL_MS
+      if (isFresh) return
+
       this._forceRefresh = false
       this.loading = true
-      try {
-        const { data, error } = await withTimeout(
-          supabase
-            .from('accounts')
-            .select('*')
-            .neq('status', 'deleted')
-            .order('ip_code')
-            .order('sequence'),
-          10000,
-          '加载账户列表'
-        )
-        if (error) throw error
-        this.accounts = data || []
-      } catch (e) {
-        console.error('Failed to fetch accounts:', e)
-      } finally {
-        this.loading = false
-      }
+      this._inflight = (async () => {
+        try {
+          const { data, error } = await withTimeout(
+            supabase
+              .from('accounts')
+              .select('*')
+              .neq('status', 'deleted')
+              .order('ip_code')
+              .order('sequence'),
+            10000,
+            '加载账户列表'
+          )
+          if (error) throw error
+          this.accounts = data || []
+          this._lastFetch = Date.now()
+        } catch (e) {
+          console.error('Failed to fetch accounts:', e)
+        } finally {
+          this.loading = false
+          this._inflight = null
+        }
+      })()
+      return this._inflight
+    },
+
+    // 外部写操作后让下次 fetchAccounts 立即走网络
+    invalidateCache() {
+      this._lastFetch = 0
     },
 
     async createAccount(payload) {
