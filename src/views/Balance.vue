@@ -77,17 +77,16 @@
           </tr>
         </thead>
         <tbody>
-          <template v-for="group in groupedRows" :key="group.ipCode">
+          <template v-for="group in groupedRows" :key="group.key">
             <tr class="bg-gray-50/60 border-t border-gray-100">
               <td colspan="5" class="px-4 py-1.5 text-xs font-medium text-gray-500">
-                {{ group.ipCode || '未分类' }} · {{ group.accounts.length }} 个账户
+                {{ group.label }} · {{ group.accounts.length }} 个账户
               </td>
             </tr>
             <tr v-for="r in group.accounts" :key="r.account_id"
               class="border-t border-gray-50 hover:bg-blue-50/30 transition">
               <td class="px-4 py-2.5">
                 <div class="font-medium text-gray-800">{{ r.short_name || r.code || '—' }}</div>
-                <div v-if="r.category" class="text-[11px] text-gray-400">{{ categoryLabel(r.category) }}</div>
               </td>
               <td class="px-4 py-2.5 text-right text-gray-600">{{ formatMoney(r.opening) }}</td>
               <td class="px-4 py-2.5 text-right">
@@ -323,19 +322,23 @@ async function loadMatrix() {
   }
 }
 
-// 按 ip_code 分组 + 小计
+// 按三大类(个人/企业/店铺)分组 + 小计 + 固定排序
+const GROUP_DEF = [
+  { key: 'personal', label: '个人账户', matches: c => c === 'personal' || c === 'cash' || c === 'bank' || !c },
+  { key: 'company',  label: '企业账户', matches: c => c === 'company' },
+  { key: 'ecommerce', label: '店铺账户', matches: c => c === 'ecommerce' },
+]
 const groupedRows = computed(() => {
-  const groups = {}
+  const groups = GROUP_DEF.map(g => ({ ...g, accounts: [], subtotal: { opening: 0, increase: 0, decrease: 0, closing: 0 } }))
   for (const r of rows.value) {
-    const k = r.ip_code || '未分类'
-    if (!groups[k]) groups[k] = { ipCode: k, accounts: [], subtotal: { opening: 0, increase: 0, decrease: 0, closing: 0 } }
-    groups[k].accounts.push(r)
-    groups[k].subtotal.opening += r.opening
-    groups[k].subtotal.increase += r.increase
-    groups[k].subtotal.decrease += r.decrease
-    groups[k].subtotal.closing += r.closing
+    const g = groups.find(gg => gg.matches(r.category)) || groups[0]
+    g.accounts.push(r)
+    g.subtotal.opening += r.opening
+    g.subtotal.increase += r.increase
+    g.subtotal.decrease += r.decrease
+    g.subtotal.closing += r.closing
   }
-  return Object.values(groups)
+  return groups.filter(g => g.accounts.length > 0)
 })
 
 const totals = computed(() => rows.value.reduce((acc, r) => ({

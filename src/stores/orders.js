@@ -130,12 +130,20 @@ export const useOrderStore = defineStore('orders', {
       if (payload.account_id && payload.amount && orderStatus === 'completed') {
         const { useAccountStore } = await import('./accounts')
         const accStore = useAccountStore()
-        balBefore = accStore.accounts.find(a => a.id === payload.account_id)?.balance ?? null
-        try {
-          await accStore.updateBalance(payload.account_id, Number(payload.amount))
-          balAfter = accStore.accounts.find(a => a.id === payload.account_id)?.balance ?? null
-        } catch (e) {
-          console.error('余额更新失败，订单已创建但余额未更新:', e)
+        const acc = accStore.accounts.find(a => a.id === payload.account_id)
+        balBefore = acc?.balance ?? null
+        // ⚠️ 电商店铺 balance_method='manual' 时，订单不再累加店铺余额
+        // (店铺真实余额由财务通过"入账"入口手工维护，订单只作运营数据)
+        const skipBalance = acc?.category === 'ecommerce' && acc?.balance_method === 'manual'
+        if (!skipBalance) {
+          try {
+            await accStore.updateBalance(payload.account_id, Number(payload.amount))
+            balAfter = accStore.accounts.find(a => a.id === payload.account_id)?.balance ?? null
+          } catch (e) {
+            console.error('余额更新失败，订单已创建但余额未更新:', e)
+          }
+        } else {
+          balAfter = balBefore  // 未动余额
         }
       }
 
@@ -214,9 +222,12 @@ export const useOrderStore = defineStore('orders', {
       // DB 更新成功后，再处理余额变动
       const { useAccountStore } = await import('./accounts')
       const accStore = useAccountStore()
+      // ⚠️ 电商店铺 manual 模式跳过所有余额变动(订单只作运营数据)
+      const _acc = oldOrder ? accStore.accounts.find(a => a.id === oldOrder.account_id) : null
+      const skipBalance = _acc?.category === 'ecommerce' && _acc?.balance_method === 'manual'
 
       // 取消订单：退回余额
-      if (needCancelRefund) {
+      if (needCancelRefund && !skipBalance) {
         try {
           const balBefore = accStore.accounts.find(a => a.id === oldOrder.account_id)?.balance ?? null
           await accStore.updateBalance(oldOrder.account_id, -Number(oldOrder.amount))
@@ -245,7 +256,7 @@ export const useOrderStore = defineStore('orders', {
       }
 
       // 订单状态变更为 completed：增加余额
-      if (needCompleteAdd) {
+      if (needCompleteAdd && !skipBalance) {
         try {
           const balBefore = accStore.accounts.find(a => a.id === oldOrder.account_id)?.balance ?? null
           await accStore.updateBalance(oldOrder.account_id, Number(oldOrder.amount))
@@ -274,7 +285,7 @@ export const useOrderStore = defineStore('orders', {
       }
 
       // 修改金额：调整余额差额
-      if (needAmountAdjust) {
+      if (needAmountAdjust && !skipBalance) {
         try {
           const balBefore = accStore.accounts.find(a => a.id === oldOrder.account_id)?.balance ?? null
           await accStore.updateBalance(oldOrder.account_id, amountDelta)

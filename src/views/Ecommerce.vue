@@ -107,10 +107,12 @@
                     ¥{{ formatNum(store.withdrawable_amount) }}
                   </span>
                 </td>
-                <td class="px-3 py-2.5 text-right">
-                  <button @click="openStoreDetail(store)" class="text-green-600 text-xs px-2 py-1 rounded hover:bg-green-50 transition cursor-pointer">明细</button>
-                  <button v-if="canEdit" @click="openWithdraw(store)" class="text-blue-600 text-xs px-2 py-1 rounded hover:bg-blue-50 transition cursor-pointer ml-1">提现</button>
-                  <button v-if="canEdit" @click="openEditStore(store)" class="text-gray-500 text-xs px-2 py-1 rounded hover:bg-gray-100 transition cursor-pointer ml-1">编辑</button>
+                <td class="px-3 py-2.5 text-right whitespace-nowrap">
+                  <button @click="openStoreDetail(store)" class="text-green-600 text-xs px-2 py-1 rounded hover:bg-green-50 cursor-pointer">明细</button>
+                  <button v-if="canEdit" @click="openDeposit(store)" class="text-emerald-600 text-xs px-2 py-1 rounded hover:bg-emerald-50 cursor-pointer ml-1">入账</button>
+                  <button v-if="canEdit" @click="openWithdraw(store)" class="text-blue-600 text-xs px-2 py-1 rounded hover:bg-blue-50 cursor-pointer ml-1">提现</button>
+                  <button v-if="canEdit" @click="openEditStore(store)" class="text-gray-500 text-xs px-2 py-1 rounded hover:bg-gray-100 cursor-pointer ml-1">编辑</button>
+                  <button v-if="canEdit" @click="confirmDeleteStore(store)" class="text-red-400 text-xs px-2 py-1 rounded hover:bg-red-50 cursor-pointer ml-1">删除</button>
                 </td>
               </tr>
             </tbody>
@@ -136,10 +138,12 @@
               <td class="px-4 py-3 font-medium text-gray-800">{{ store.short_name }}</td>
               <td class="px-4 py-3 text-gray-600">{{ platformLabel(store.ecommerce_platform) }}</td>
               <td class="px-4 py-3 text-right font-medium">¥{{ formatNum(store.balance) }}</td>
-              <td class="px-4 py-3 text-right">
+              <td class="px-4 py-3 text-right whitespace-nowrap">
                 <button @click="openStoreDetail(store)" class="text-green-600 text-xs px-2 py-1 rounded hover:bg-green-50 cursor-pointer">明细</button>
+                <button v-if="canEdit" @click="openDeposit(store)" class="text-emerald-600 text-xs px-2 py-1 rounded hover:bg-emerald-50 cursor-pointer ml-1">入账</button>
                 <button v-if="canEdit" @click="openWithdraw(store)" class="text-purple-600 text-xs px-2 py-1 rounded hover:bg-purple-50 cursor-pointer ml-1">提现</button>
                 <button v-if="canEdit" @click="openEditStore(store)" class="text-blue-600 text-xs px-2 py-1 rounded hover:bg-blue-50 cursor-pointer ml-1">编辑</button>
+                <button v-if="canEdit" @click="confirmDeleteStore(store)" class="text-red-400 text-xs px-2 py-1 rounded hover:bg-red-50 cursor-pointer ml-1">删除</button>
               </td>
             </tr>
             <tr v-if="!stores.length" class="text-center text-gray-500 py-8">
@@ -163,6 +167,7 @@
               <th class="px-4 py-3 text-right">实际到账</th>
               <th class="px-4 py-3 text-left">到账账户</th>
               <th class="px-4 py-3 text-left">备注</th>
+              <th v-if="canEdit" class="px-4 py-3 text-center">操作</th>
             </tr>
           </thead>
           <tbody>
@@ -174,9 +179,12 @@
               <td class="px-4 py-3 text-right font-medium text-green-600">¥{{ formatNum(w.actual_arrival) }}</td>
               <td class="px-4 py-3 text-gray-600 text-xs">{{ w.to_account?.short_name || '-' }}</td>
               <td class="px-4 py-3 text-gray-500 text-xs">{{ w.remark || '' }}</td>
+              <td v-if="canEdit" class="px-4 py-3 text-center">
+                <button @click="revertWithdrawal(w)" class="text-red-500 text-xs px-2 py-1 rounded hover:bg-red-50 cursor-pointer">撤销</button>
+              </td>
             </tr>
             <tr v-if="!withdrawals.length" class="text-center text-gray-500 py-8">
-              <td colspan="7">暂无提现记录</td>
+              <td :colspan="canEdit ? 8 : 7">暂无提现记录</td>
             </tr>
           </tbody>
         </table>
@@ -345,6 +353,48 @@
       </div>
     </div>
     <!-- 导入功能已移至「电商订单」页面 -->
+    <!-- ==================== 入账弹窗 ==================== -->
+    <div v-if="showDepositModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]" @click.self="showDepositModal = false">
+      <div class="bg-white rounded-2xl w-full max-w-md mx-4 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h2 class="font-bold text-gray-800">💰 店铺入账 — {{ depositForm.storeName }}</h2>
+          <button @click="showDepositModal = false" class="text-gray-500 hover:text-gray-600 cursor-pointer text-xl">&times;</button>
+        </div>
+        <div class="px-6 py-4 space-y-4">
+          <div class="bg-gray-50 rounded-lg p-3">
+            <div class="text-xs text-gray-500">当前店铺余额</div>
+            <div class="text-xl font-bold text-green-600">¥{{ formatNum(depositForm.storeBalance) }}</div>
+            <div class="text-[11px] text-gray-400 mt-1">此操作为财务手工增加店铺真实余额（不自动从订单累加）</div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">入账金额</label>
+            <input v-model.number="depositForm.amount" type="number" step="0.01" min="0" placeholder="0.00"
+              class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">入账日期</label>
+            <input v-model="depositForm.depositDate" type="date"
+              class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500">
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">备注</label>
+            <input v-model="depositForm.note" type="text" placeholder="选填，例如：4月提现预留、差额调整"
+              class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-emerald-500">
+          </div>
+          <div v-if="depositForm.amount > 0" class="bg-emerald-50 rounded-lg p-3 text-sm">
+            入账后余额：<span class="font-bold text-emerald-700">¥{{ formatNum(Number(depositForm.storeBalance) + Number(depositForm.amount)) }}</span>
+          </div>
+        </div>
+        <div class="px-6 py-3 border-t border-gray-100 flex justify-end gap-2">
+          <button @click="showDepositModal = false" class="px-4 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50">取消</button>
+          <button @click="doDeposit" :disabled="depositing || !depositForm.amount || depositForm.amount <= 0"
+            class="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm hover:bg-emerald-700 disabled:opacity-50 cursor-pointer">
+            {{ depositing ? '入账中…' : '确认入账' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- ==================== 店铺明细弹窗 ==================== -->
     <div v-if="showStoreDetail" class="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] pb-16 md:pb-0" @click.self="showStoreDetail = false">
       <div class="bg-white rounded-2xl w-full max-w-2xl mx-4 max-h-[90vh] flex flex-col overflow-hidden">
@@ -364,7 +414,7 @@
         <!-- 明细列表 -->
         <div class="flex-1 overflow-y-auto px-6 py-3">
           <div v-if="storeDetail.loading" class="text-center text-gray-400 py-8">加载中...</div>
-          <div v-else-if="storeDetail.records.length === 0" class="text-center text-gray-400 py-8">暂无提现记录</div>
+          <div v-else-if="storeDetail.records.length === 0" class="text-center text-gray-400 py-8">暂无记录</div>
           <div v-else class="space-y-2">
             <div v-for="(record, idx) in storeDetail.records" :key="idx"
               class="flex items-center justify-between p-3 rounded-lg border border-gray-100 hover:bg-gray-50">
@@ -374,7 +424,8 @@
                     :class="{
                       'bg-purple-50 text-purple-600': record.type === 'withdrawal',
                       'bg-orange-50 text-orange-600': record.type === 'fee',
-                    }">{{ {withdrawal:'提现',fee:'手续费'}[record.type] || '提现' }}</span>
+                      'bg-emerald-50 text-emerald-600': record.type === 'deposit',
+                    }">{{ {withdrawal:'提现',fee:'手续费',deposit:'入账'}[record.type] || record.type }}</span>
                   <span class="text-xs text-gray-500">{{ record.time }}</span>
                 </div>
                 <div class="text-sm text-gray-800 mt-1 truncate">{{ record.desc }}</div>
@@ -385,6 +436,8 @@
                   {{ record.amount >= 0 ? '+' : '' }}¥{{ formatNum(Math.abs(record.amount)) }}
                 </div>
                 <div v-if="record.balanceAfter != null" class="text-[10px] text-gray-400">余额 ¥{{ formatNum(record.balanceAfter) }}</div>
+                <button v-if="record.type === 'deposit' && canEdit" @click="revertDeposit(record.depositId, record.amount, storeDetail.storeName)"
+                  class="mt-1 text-[11px] text-red-500 hover:underline cursor-pointer">撤销</button>
               </div>
             </div>
           </div>
@@ -400,7 +453,8 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabase'
 import { parseEcommerceExcel, importEcommerceOrders } from '../lib/ecommerceOrderImporter'
@@ -408,6 +462,10 @@ import { useAuthStore } from '../stores/auth'
 import { useAccountStore } from '../stores/accounts'
 import { PLATFORM_FEE_RATES, PLATFORM_LABELS, calcWithdrawFees } from '../lib/platformFees'
 import { performStoreWithdrawal } from '../lib/storeWithdrawal'
+import { logOperation } from '../utils/operationLogger'
+
+const route = useRoute()
+const router = useRouter()
 
 const auth = useAuthStore()
 const accountStore = useAccountStore()
@@ -434,6 +492,125 @@ const monthlyWithdrawnTotal = computed(() => monthlyWithdrawnData.value.reduce((
 const showWithdrawModal = ref(false)
 const withdrawForm = ref({ storeId: '', storeName: '', platform: '', withdrawableAmount: 0, amount: null, toAccountId: '', remark: '' })
 const withdrawing = ref(false)
+
+// 入账弹窗
+const showDepositModal = ref(false)
+const depositForm = ref({ storeId: '', storeName: '', storeBalance: 0, amount: null, depositDate: new Date().toISOString().slice(0, 10), note: '' })
+const depositing = ref(false)
+
+function openDeposit(store) {
+  depositForm.value = {
+    storeId: store.id,
+    storeName: store.short_name,
+    storeBalance: Number(store.balance || 0),
+    amount: null,
+    depositDate: new Date().toISOString().slice(0, 10),
+    note: '',
+  }
+  showDepositModal.value = true
+}
+
+async function doDeposit() {
+  if (depositing.value) return
+  const f = depositForm.value
+  const amt = Number(f.amount || 0)
+  if (amt <= 0) { toast('请填入大于 0 的金额', 'warning'); return }
+  depositing.value = true
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    const userId = session?.user?.id
+    const isoDate = new Date(f.depositDate + 'T00:00:00+08:00').toISOString()
+    const { error } = await supabase.from('store_deposits').insert({
+      account_id: f.storeId,
+      amount: amt,
+      deposit_date: isoDate,
+      note: f.note || null,
+      recorded_by: userId,
+      status: 'completed',
+    })
+    if (error) throw error
+    // 同步店铺 balance
+    const acc = accountStore.accounts.find(a => a.id === f.storeId)
+    const oldBal = Number(acc?.balance || 0)
+    const newBal = oldBal + amt
+    const { error: e2 } = await supabase.from('accounts').update({ balance: newBal }).eq('id', f.storeId)
+    if (e2) throw e2
+    if (acc) acc.balance = newBal
+    try {
+      await logOperation({
+        action: 'store_deposit',
+        module: '店铺入账',
+        description: `店铺入账：${f.storeName} +¥${amt.toFixed(2)}${f.note ? '（' + f.note + '）' : ''}`,
+        amount: amt,
+        accountId: f.storeId,
+        accountName: f.storeName,
+        balanceBefore: oldBal,
+        balanceAfter: newBal,
+        detail: { type: 'store_deposit', note: f.note, depositDate: f.depositDate },
+      })
+    } catch (_) {}
+    toast(`入账成功！${f.storeName} 余额 ¥${newBal.toFixed(2)}`, 'success')
+    showDepositModal.value = false
+    await loadData()
+  } catch (e) {
+    toast('入账失败：' + (e.message || ''), 'error')
+  } finally {
+    depositing.value = false
+  }
+}
+
+// 删除店铺（软删）
+async function confirmDeleteStore(store) {
+  if (!confirm(`确认删除店铺「${store.short_name}」？该店铺将从列表隐藏，历史数据保留可恢复。`)) return
+  try {
+    const { error } = await supabase.from('accounts').update({ status: 'deleted' }).eq('id', store.id)
+    if (error) throw error
+    // 同步 pinia
+    const idx = accountStore.accounts.findIndex(a => a.id === store.id)
+    if (idx >= 0) accountStore.accounts[idx].status = 'deleted'
+    toast(`店铺「${store.short_name}」已删除`, 'success')
+    await loadData()
+  } catch (e) {
+    toast('删除失败：' + (e.message || ''), 'error')
+  }
+}
+
+// 撤销提现
+async function revertWithdrawal(w) {
+  const storeName = w.from_store?.short_name || '店铺'
+  if (!confirm(`撤销这笔提现？\n${storeName} → ¥${Number(w.actual_arrival).toFixed(2)}\n店铺将加回 ¥${Number(w.amount).toFixed(2)}，目标账户扣回 ¥${Number(w.actual_arrival).toFixed(2)}，手续费支出一并撤销。`)) return
+  try {
+    const { error } = await supabase.rpc('revert_withdrawal', { p_id: w.id })
+    if (error) throw error
+    toast('提现已撤销', 'success')
+    // 刷新账户余额和提现列表
+    accountStore._forceRefresh = true
+    await accountStore.fetchAccounts()
+    await loadData()
+  } catch (e) {
+    toast('撤销失败：' + (e.message || ''), 'error')
+  }
+}
+
+// 撤销店铺入账
+async function revertDeposit(depositId, amount, storeName) {
+  if (!confirm(`撤销这笔入账？${storeName} -¥${Number(amount).toFixed(2)}`)) return
+  try {
+    const { error } = await supabase.rpc('revert_store_deposit', { p_id: depositId })
+    if (error) throw error
+    toast('入账已撤销', 'success')
+    accountStore._forceRefresh = true
+    await accountStore.fetchAccounts()
+    // 重开当前店铺明细以刷新
+    if (storeDetail.value.storeId) {
+      const acc = accountStore.accounts.find(a => a.id === storeDetail.value.storeId)
+      if (acc) await openStoreDetail(acc)
+    }
+    await loadData()
+  } catch (e) {
+    toast('撤销失败：' + (e.message || ''), 'error')
+  }
+}
 
 // 店铺明细弹窗
 const showStoreDetail = ref(false)
@@ -613,6 +790,27 @@ async function openStoreDetail(store) {
         amount: -Number(f.amount || 0),
         balanceAfter: null,
         sortTime: f.created_at,
+      })
+    }
+
+    // 财务入账记录
+    const { data: deposits } = await supabase
+      .from('store_deposits')
+      .select('id, amount, deposit_date, note, status, created_at')
+      .eq('account_id', store.id)
+      .is('deleted_at', null)
+      .order('deposit_date', { ascending: false })
+      .limit(200)
+    for (const d of (deposits || [])) {
+      records.push({
+        type: 'deposit',
+        depositId: d.id,
+        time: formatDate(d.deposit_date || d.created_at),
+        desc: '财务入账' + (d.note ? '：' + d.note : ''),
+        sub: null,
+        amount: Number(d.amount || 0),
+        balanceAfter: null,
+        sortTime: d.deposit_date || d.created_at,
       })
     }
 
@@ -1064,12 +1262,34 @@ watch(withdrawnMonth, () => {
   loadMonthlyWithdrawn()
 })
 
-onMounted(() => {
+// 从 URL query 触发：?store=<uuid>&detail=1 → 自动打开该店铺明细
+async function maybeOpenFromQuery() {
+  const storeId = route.query.store
+  const wantDetail = route.query.detail === '1'
+  if (!storeId) return
+  await nextTick()
+  // 确保 stores 已加载
+  let tries = 0
+  while (stores.value.length === 0 && tries < 20) {
+    await new Promise(r => setTimeout(r, 100))
+    tries++
+  }
+  const target = stores.value.find(s => s.id === storeId) || accountStore.accounts.find(a => a.id === storeId)
+  if (!target) return
+  if (wantDetail) {
+    await openStoreDetail(target)
+  }
+  // 清掉 query，防止刷新重复触发
+  router.replace({ query: {} })
+}
+
+onMounted(async () => {
   if (auth.isLoggedIn) {
-    loadData()
+    await loadData()
+    maybeOpenFromQuery()
   } else {
-    const unwatch = watch(() => auth.isLoggedIn, (val) => {
-      if (val) { loadData(); unwatch() }
+    const unwatch = watch(() => auth.isLoggedIn, async (val) => {
+      if (val) { await loadData(); maybeOpenFromQuery(); unwatch() }
     })
   }
 })

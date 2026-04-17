@@ -177,7 +177,7 @@ export const useEcommerceStore = defineStore('ecommerce', {
             opening_balance: 0,
             withdrawal_account_id: storeData.withdrawal_account_id || null,
             status: 'active',
-            balance_method: 'auto',
+            balance_method: 'manual',  // 新建电商店铺默认手工维护余额；订单导入只计入运营数据，不累加 balance
           })
           .select()
           .single(),
