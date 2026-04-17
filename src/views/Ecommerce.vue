@@ -438,6 +438,8 @@
                 <div v-if="record.balanceAfter != null" class="text-[10px] text-gray-400">余额 ¥{{ formatNum(record.balanceAfter) }}</div>
                 <button v-if="record.type === 'deposit' && canEdit" @click="revertDeposit(record.depositId, record.amount, storeDetail.storeName)"
                   class="mt-1 text-[11px] text-red-500 hover:underline cursor-pointer">撤销</button>
+                <button v-if="record.type === 'withdrawal' && canEdit" @click="revertWithdrawalById(record.withdrawalId, Math.abs(record.amount))"
+                  class="mt-1 text-[11px] text-red-500 hover:underline cursor-pointer">撤销</button>
               </div>
             </div>
           </div>
@@ -587,6 +589,26 @@ async function revertWithdrawal(w) {
     // 刷新账户余额和提现列表
     accountStore._forceRefresh = true
     await accountStore.fetchAccounts()
+    await loadData()
+  } catch (e) {
+    toast('撤销失败：' + (e.message || ''), 'error')
+  }
+}
+
+// 从店铺明细抽屉里撤销提现(按 withdrawal.id)
+async function revertWithdrawalById(withdrawalId, amount) {
+  if (!withdrawalId) { toast('找不到提现记录 id', 'error'); return }
+  const storeName = storeDetail.value.storeName || '店铺'
+  if (!confirm(`撤销这笔提现？\n${storeName} 将加回 ¥${Number(amount).toFixed(2)}，目标账户同步扣回，手续费一并撤销。`)) return
+  try {
+    const { error } = await supabase.rpc('revert_withdrawal', { p_id: withdrawalId })
+    if (error) throw error
+    toast('提现已撤销', 'success')
+    accountStore._forceRefresh = true
+    await accountStore.fetchAccounts()
+    // 刷新当前打开的店铺明细
+    const acc = accountStore.accounts.find(a => a.id === storeDetail.value.storeId)
+    if (acc) await openStoreDetail(acc)
     await loadData()
   } catch (e) {
     toast('撤销失败：' + (e.message || ''), 'error')
@@ -753,24 +775,28 @@ async function openStoreDetail(store) {
   try {
     const records = []
 
-    // 查提现相关的操作日志
-    const { data: logs } = await supabase
-      .from('operation_logs')
-      .select('id, action, description, amount, balance_before, balance_after, created_at')
+    // 直接查 withdrawals 表(不走 operation_logs，那只是审计副本)
+    // 这样能拿到真实的 withdrawal_id 给撤销 RPC 用
+    const { data: wlist } = await supabase
+      .from('withdrawals')
+      .select('id, amount, actual_arrival, fee_detail, withdrawn_at, created_at, remark, to_account:to_account_id(short_name, code)')
       .eq('account_id', store.id)
-      .like('action', '%withdrawal%')
-      .order('created_at', { ascending: false })
+      .is('deleted_at', null)
+      .order('withdrawn_at', { ascending: false })
       .limit(200)
 
-    for (const l of (logs || [])) {
+    for (const w of (wlist || [])) {
+      const toName = w.to_account?.short_name || w.to_account?.code || '—'
+      const arriveAmt = Number(w.actual_arrival ?? w.amount ?? 0)
       records.push({
         type: 'withdrawal',
-        time: formatDate(l.created_at),
-        desc: l.description || '提现',
-        sub: null,
-        amount: Number(l.amount || 0),
-        balanceAfter: l.balance_after,
-        sortTime: l.created_at,
+        withdrawalId: w.id,
+        time: formatDate(w.withdrawn_at || w.created_at),
+        desc: `电商提现：${store.short_name} → ¥${arriveAmt.toFixed(2)} 到 ${toName}`,
+        sub: w.remark || null,
+        amount: -Number(w.amount || 0),   // 负数表示从店铺流出
+        balanceAfter: null,
+        sortTime: w.withdrawn_at || w.created_at,
       })
     }
 
