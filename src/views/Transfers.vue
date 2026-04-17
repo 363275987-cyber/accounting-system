@@ -597,18 +597,21 @@ onMounted(async () => {
     await accountStore.fetchAccounts()
     accounts.value = accountStore.accounts
 
-    const { data } = await supabase
+    // 注意：account_transfers 无 created_by 列，不能 join profiles；
+    // 之前写了 creator:created_by(name) 导致 PostgREST 400，全表空白
+    const { data, error } = await supabase
       .from('account_transfers')
-      .select('*, from_account:from_account_id(code, short_name, ip_code), to_account:to_account_id(code, short_name, ip_code), creator:created_by(name)')
+      .select('*, from_account:from_account_id(code, short_name, ip_code), to_account:to_account_id(code, short_name, ip_code)')
       .is('deleted_at', null)
       .order('created_at', { ascending: false })
+    if (error) throw error
     transfers.value = (data || []).map(t => ({
       ...t,
       from_code: t.from_account?.code || '—',
       to_code: t.to_account?.code || '—',
       from_name: t.from_account?.short_name || t.from_account?.code || '—',
       to_name: t.to_account?.short_name || t.to_account?.code || '—',
-      creator_name: t.creator?.name || '',
+      creator_name: '',
     }))
   } catch (e) {
     console.error('Failed to load transfers:', e)
