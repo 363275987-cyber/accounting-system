@@ -21,37 +21,40 @@
       </div>
     </div>
 
-    <!-- 今日余额变动 -->
-    <div v-if="todayTransferData.loaded" class="bg-white rounded-xl p-3 mb-4 border border-gray-100 flex items-center gap-3">
-      <div class="w-1 h-8 rounded-full bg-blue-400"></div>
-      <div class="text-sm">
-        <span class="text-gray-500">今日转账</span>
-        <span v-if="todayTransferData.count > 0" class="ml-2 font-semibold text-gray-800">{{ todayTransferData.count }} 笔</span>
-        <span v-if="todayTransferData.count > 0" class="ml-2 text-blue-500">{{ '¥' + todayTransferData.total.toFixed(2) }}</span>
-        <span v-else class="ml-2 text-gray-300">无</span>
-      </div>
-    </div>
-
-    <!-- Stats -->
-    <div class="grid grid-cols-2 gap-4 mb-5">
-      <div @click="filters.category = 'personal'"
-        :class="filters.category === 'personal' ? 'border-blue-300 ring-2 ring-blue-100' : 'border-gray-100'"
-        class="bg-white rounded-xl border p-4 cursor-pointer hover:shadow-sm transition">
+    <!-- Stats: 4 个卡片 -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+      <div @click="filters.category = 'personal'; activeTab = 'active'"
+        :class="filters.category === 'personal' && activeTab === 'active' ? 'border-blue-300 ring-2 ring-blue-100' : 'border-gray-100'"
+        class="bg-white rounded-xl border p-3 cursor-pointer hover:shadow-sm transition">
         <div class="text-xs text-gray-500 mb-1">👤 个人账户</div>
-        <div class="text-2xl font-bold" :class="personalTotal >= 0 ? 'text-green-600' : 'text-red-500'">{{ formatMoney(personalTotal) }}</div>
-        <div class="text-xs text-gray-500 mt-1">{{ personalCount }} 个账户</div>
+        <div class="text-xl md:text-2xl font-bold" :class="personalTotal >= 0 ? 'text-green-600' : 'text-red-500'">{{ formatMoney(personalTotal) }}</div>
+        <div class="text-[11px] text-gray-500 mt-1">{{ personalCount }} 个账户</div>
       </div>
-      <div @click="filters.category = 'company'"
-        :class="filters.category === 'company' ? 'border-blue-300 ring-2 ring-blue-100' : 'border-gray-100'"
-        class="bg-white rounded-xl border p-4 cursor-pointer hover:shadow-sm transition">
+      <div @click="filters.category = 'company'; activeTab = 'active'"
+        :class="filters.category === 'company' && activeTab === 'active' ? 'border-blue-300 ring-2 ring-blue-100' : 'border-gray-100'"
+        class="bg-white rounded-xl border p-3 cursor-pointer hover:shadow-sm transition">
         <div class="text-xs text-gray-500 mb-1">🏢 企业账户</div>
-        <div class="text-2xl font-bold" :class="companyTotal >= 0 ? 'text-green-600' : 'text-red-500'">{{ formatMoney(companyTotal) }}</div>
-        <div class="text-xs text-gray-500 mt-1">{{ companyCount }} 个账户</div>
+        <div class="text-xl md:text-2xl font-bold" :class="companyTotal >= 0 ? 'text-green-600' : 'text-red-500'">{{ formatMoney(companyTotal) }}</div>
+        <div class="text-[11px] text-gray-500 mt-1">{{ companyCount }} 个账户</div>
+      </div>
+      <div @click="activeTab = 'detail'; setDetailToday()"
+        :class="activeTab === 'detail' ? 'border-blue-300 ring-2 ring-blue-100' : 'border-gray-100'"
+        class="bg-white rounded-xl border p-3 cursor-pointer hover:shadow-sm transition">
+        <div class="text-xs text-gray-500 mb-1">📈 今日收入</div>
+        <div class="text-xl md:text-2xl font-bold text-green-600">+{{ formatMoney(todayStats.increase) }}</div>
+        <div class="text-[11px] text-gray-500 mt-1">{{ todayStats.incAccounts }} 个账户入账</div>
+      </div>
+      <div @click="activeTab = 'detail'; setDetailToday()"
+        :class="activeTab === 'detail' ? 'border-blue-300 ring-2 ring-blue-100' : 'border-gray-100'"
+        class="bg-white rounded-xl border p-3 cursor-pointer hover:shadow-sm transition">
+        <div class="text-xs text-gray-500 mb-1">📉 今日支出</div>
+        <div class="text-xl md:text-2xl font-bold text-red-500">-{{ formatMoney(todayStats.decrease) }}</div>
+        <div class="text-[11px] text-gray-500 mt-1">{{ todayStats.decAccounts }} 个账户出账</div>
       </div>
     </div>
 
     <!-- Tabs -->
-    <div class="flex gap-2 mb-4">
+    <div class="flex gap-2 mb-4 flex-wrap">
       <button
         @click="activeTab = 'active'"
         :class="activeTab === 'active' ? 'bg-green-50 text-green-700 border-green-300 font-medium' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'"
@@ -62,10 +65,128 @@
         :class="activeTab === 'frozen' ? 'bg-gray-100 text-gray-700 border-gray-400 font-medium' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'"
         class="px-4 py-2 rounded-lg text-sm border transition cursor-pointer"
       >🔒 已停用账户</button>
+      <button
+        @click="activeTab = 'detail'"
+        :class="activeTab === 'detail' ? 'bg-blue-50 text-blue-700 border-blue-300 font-medium' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'"
+        class="px-4 py-2 rounded-lg text-sm border transition cursor-pointer"
+      >📋 账户明细</button>
     </div>
 
-    <!-- Filters -->
-    <div class="bg-white rounded-xl border border-gray-100 p-4 mb-4 flex gap-3 items-center flex-wrap">
+    <!-- ========== 账户明细视图 ========== -->
+    <div v-if="activeTab === 'detail'">
+      <!-- 日期选择 -->
+      <div class="bg-white rounded-xl border border-gray-100 p-4 mb-4 flex items-center gap-3 flex-wrap">
+        <div class="flex items-center gap-1">
+          <button v-for="p in detailPresets" :key="p.key"
+            @click="applyDetailPreset(p.key)"
+            class="px-3 py-1.5 text-xs rounded-lg border transition cursor-pointer"
+            :class="detailPreset === p.key
+              ? 'bg-blue-600 border-blue-600 text-white'
+              : 'border-gray-200 text-gray-600 hover:bg-gray-50'">
+            {{ p.label }}
+          </button>
+        </div>
+        <div class="h-6 w-px bg-gray-200"></div>
+        <div class="flex items-center gap-2 text-sm">
+          <input type="date" v-model="detailFrom" :max="detailTo"
+            class="px-2 py-1.5 border border-gray-200 rounded-lg outline-none focus:ring-1 focus:ring-blue-400" />
+          <span class="text-gray-400">→</span>
+          <input type="date" v-model="detailTo" :min="detailFrom" :max="todayStr"
+            class="px-2 py-1.5 border border-gray-200 rounded-lg outline-none focus:ring-1 focus:ring-blue-400" />
+        </div>
+        <button @click="loadDetailMatrix" :disabled="detailLoading"
+          class="ml-auto px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 cursor-pointer">
+          {{ detailLoading ? '加载中…' : '🔄 刷新' }}
+        </button>
+      </div>
+
+      <!-- 汇总卡片 -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+        <div class="bg-white rounded-xl border border-gray-100 p-3">
+          <div class="text-[11px] text-gray-500 mb-1">变动账户</div>
+          <div class="text-lg font-bold text-gray-800">{{ detailRows.length }} 个</div>
+        </div>
+        <div class="bg-white rounded-xl border border-green-100 p-3">
+          <div class="text-[11px] text-gray-500 mb-1">本期收入</div>
+          <div class="text-lg font-bold text-green-600">+{{ formatMoney(detailTotals.increase) }}</div>
+        </div>
+        <div class="bg-white rounded-xl border border-red-100 p-3">
+          <div class="text-[11px] text-gray-500 mb-1">本期支出</div>
+          <div class="text-lg font-bold text-red-500">-{{ formatMoney(detailTotals.decrease) }}</div>
+        </div>
+        <div class="bg-white rounded-xl border border-gray-100 p-3">
+          <div class="text-[11px] text-gray-500 mb-1">净变动</div>
+          <div class="text-lg font-bold" :class="(detailTotals.increase - detailTotals.decrease) >= 0 ? 'text-gray-800' : 'text-red-500'">
+            {{ (detailTotals.increase - detailTotals.decrease) >= 0 ? '+' : '' }}{{ formatMoney(detailTotals.increase - detailTotals.decrease) }}
+          </div>
+        </div>
+      </div>
+
+      <!-- 变动账户列表 -->
+      <div class="bg-white rounded-xl border border-gray-100 overflow-hidden">
+        <div v-if="detailLoading" class="p-10 text-center text-gray-500 animate-pulse">加载中…</div>
+        <div v-else-if="detailRows.length === 0" class="p-10 text-center text-gray-400">
+          <div class="text-3xl mb-2">📭</div>
+          <p>所选区间内没有账户发生变动</p>
+        </div>
+        <table v-else class="w-full text-sm">
+          <thead class="bg-gray-50">
+            <tr class="text-xs text-gray-500">
+              <th class="text-left px-4 py-2.5 font-medium">账户</th>
+              <th class="text-right px-4 py-2.5 font-medium">期初</th>
+              <th class="text-right px-4 py-2.5 font-medium">本期增加</th>
+              <th class="text-right px-4 py-2.5 font-medium">本期减少</th>
+              <th class="text-right px-4 py-2.5 font-medium">期末</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template v-for="group in detailGroupedRows" :key="group.key">
+              <tr class="bg-gray-50/60 border-t border-gray-100">
+                <td colspan="5" class="px-4 py-1.5 text-xs font-medium text-gray-500">
+                  {{ group.label }} · {{ group.accounts.length }} 个账户
+                </td>
+              </tr>
+              <tr v-for="r in group.accounts" :key="r.account_id"
+                class="border-t border-gray-50 hover:bg-blue-50/30 transition">
+                <td class="px-4 py-2.5 font-medium text-gray-800">{{ r.short_name || r.code || '—' }}</td>
+                <td class="px-4 py-2.5 text-right text-gray-600">{{ formatMoney(r.opening) }}</td>
+                <td class="px-4 py-2.5 text-right">
+                  <button v-if="r.increase > 0" @click="openDetailDrawer(r, 'in')"
+                    class="font-medium text-green-600 hover:underline cursor-pointer">
+                    +{{ formatMoney(r.increase) }}
+                  </button>
+                  <span v-else class="text-gray-300">—</span>
+                </td>
+                <td class="px-4 py-2.5 text-right">
+                  <button v-if="r.decrease > 0" @click="openDetailDrawer(r, 'out')"
+                    class="font-medium text-red-500 hover:underline cursor-pointer">
+                    -{{ formatMoney(r.decrease) }}
+                  </button>
+                  <span v-else class="text-gray-300">—</span>
+                </td>
+                <td class="px-4 py-2.5 text-right font-semibold"
+                  :class="r.closing < 0 ? 'text-red-500' : 'text-gray-800'">
+                  {{ formatMoney(r.closing) }}
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+      </div>
+
+      <BalanceFlowDrawer v-if="detailDrawer.open"
+        :account-id="detailDrawer.accountId"
+        :account-name="detailDrawer.accountName"
+        :account-category="detailDrawer.accountCategory"
+        :from="detailFrom"
+        :to="detailTo"
+        :direction="detailDrawer.direction"
+        @close="detailDrawer.open = false"
+        @updated="onDetailUpdated" />
+    </div>
+
+    <!-- Filters (active / frozen tabs only) -->
+    <div v-if="activeTab !== 'detail'" class="bg-white rounded-xl border border-gray-100 p-4 mb-4 flex gap-3 items-center flex-wrap">
       <input
         v-model="filters.keyword"
         placeholder="🔍 搜索账户简称..."
@@ -107,10 +228,10 @@
     </div>
 
     <!-- Loading -->
-    <Skeleton v-if="loading" type="card" :count="6" card-grid-class="grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6" />
+    <Skeleton v-if="activeTab !== 'detail' && loading" type="card" :count="6" card-grid-class="grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6" />
 
     <!-- Account List View -->
-    <div v-if="!loading" class="bg-white rounded-xl border border-gray-100 overflow-hidden">
+    <div v-if="activeTab !== 'detail' && !loading" class="bg-white rounded-xl border border-gray-100 overflow-hidden">
       <table class="w-full text-sm">
         <thead class="bg-gray-50 border-b border-gray-100">
           <tr>
@@ -185,7 +306,7 @@
 
     <!-- Empty State -->
     <div
-      v-if="filteredAccounts.length === 0 && !loading"
+      v-if="activeTab !== 'detail' && filteredAccounts.length === 0 && !loading"
       class="bg-white rounded-xl border border-gray-100 p-12 text-center"
     >
       <div class="text-4xl mb-4">📭</div>
@@ -467,6 +588,7 @@
 
 <script setup>
 import { ref, computed, onMounted, reactive, watch } from 'vue'
+import BalanceFlowDrawer from '../components/BalanceFlowDrawer.vue'
 import { useAuthStore } from '../stores/auth'
 import { useAccountStore } from '../stores/accounts'
 import { supabase } from '../lib/supabase'
@@ -520,43 +642,157 @@ const flippedCards = reactive({})
 const editingBalanceId = ref(null)
 const editingBalanceVal = ref(null)
 
-// --- 今日转账数据 ---
-const todayTransferData = reactive({ total: 0, count: 0, loaded: false })
+// --- Tab 必须先声明（下面的 watch 会引用） ---
+const activeTab = ref('active')
 
-async function loadTodayTransfers() {
-  try {
-    const now = new Date()
-    let dayStart
-    if (now.getHours() < 6) {
-      dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 6, 0, 0)
-    } else {
-      dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 6, 0, 0)
-    }
-    const dayEnd = new Date(dayStart)
-    dayEnd.setDate(dayEnd.getDate() + 1)
-    const startISO = dayStart.toISOString()
-    const endISO = dayEnd.toISOString()
+// --- 今日卡片 & 明细 Tab 数据 ---
+const todayStr = new Date().toISOString().slice(0, 10)
+const todayStats = reactive({ increase: 0, decrease: 0, incAccounts: 0, decAccounts: 0 })
 
-    const { data } = await supabase
-      .from('account_transfers')
-      .select('amount')
-      .is('deleted_at', null)
-      .gte('created_at', startISO)
-      .lte('created_at', endISO)
-    if (data && data.length > 0) {
-      todayTransferData.total = data.reduce((s, r) => s + (Number(r.amount) || 0), 0)
-      todayTransferData.count = data.length
-    } else {
-      todayTransferData.total = 0
-      todayTransferData.count = 0
-    }
-    todayTransferData.loaded = true
-  } catch (e) {
-    console.error('加载今日转账失败:', e)
+function toIsoRange(fromStr, toStr) {
+  return {
+    fromIso: new Date(fromStr + 'T00:00:00+08:00').toISOString(),
+    toIso:   new Date(toStr   + 'T23:59:59+08:00').toISOString(),
   }
 }
 
-const activeTab = ref('active')
+async function loadTodayStats() {
+  try {
+    const { fromIso, toIso } = toIsoRange(todayStr, todayStr)
+    const { data, error } = await supabase.rpc('compute_balance_range', { p_from: fromIso, p_to: toIso })
+    if (error) throw error
+    let inc = 0, dec = 0, incN = 0, decN = 0
+    for (const r of (data || [])) {
+      const i = Number(r.increase || 0), d = Number(r.decrease || 0)
+      inc += i; dec += d
+      if (i > 0) incN++
+      if (d > 0) decN++
+    }
+    todayStats.increase = inc
+    todayStats.decrease = dec
+    todayStats.incAccounts = incN
+    todayStats.decAccounts = decN
+  } catch (e) {
+    console.error('加载今日统计失败:', e)
+  }
+}
+
+// --- 账户明细 tab ---
+const detailFrom = ref(todayStr)
+const detailTo = ref(todayStr)
+const detailPreset = ref('today')
+const detailLoading = ref(false)
+const detailRows = ref([])
+const detailPresets = [
+  { key: 'today', label: '今天' },
+  { key: 'yesterday', label: '昨天' },
+  { key: 'thisWeek', label: '本周' },
+  { key: 'thisMonth', label: '本月' },
+  { key: 'custom', label: '自定义' },
+]
+
+const detailGroupDef = [
+  { key: 'personal', label: '个人账户', matches: c => c === 'personal' || c === 'cash' || c === 'bank' || !c },
+  { key: 'company',  label: '企业账户', matches: c => c === 'company' },
+  { key: 'ecommerce', label: '店铺账户', matches: c => c === 'ecommerce' },
+]
+
+const detailGroupedRows = computed(() => {
+  const groups = detailGroupDef.map(g => ({ ...g, accounts: [] }))
+  for (const r of detailRows.value) {
+    const g = groups.find(gg => gg.matches(r.category)) || groups[0]
+    g.accounts.push(r)
+  }
+  return groups.filter(g => g.accounts.length > 0)
+})
+
+const detailTotals = computed(() => detailRows.value.reduce((acc, r) => ({
+  increase: acc.increase + r.increase,
+  decrease: acc.decrease + r.decrease,
+}), { increase: 0, decrease: 0 }))
+
+function setDetailToday() {
+  detailPreset.value = 'today'
+  detailFrom.value = todayStr
+  detailTo.value = todayStr
+  loadDetailMatrix()
+}
+
+function applyDetailPreset(key) {
+  detailPreset.value = key
+  const now = new Date()
+  const pad = n => String(n).padStart(2, '0')
+  const fmt = dt => `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`
+  if (key === 'today') {
+    detailFrom.value = todayStr; detailTo.value = todayStr
+  } else if (key === 'yesterday') {
+    const d = new Date(now); d.setDate(d.getDate() - 1)
+    const y = fmt(d); detailFrom.value = y; detailTo.value = y
+  } else if (key === 'thisWeek') {
+    const d = new Date(now); const dow = d.getDay() || 7
+    d.setDate(d.getDate() - (dow - 1))
+    detailFrom.value = fmt(d); detailTo.value = todayStr
+  } else if (key === 'thisMonth') {
+    detailFrom.value = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`
+    detailTo.value = todayStr
+  }
+  if (key !== 'custom') loadDetailMatrix()
+}
+
+async function loadDetailMatrix() {
+  if (!detailFrom.value || !detailTo.value) return
+  detailLoading.value = true
+  try {
+    if (accountStore.accounts.length === 0) await accountStore.fetchAccounts()
+    const { fromIso, toIso } = toIsoRange(detailFrom.value, detailTo.value)
+    const { data, error } = await supabase.rpc('compute_balance_range', { p_from: fromIso, p_to: toIso })
+    if (error) throw error
+    const byId = new Map((data || []).map(r => [r.account_id, r]))
+    const merged = accountStore.accounts
+      .filter(a => a.status !== 'deleted')
+      .map(a => {
+        const m = byId.get(a.id) || { opening: 0, increase: 0, decrease: 0, closing: Number(a.opening_balance || 0) }
+        return {
+          account_id: a.id,
+          short_name: a.short_name,
+          code: a.code,
+          category: a.category,
+          opening: Number(m.opening || 0),
+          increase: Number(m.increase || 0),
+          decrease: Number(m.decrease || 0),
+          closing: Number(m.closing || 0),
+        }
+      })
+      .filter(r => r.increase > 0 || r.decrease > 0)  // 只要有变动的
+    detailRows.value = merged
+  } catch (e) {
+    console.error('[Accounts-detail] loadDetailMatrix failed:', e)
+    toast('加载明细失败：' + (e?.message || e?.code || ''), 'error')
+  } finally {
+    detailLoading.value = false
+  }
+}
+
+// 抽屉
+const detailDrawer = ref({ open: false, accountId: '', accountName: '', accountCategory: '', direction: 'in' })
+function openDetailDrawer(r, direction) {
+  detailDrawer.value = {
+    open: true,
+    accountId: r.account_id,
+    accountName: r.short_name || r.code || '',
+    accountCategory: r.category || '',
+    direction,
+  }
+}
+async function onDetailUpdated() {
+  await loadDetailMatrix()
+  await loadTodayStats()
+}
+
+watch(() => [detailFrom.value, detailTo.value], () => { detailPreset.value = 'custom' })
+watch(() => activeTab.value, (val) => {
+  if (val === 'detail' && detailRows.value.length === 0) loadDetailMatrix()
+})
 
 const filters = reactive({
   keyword: '',
@@ -1143,7 +1379,7 @@ onMounted(async () => {
     accountStore._forceRefresh = true
     await Promise.all([
       accountStore.fetchAccounts(),
-      loadTodayTransfers(),
+      loadTodayStats(),
     ])
   } finally {
     loading.value = false
