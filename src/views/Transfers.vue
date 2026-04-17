@@ -192,7 +192,7 @@
     <!-- Action Bar -->
     <div v-if="selectedIds.length > 0 && canDeleteTransfers" class="bg-red-50 border border-red-100 rounded-xl px-4 py-3 mb-4 flex items-center gap-3">
       <span class="text-red-600 text-sm font-medium">已选 {{ selectedIds.length }} 条</span>
-      <button v-if="canDelete" @click="handleBatchDelete" class="bg-red-600 text-white px-3 py-1.5 rounded-lg text-sm hover:bg-red-700 transition cursor-pointer">删除选中</button>
+      <button @click="handleBatchDelete" class="bg-red-600 text-white px-3 py-1.5 rounded-lg text-sm hover:bg-red-700 transition cursor-pointer">删除选中</button>
       <button @click="selectedIds = []" class="text-gray-500 text-sm hover:text-gray-700 cursor-pointer">取消选择</button>
     </div>
 
@@ -239,7 +239,7 @@
               </span>
             </td>
             <td v-if="canDeleteTransfers" class="px-4 py-3 text-center">
-              <button v-if="canDelete" @click="handleDeleteTransfer(t)" class="text-red-400 hover:text-red-600 text-xs px-2 py-1 rounded hover:bg-red-50 transition cursor-pointer">删除</button>
+              <button @click="handleDeleteTransfer(t)" class="text-red-400 hover:text-red-600 text-xs px-2 py-1 rounded hover:bg-red-50 transition cursor-pointer">删除</button>
             </td>
           </tr>
           <tr v-if="filteredTransfers.length === 0">
