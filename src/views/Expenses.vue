@@ -1669,28 +1669,32 @@ function fuzzyMatchAccount(input, accounts) {
 }
 
 // ══════════════════════════════════════════════════════════
-// 配对转账识别：
-//   输入形如 "达一般户支出300.01，达基本户收到300.01"
-//   → 识别为 一条 transfer：达一般户 → 达基本户 ¥300.01
-// 支持动词：支出/转出/付出/给出/扣款/划出  和  收到/转入/入账/到账/收款
-// 分隔符：中英文逗号/分号/顿号/换行/空格
+// 配对转账识别（两半）：
+//   "达一般户支出300.01，达基本户收到300.01"
+//   "达一般户-300，达基本户+300"
 // ══════════════════════════════════════════════════════════
-const OUT_VERBS = '支出|转出|付出|给出|扣款|扣除|划出'
-const IN_VERBS  = '收到|转入|入账|到账|收款'
+const OUT_VERBS = '支出|转出|付出|给出|扣款|扣除|划出|划走|出账|转走|付'
+const IN_VERBS  = '收到|转入|入账|到账|收款|进账|打来|打入|汇入|增加'
 function tryPairTransfer(line, accounts) {
-  const parts = line.split(/[,，;；、\n]/).map(s => s.trim()).filter(Boolean)
+  const parts = line.split(/[,,;;、\n]/).map(s => s.trim()).filter(Boolean)
   if (parts.length < 2) return null
   const outs = [], ins = []
   const reOut = new RegExp(`^(.+?)(?:${OUT_VERBS})\\s*([\\d,]+(?:\\.\\d+)?)\\s*(?:元)?$`)
   const reIn  = new RegExp(`^(.+?)(?:${IN_VERBS})\\s*([\\d,]+(?:\\.\\d+)?)\\s*(?:元)?$`)
+  // 符号式：-300 出；+300 入
+  const reNeg = /^(.+?)\s*[-－]\s*([\d,]+(?:\.\d+)?)\s*(?:元)?$/
+  const rePos = /^(.+?)\s*[+＋]\s*([\d,]+(?:\.\d+)?)\s*(?:元)?$/
   for (const p of parts) {
     let m = p.match(reOut)
     if (m) { outs.push({ name: m[1].trim(), amount: parseFloat(m[2].replace(/,/g, '')) }); continue }
     m = p.match(reIn)
     if (m) { ins.push({ name: m[1].trim(), amount: parseFloat(m[2].replace(/,/g, '')) }); continue }
+    m = p.match(reNeg)
+    if (m) { outs.push({ name: m[1].trim(), amount: parseFloat(m[2].replace(/,/g, '')) }); continue }
+    m = p.match(rePos)
+    if (m) { ins.push({ name: m[1].trim(), amount: parseFloat(m[2].replace(/,/g, '')) }); continue }
   }
   if (outs.length === 0 || ins.length === 0) return null
-  // 按金额等值配对
   for (const o of outs) {
     for (const i of ins) {
       if (Math.abs(o.amount - i.amount) < 0.001) {
@@ -1704,6 +1708,64 @@ function tryPairTransfer(line, accounts) {
             fromInput: o.name, toInput: i.name,
           }
         }
+      }
+    }
+  }
+  return null
+}
+
+// ══════════════════════════════════════════════════════════
+// 单行转账识别（一行一笔）：
+//   "达一般户→达基本户 300.01"           箭头式
+//   "达一般户转达基本户 300"              单字"转"
+//   "达一般户转到达基本户 300"            转到/转给/转至/转入
+//   "达一般户转账到达基本户 300"          转账到/转账至/转账给
+//   "达一般户划款到达基本户 300"          划款到/划到/划至
+//   "达一般户打款到达基本户 300"          打款到/打到
+//   "达一般户汇到达基本户 300"            汇到/汇至
+//   "从达一般户到达基本户 300"            从 A 到 B
+//   "达一般户 转 300 到 达基本户"         A 动词 金额 到 B
+//   "300 达一般户→达基本户"               金额前置箭头
+// ══════════════════════════════════════════════════════════
+function tryInlineTransfer(line, accounts) {
+  // 归一化：全角数字/小数点 → 半角
+  const ln = line
+    .replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xff10 + 0x30))
+    .replace(/．/g, '.')
+    .trim()
+
+  // 候选 pattern。顺序：先精确/复合动词，再单字 fallback
+  const patterns = [
+    // 1) 箭头式：A → B 300
+    { re: /^(.+?)\s*(?:→|->|—>|=>|⇒|➡|➔|⟶)\s*(.+?)\s*([\d,]+(?:\.\d+)?)\s*(?:元)?$/, map: m => ({ from: m[1], to: m[2], amt: m[3] }) },
+    // 2) 金额前置：300 A → B
+    { re: /^([\d,]+(?:\.\d+)?)\s*(?:元)?\s+(.+?)\s*(?:→|->|⇒|➡)\s*(.+?)$/, map: m => ({ from: m[2], to: m[3], amt: m[1] }) },
+    // 3) 从 A 到 B 300
+    { re: /^从\s*(.+?)\s*(?:到|转到|转至|划至|汇至|打到|转|汇|划|打)\s*(.+?)\s+([\d,]+(?:\.\d+)?)\s*(?:元)?$/, map: m => ({ from: m[1], to: m[2], amt: m[3] }) },
+    // 4) A <复合动词> B 金额
+    { re: /^(.+?)\s*(?:转账到|转账至|转账给|转给|转至|转到|转入|划转到|划转至|划款到|划款至|打款到|打款至|打款给|汇款到|汇款至|汇到|汇至|汇给)\s*(.+?)\s*([\d,]+(?:\.\d+)?)\s*(?:元)?$/, map: m => ({ from: m[1], to: m[2], amt: m[3] }) },
+    // 5) A <单字动词> 金额 到/给/至/入 B
+    { re: /^(.+?)\s*(?:转|划|汇|打)\s*([\d,]+(?:\.\d+)?)\s*(?:元)?\s*(?:到|给|至|入|进)\s*(.+?)$/, map: m => ({ from: m[1], amt: m[2], to: m[3] }) },
+    // 6) A 转 B 金额(最弱的 fallback)
+    { re: /^(.+?)\s*(?:转|划|汇)\s*(.+?)\s+([\d,]+(?:\.\d+)?)\s*(?:元)?$/, map: m => ({ from: m[1], to: m[2], amt: m[3] }) },
+  ]
+
+  for (const p of patterns) {
+    const m = ln.match(p.re)
+    if (!m) continue
+    const mapped = p.map(m)
+    const fromName = mapped.from.trim()
+    const toName = mapped.to.trim()
+    const amount = parseFloat(String(mapped.amt).replace(/,/g, ''))
+    if (!fromName || !toName || !amount || amount <= 0) continue
+    const fromAcc = fuzzyMatchAccount(fromName, accounts)
+    const toAcc = fuzzyMatchAccount(toName, accounts)
+    if (fromAcc && toAcc && fromAcc.id !== toAcc.id) {
+      return {
+        amount,
+        fromId: fromAcc.id, fromLabel: fromAcc.short_name || fromAcc.code,
+        toId: toAcc.id, toLabel: toAcc.short_name || toAcc.code,
+        fromInput: fromName, toInput: toName,
       }
     }
   }
@@ -1784,9 +1846,9 @@ function parseExpenseText(text) {
   for (const { desc, fmtAmount } of entries) {
     const line = desc
 
-    // ── Step 0: 配对转账识别（"A支出N，B收到N"格式） ──
-    // 在走普通识别之前先尝试，命中直接 push 一条 transfer 条目
-    const pair = tryPairTransfer(line, activeAccs)
+    // ── Step 0: 转账识别 ──
+    // 先尝试配对式("A支出N, B收到N"),再尝试单行式("A→B N" / "A 转 B N" ...)
+    const pair = tryPairTransfer(line, activeAccs) || tryInlineTransfer(line, activeAccs)
     if (pair) {
       const noteText = `${pair.fromInput} → ${pair.toInput}`.trim()
       results.push({
