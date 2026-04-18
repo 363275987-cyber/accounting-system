@@ -3,7 +3,7 @@
     <!-- Header -->
     <div class="flex items-center justify-between mb-4">
       <div>
-        <h1 class="text-lg md:text-xl font-bold text-gray-800">📦 产品销量报表</h1>
+        <h1 class="text-lg md:text-xl font-bold text-gray-800"><Icon name="package" class="inline w-4 h-4 -mt-0.5 mr-1" /> 产品销量报表</h1>
         <p class="text-xs text-gray-500 mt-0.5">按销售链路统计销量、收入</p>
       </div>
     </div>
@@ -46,7 +46,7 @@
         <option value="year">本年</option>
         <option value="all">全部</option>
       </select>
-      <button @click="loadData" class="px-3 py-2 bg-blue-50 text-blue-600 rounded-lg text-sm hover:bg-blue-100 cursor-pointer">🔄 刷新</button>
+      <button @click="loadData" class="px-3 py-2 bg-blue-50 text-blue-600 rounded-lg text-sm hover:bg-blue-100 cursor-pointer"><Icon name="refresh" class="inline w-4 h-4 -mt-0.5 mr-1" /> 刷新</button>
       <span class="text-sm text-gray-500 ml-auto">
         {{ activeChannel === 'private' ? `共 ${privateFilteredData.length} 个产品` : `共 ${ecomFilteredData.length} 条记录` }}
       </span>
@@ -139,7 +139,7 @@
 
       <!-- 品牌排行 -->
       <div v-if="pvBrandData.length > 0" class="mt-6">
-        <h2 class="text-base font-semibold text-gray-800 mb-3">🏷️ 品牌销量排行</h2>
+        <h2 class="text-base font-semibold text-gray-800 mb-3"><Icon name="tag" class="inline w-4 h-4 -mt-0.5 mr-1" /> 品牌销量排行</h2>
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div v-for="brand in pvBrandData" :key="brand.name"
             class="bg-white rounded-xl border border-gray-100 p-4">
@@ -159,7 +159,7 @@
       <!-- 汇总卡片 -->
       <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
         <div class="bg-white rounded-xl border border-gray-100 p-4">
-          <div class="text-xs text-gray-500 mb-1">💰 总销售额</div>
+          <div class="text-xs text-gray-500 mb-1"><Icon name="wallet" class="inline w-4 h-4 -mt-0.5 mr-1" /> 总销售额</div>
           <div class="text-2xl font-bold text-green-600">{{ formatMoney(ecomSummary.sales) }}</div>
           <div class="text-xs text-gray-500 mt-0.5">{{ ecomSummary.orders }} 单</div>
         </div>
@@ -169,12 +169,12 @@
           <div class="text-xs text-gray-500 mt-0.5">退款率 {{ ecomSummary.refundRate }}%</div>
         </div>
         <div class="bg-white rounded-xl border border-gray-100 p-4">
-          <div class="text-xs text-gray-500 mb-1">📈 净销售额</div>
+          <div class="text-xs text-gray-500 mb-1"><Icon name="trending-up" class="inline w-4 h-4 -mt-0.5 mr-1" /> 净销售额</div>
           <div class="text-2xl font-bold text-blue-600">{{ formatMoney(ecomSummary.net) }}</div>
           <div class="text-xs text-gray-500 mt-0.5">有效 {{ ecomSummary.effectiveOrders }} 单</div>
         </div>
         <div class="bg-white rounded-xl border border-gray-100 p-4">
-          <div class="text-xs text-gray-500 mb-1">📊 客单价</div>
+          <div class="text-xs text-gray-500 mb-1"><Icon name="gauge" class="inline w-4 h-4 -mt-0.5 mr-1" /> 客单价</div>
           <div class="text-2xl font-bold text-purple-600">{{ formatMoney(ecomSummary.avgOrderValue) }}</div>
           <div class="text-xs text-gray-500 mt-0.5">有效单均值</div>
         </div>
@@ -277,6 +277,7 @@ import Skeleton from '../components/Skeleton.vue'
 import { supabase } from '../lib/supabase'
 import { formatMoney, PRODUCT_ITEM_CATEGORIES, PLATFORM_LABELS, toast } from '../lib/utils'
 import { useAuthStore } from '../stores/auth'
+import Icon from '../components/icons/Icons.vue'
 
 const auth = useAuthStore()
 

@@ -14,11 +14,11 @@
     <!-- Summary Cards -->
     <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
       <div class="bg-white rounded-xl border border-gray-100 p-4">
-        <div class="text-sm text-gray-500 mb-1">💰 应收总额</div>
+        <div class="text-sm text-gray-500 mb-1"><Icon name="wallet" class="inline w-4 h-4 -mt-0.5 mr-1" /> 应收总额</div>
         <div class="text-2xl font-bold text-blue-600">{{ formatMoney(stats.totalAmount) }}</div>
       </div>
       <div class="bg-white rounded-xl border border-gray-100 p-4">
-        <div class="text-sm text-gray-500 mb-1">✅ 已收回</div>
+        <div class="text-sm text-gray-500 mb-1"><Icon name="check-circle" class="inline w-4 h-4 -mt-0.5 mr-1" /> 已收回</div>
         <div class="text-2xl font-bold text-green-600">{{ formatMoney(stats.recoveredAmount) }}</div>
       </div>
       <div class="bg-white rounded-xl border border-gray-100 p-4">
@@ -26,11 +26,11 @@
         <div class="text-2xl font-bold text-orange-500">{{ formatMoney(stats.remainingAmount) }}</div>
       </div>
       <div class="bg-white rounded-xl border border-gray-100 p-4">
-        <div class="text-sm text-gray-500 mb-1">🏠 押金小计</div>
+        <div class="text-sm text-gray-500 mb-1"><Icon name="home" class="inline w-4 h-4 -mt-0.5 mr-1" /> 押金小计</div>
         <div class="text-2xl font-bold text-blue-500">{{ formatMoney(stats.depositTotal) }}</div>
       </div>
       <div class="bg-white rounded-xl border border-gray-100 p-4">
-        <div class="text-sm text-gray-500 mb-1">💸 借出款小计</div>
+        <div class="text-sm text-gray-500 mb-1"><Icon name="wallet" class="inline w-4 h-4 -mt-0.5 mr-1" /> 借出款小计</div>
         <div class="text-2xl font-bold text-amber-500">{{ formatMoney(stats.loanTotal) }}</div>
       </div>
     </div>
@@ -231,6 +231,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { supabase } from '../lib/supabase'
+import Icon from '../components/icons/Icons.vue'
 
 const loading = ref(false)
 const saving = ref(false)

@@ -2,19 +2,17 @@
   <div>
     <!-- Header -->
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-xl font-bold text-gray-800">📊 库存总览</h1>
+      <h1 class="text-xl font-bold text-gray-800"><Icon name="gauge" class="inline w-4 h-4 -mt-0.5 mr-1" /> 库存总览</h1>
       <div class="flex gap-2">
         <button
           @click="openTransferModal"
           class="bg-purple-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-purple-700 transition cursor-pointer"
-        >
-          🔄 仓库调拨
+        ><Icon name="refresh" class="inline w-4 h-4 -mt-0.5 mr-1" /> 仓库调拨
         </button>
         <button
           @click="openAdjustModal"
           class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition cursor-pointer"
-        >
-          📝 库存调整
+        ><Icon name="edit" class="inline w-4 h-4 -mt-0.5 mr-1" /> 库存调整
         </button>
       </div>
     </div>
@@ -22,19 +20,19 @@
     <!-- Stats Cards -->
     <div class="grid grid-cols-4 gap-4 mb-5">
       <div class="bg-white rounded-xl border border-gray-100 p-4">
-        <div class="text-xs text-gray-500 mb-1">📦 总库存</div>
+        <div class="text-xs text-gray-500 mb-1"><Icon name="package" class="inline w-4 h-4 -mt-0.5 mr-1" /> 总库存</div>
         <div class="text-2xl font-bold text-gray-800">{{ store.stats.totalStock }}</div>
       </div>
       <div class="bg-white rounded-xl border border-gray-100 p-4">
-        <div class="text-xs text-gray-500 mb-1">🏷️ 产品数</div>
+        <div class="text-xs text-gray-500 mb-1"><Icon name="tag" class="inline w-4 h-4 -mt-0.5 mr-1" /> 产品数</div>
         <div class="text-2xl font-bold text-blue-600">{{ store.stats.totalProducts }}</div>
       </div>
       <div class="bg-white rounded-xl border border-gray-100 p-4">
-        <div class="text-xs text-gray-500 mb-1">🏢 仓库数</div>
+        <div class="text-xs text-gray-500 mb-1"><Icon name="building" class="inline w-4 h-4 -mt-0.5 mr-1" /> 仓库数</div>
         <div class="text-2xl font-bold text-indigo-600">{{ store.stats.totalWarehouses }}</div>
       </div>
       <div class="bg-white rounded-xl border border-gray-100 p-4">
-        <div class="text-xs text-gray-500 mb-1">⚠️ 低库存预警</div>
+        <div class="text-xs text-gray-500 mb-1"><Icon name="alert-triangle" class="inline w-4 h-4 -mt-0.5 mr-1" /> 低库存预警</div>
         <div class="text-2xl font-bold text-orange-500">{{ store.stats.lowStockWarnings }}</div>
       </div>
     </div>
@@ -66,14 +64,12 @@
       <button
         @click="search"
         class="bg-blue-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-blue-700 transition cursor-pointer"
-      >
-        🔍 搜索
+      ><Icon name="search" class="inline w-4 h-4 -mt-0.5 mr-1" /> 搜索
       </button>
       <button
         @click="handleExportInventory"
         class="bg-green-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-green-700 transition cursor-pointer"
-      >
-        📥 导出CSV
+      ><Icon name="download" class="inline w-4 h-4 -mt-0.5 mr-1" /> 导出CSV
       </button>
       <span class="text-sm text-gray-500 ml-auto">
         共 {{ store.pagination.total }} 条记录
@@ -145,8 +141,7 @@
                     @click="openEditModal(item)"
                     class="p-1.5 rounded-lg hover:bg-blue-50 text-blue-500 transition cursor-pointer"
                     title="编辑"
-                  >
-                    ✏️
+                  ><Icon name="edit" class="inline w-4 h-4 -mt-0.5 mr-1" />
                   </button>
                   <button
                     v-if="userRole === 'admin'"
@@ -191,7 +186,7 @@
     <div v-if="showEditModal" class="fixed inset-0 z-50 flex items-center justify-center">
       <div class="absolute inset-0 bg-black/40" @click="showEditModal = false"></div>
       <div class="relative bg-white rounded-xl shadow-xl w-full max-w-md mx-4 p-6">
-        <h2 class="text-lg font-bold text-gray-800 mb-4">✏️ 编辑库存</h2>
+        <h2 class="text-lg font-bold text-gray-800 mb-4"><Icon name="edit" class="inline w-4 h-4 -mt-0.5 mr-1" /> 编辑库存</h2>
 
         <div class="space-y-4">
           <div>
@@ -249,7 +244,7 @@
     <div v-if="showAdjustModal" class="fixed inset-0 z-50 flex items-center justify-center">
       <div class="absolute inset-0 bg-black/40" @click="showAdjustModal = false"></div>
       <div class="relative bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 p-6">
-        <h2 class="text-lg font-bold text-gray-800 mb-4">📝 库存调整</h2>
+        <h2 class="text-lg font-bold text-gray-800 mb-4"><Icon name="edit" class="inline w-4 h-4 -mt-0.5 mr-1" /> 库存调整</h2>
 
         <div class="space-y-4">
           <!-- 仓库 -->
@@ -283,9 +278,9 @@
               class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">请选择</option>
-              <option value="in">📥 入库</option>
-              <option value="out">📤 出库</option>
-              <option value="count">📋 盘点</option>
+              <option value="in">入库</option>
+              <option value="out">出库</option>
+              <option value="count">盘点</option>
             </select>
           </div>
 
@@ -335,7 +330,7 @@
     <div v-if="showTransferModal" class="fixed inset-0 z-50 flex items-center justify-center">
       <div class="absolute inset-0 bg-black/40" @click="showTransferModal = false"></div>
       <div class="relative bg-white rounded-xl shadow-xl w-full max-w-lg mx-4 p-6">
-        <h2 class="text-lg font-bold text-gray-800 mb-4">🔄 仓库调拨</h2>
+        <h2 class="text-lg font-bold text-gray-800 mb-4"><Icon name="refresh" class="inline w-4 h-4 -mt-0.5 mr-1" /> 仓库调拨</h2>
 
         <div class="space-y-4">
           <!-- 源仓库 -->
@@ -423,6 +418,7 @@ import { useInventoryStore } from '../stores/inventory'
 import { supabase } from '../lib/supabase'
 import { toast } from '../lib/utils'
 import SearchableSelect from '../components/SearchableSelect.vue'
+import Icon from '../components/icons/Icons.vue'
 
 const store = useInventoryStore()
 

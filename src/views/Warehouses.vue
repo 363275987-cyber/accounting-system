@@ -2,12 +2,11 @@
   <div>
     <!-- Header -->
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-xl font-bold text-gray-800">📦 仓库管理</h1>
+      <h1 class="text-xl font-bold text-gray-800"><Icon name="package" class="inline w-4 h-4 -mt-0.5 mr-1" /> 仓库管理</h1>
       <button
         @click="openModal()"
         class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition cursor-pointer"
-      >
-        ➕ 新建仓库
+      ><Icon name="plus" class="inline w-4 h-4 -mt-0.5 mr-1" /> 新建仓库
       </button>
     </div>
 
@@ -120,7 +119,7 @@
               class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="">请选择</option>
-              <option value="physical">🏢 实体仓</option>
+              <option value="physical">实体仓</option>
               <option value="virtual">☁️ 虚拟仓</option>
               <option value="platform">📱 平台仓</option>
             </select>
@@ -175,6 +174,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { usePermission } from '../composables/usePermission'
+import Icon from '../components/icons/Icons.vue'
 
 const { canDelete, loadRole } = usePermission()
 import { useInventoryStore } from '../stores/inventory'

@@ -2,7 +2,7 @@
   <div class="p-4 md:p-6 space-y-6">
     <!-- 顶部标题 + 筛选 -->
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-      <h1 class="text-xl font-bold text-gray-800">📊 电商销量</h1>
+      <h1 class="text-xl font-bold text-gray-800"><Icon name="gauge" class="inline w-4 h-4 -mt-0.5 mr-1" /> 电商销量</h1>
       <div class="flex items-center gap-2 flex-wrap">
         <button v-for="opt in dateOptions" :key="opt.key"
           @click="setDateRange(opt.key)"
@@ -40,7 +40,7 @@
     <!-- 汇总卡片 -->
     <div class="grid grid-cols-3 gap-3">
       <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-        <div class="text-xs text-gray-500 mb-1.5">💰 销售额</div>
+        <div class="text-xs text-gray-500 mb-1.5"><Icon name="wallet" class="inline w-4 h-4 -mt-0.5 mr-1" /> 销售额</div>
         <div class="text-xl font-bold text-green-600">¥{{ formatNum(summary.sales) }}</div>
         <div class="text-xs text-gray-500 mt-0.5">{{ summary.orders }} 单</div>
       </div>
@@ -50,7 +50,7 @@
         <div class="text-xs text-gray-500 mt-0.5">退款率 {{ summary.refundRate }}%</div>
       </div>
       <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-        <div class="text-xs text-gray-500 mb-1.5">📈 净营业额</div>
+        <div class="text-xs text-gray-500 mb-1.5"><Icon name="trending-up" class="inline w-4 h-4 -mt-0.5 mr-1" /> 净营业额</div>
         <div class="text-xl font-bold text-blue-600">¥{{ formatNum(summary.net) }}</div>
         <div class="text-xs text-gray-500 mt-0.5">有效 {{ summary.effectiveOrders }} 单</div>
       </div>
@@ -58,7 +58,7 @@
 
     <!-- 待结算资金（分店铺） -->
     <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-      <div class="text-xs text-gray-500 mb-3">🛒 待结算资金</div>
+      <div class="text-xs text-gray-500 mb-3"><Icon name="shopping-bag" class="inline w-4 h-4 -mt-0.5 mr-1" /> 待结算资金</div>
       <div v-if="pendingByStore.length" class="space-y-0">
         <div v-for="(item, idx) in pendingByStore" :key="item.name"
           :class="[
@@ -138,6 +138,7 @@ import { ref, computed, watch, onMounted, defineAsyncComponent } from 'vue'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/auth'
 import { PLATFORM_LABELS } from '../lib/utils'
+import Icon from '../components/icons/Icons.vue'
 
 // ⚠️ echarts + vue-echarts 异步加载(合计 ~430KB),渲染到图表时才下载
 const VChart = defineAsyncComponent(async () => {

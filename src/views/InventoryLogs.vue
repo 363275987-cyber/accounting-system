@@ -2,7 +2,7 @@
   <div>
     <!-- Header -->
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-xl font-bold text-gray-800">📋 库存流水</h1>
+      <h1 class="text-xl font-bold text-gray-800"><Icon name="clipboard" class="inline w-4 h-4 -mt-0.5 mr-1" /> 库存流水</h1>
     </div>
 
     <!-- Filters -->
@@ -43,8 +43,7 @@
       <button
         @click="search"
         class="bg-blue-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-blue-700 transition cursor-pointer"
-      >
-        🔍 搜索
+      ><Icon name="search" class="inline w-4 h-4 -mt-0.5 mr-1" /> 搜索
       </button>
       <button
         @click="resetFilters"
@@ -145,6 +144,7 @@
 <script setup>
 import { reactive, onMounted } from 'vue'
 import { useInventoryStore } from '../stores/inventory'
+import Icon from '../components/icons/Icons.vue'
 
 const store = useInventoryStore()
 

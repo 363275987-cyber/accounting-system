@@ -31,8 +31,7 @@
           </div>
           <div class="flex items-center gap-2">
             <button @click="confirmMonthlyAmortization"
-              class="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition cursor-pointer">
-              📅 本月摊销
+              class="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition cursor-pointer"><Icon name="calendar" class="inline w-4 h-4 -mt-0.5 mr-1" /> 本月摊销
             </button>
             <button @click="openAddModal"
               class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition cursor-pointer">
@@ -221,6 +220,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { supabase } from '../lib/supabase'
+import Icon from '../components/icons/Icons.vue'
 
 const categories = ['装修费', '租赁费', '开办费', '其他']
 

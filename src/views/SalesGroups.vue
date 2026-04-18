@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-xl font-bold text-gray-800">👥 销售分组管理</h1>
+      <h1 class="text-xl font-bold text-gray-800"><Icon name="users" class="inline w-4 h-4 -mt-0.5 mr-1" /> 销售分组管理</h1>
       <button @click="showCreateModal = true"
         class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 cursor-pointer">
         + 创建分组
@@ -19,7 +19,7 @@
           <!-- Group Header -->
           <div class="px-5 py-4 flex items-center justify-between">
             <div class="flex items-center gap-3">
-              <span class="text-lg">🏷️</span>
+              <span class="text-lg"><Icon name="tag" class="inline w-4 h-4 -mt-0.5 mr-1" /></span>
               <div>
                 <div class="font-semibold text-gray-800">{{ group.name }}</div>
                 <div class="text-xs text-gray-500 mt-0.5">
@@ -59,27 +59,24 @@
             <!-- Action Buttons -->
             <div class="flex gap-2">
               <button @click="openMembers(group.id)"
-                class="text-xs px-3 py-1.5 bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100 cursor-pointer">
-                👥 查看组员
+                class="text-xs px-3 py-1.5 bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100 cursor-pointer"><Icon name="users" class="inline w-4 h-4 -mt-0.5 mr-1" /> 查看组员
               </button>
               <button @click="openAddMember(group.id)"
                 class="text-xs px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 cursor-pointer">
                 + 添加组员
               </button>
               <button @click="openGroupPerformance(group.id)"
-                class="text-xs px-3 py-1.5 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 cursor-pointer">
-                📊 组内业绩
+                class="text-xs px-3 py-1.5 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 cursor-pointer"><Icon name="gauge" class="inline w-4 h-4 -mt-0.5 mr-1" /> 组内业绩
               </button>
               <button @click="openSetTarget(group.id)"
-                class="text-xs px-3 py-1.5 bg-orange-50 text-orange-600 rounded-lg hover:bg-orange-100 cursor-pointer">
-                🎯 设定目标
+                class="text-xs px-3 py-1.5 bg-orange-50 text-orange-600 rounded-lg hover:bg-orange-100 cursor-pointer"><Icon name="target" class="inline w-4 h-4 -mt-0.5 mr-1" /> 设定目标
               </button>
             </div>
           </div>
         </div>
 
         <div v-if="store.groups.length === 0" class="bg-white rounded-xl border border-gray-100 p-12 text-center">
-          <div class="text-3xl mb-3">📋</div>
+          <div class="text-3xl mb-3"><Icon name="clipboard" class="inline w-4 h-4 -mt-0.5 mr-1" /></div>
           <div class="text-gray-500 text-sm mb-4">暂无销售分组</div>
           <button @click="showCreateModal = true"
             class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 cursor-pointer">
@@ -116,7 +113,7 @@
     <div v-if="showMembersModal" class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
       <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 max-h-[80vh] overflow-auto">
         <div class="flex items-center justify-between mb-4">
-          <h3 class="text-lg font-bold text-gray-800">👥 组员列表</h3>
+          <h3 class="text-lg font-bold text-gray-800"><Icon name="users" class="inline w-4 h-4 -mt-0.5 mr-1" /> 组员列表</h3>
           <button @click="showMembersModal = false" class="text-gray-500 hover:text-gray-600 text-xl cursor-pointer">✕</button>
         </div>
         <Skeleton v-if="membersLoading" type="card" :count="4" card-grid-class="grid-cols-1" />
@@ -155,7 +152,7 @@
     <div v-if="showAddMemberModal" class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
       <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 max-h-[80vh] overflow-auto">
         <div class="flex items-center justify-between mb-4">
-          <h3 class="text-lg font-bold text-gray-800">➕ 添加组员</h3>
+          <h3 class="text-lg font-bold text-gray-800"><Icon name="plus" class="inline w-4 h-4 -mt-0.5 mr-1" /> 添加组员</h3>
           <button @click="showAddMemberModal = false" class="text-gray-500 hover:text-gray-600 text-xl cursor-pointer">✕</button>
         </div>
         <Skeleton v-if="usersLoading" type="card" :count="4" card-grid-class="grid-cols-1" />
@@ -185,7 +182,7 @@
     <div v-if="showPerformanceModal" class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
       <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl p-6 max-h-[85vh] overflow-auto">
         <div class="flex items-center justify-between mb-4">
-          <h3 class="text-lg font-bold text-gray-800">📊 组内业绩</h3>
+          <h3 class="text-lg font-bold text-gray-800"><Icon name="gauge" class="inline w-4 h-4 -mt-0.5 mr-1" /> 组内业绩</h3>
           <button @click="showPerformanceModal = false" class="text-gray-500 hover:text-gray-600 text-xl cursor-pointer">✕</button>
         </div>
 
@@ -244,7 +241,7 @@
     <div v-if="showTargetModal" class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
       <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 max-h-[80vh] overflow-auto">
         <div class="flex items-center justify-between mb-4">
-          <h3 class="text-lg font-bold text-gray-800">🎯 设定销售目标</h3>
+          <h3 class="text-lg font-bold text-gray-800"><Icon name="target" class="inline w-4 h-4 -mt-0.5 mr-1" /> 设定销售目标</h3>
           <button @click="showTargetModal = false" class="text-gray-500 hover:text-gray-600 text-xl cursor-pointer">✕</button>
         </div>
         <div class="space-y-4">
@@ -301,7 +298,7 @@
     <!-- Confirm Delete Modal -->
     <div v-if="showDeleteConfirm" class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
       <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
-        <h3 class="text-lg font-bold text-gray-800 mb-2">⚠️ 确认删除</h3>
+        <h3 class="text-lg font-bold text-gray-800 mb-2"><Icon name="alert-triangle" class="inline w-4 h-4 -mt-0.5 mr-1" /> 确认删除</h3>
         <p class="text-sm text-gray-600 mb-4">确定要删除分组「{{ deletingGroup?.name }}」吗？此操作不可恢复。</p>
         <div class="flex justify-end gap-2">
           <button @click="showDeleteConfirm = false" class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg cursor-pointer">取消</button>
@@ -318,6 +315,7 @@ import { supabase } from '../lib/supabase'
 import { useSalesGroupStore } from '../stores/salesGroup'
 import { formatMoney, toast } from '../lib/utils'
 import Skeleton from '../components/Skeleton.vue'
+import Icon from '../components/icons/Icons.vue'
 
 const store = useSalesGroupStore()
 

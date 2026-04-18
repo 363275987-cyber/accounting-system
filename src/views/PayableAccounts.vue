@@ -8,12 +8,12 @@
     <!-- Summary Cards -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
       <div class="bg-white rounded-xl border border-gray-100 p-4">
-        <div class="text-sm text-gray-500 mb-1">💰 应付总额</div>
+        <div class="text-sm text-gray-500 mb-1"><Icon name="wallet" class="inline w-4 h-4 -mt-0.5 mr-1" /> 应付总额</div>
         <div class="text-2xl font-bold text-blue-600">{{ formatMoney(stats.totalAmount) }}</div>
         <div class="text-xs text-gray-500 mt-1">共 {{ list.length }} 笔</div>
       </div>
       <div class="bg-white rounded-xl border border-gray-100 p-4">
-        <div class="text-sm text-gray-500 mb-1">✅ 已付</div>
+        <div class="text-sm text-gray-500 mb-1"><Icon name="check-circle" class="inline w-4 h-4 -mt-0.5 mr-1" /> 已付</div>
         <div class="text-2xl font-bold text-green-600">{{ formatMoney(stats.paidAmount) }}</div>
       </div>
       <div class="bg-white rounded-xl border border-gray-100 p-4">
@@ -213,6 +213,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { supabase } from '../lib/supabase'
+import Icon from '../components/icons/Icons.vue'
 
 const TABLE = 'payable_accounts'
 

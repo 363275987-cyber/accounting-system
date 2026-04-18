@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-xl font-bold text-gray-800">👥 用户管理</h1>
+      <h1 class="text-xl font-bold text-gray-800"><Icon name="users" class="inline w-4 h-4 -mt-0.5 mr-1" /> 用户管理</h1>
       <button v-if="canCreate" @click="openCreateModal" 
         class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition cursor-pointer">
         + 添加员工
@@ -72,7 +72,7 @@
     <div v-if="showCreateModal" class="fixed inset-0 bg-black/30 flex items-center justify-center z-50" @click.self="showCreateModal = false">
       <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 max-h-[85vh] flex flex-col overflow-hidden">
         <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
-          <h2 class="font-bold text-gray-800">➕ 添加员工</h2>
+          <h2 class="font-bold text-gray-800"><Icon name="plus" class="inline w-4 h-4 -mt-0.5 mr-1" /> 添加员工</h2>
           <button @click="showCreateModal = false" class="text-gray-500 hover:text-gray-600 text-xl cursor-pointer">&times;</button>
         </div>
         <form @submit.prevent="handleCreate" class="p-6 space-y-4">
@@ -140,6 +140,7 @@ import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/auth'
 import { toast, debounce } from '../lib/utils'
 import Skeleton from '../components/Skeleton.vue'
+import Icon from '../components/icons/Icons.vue'
 
 const auth = useAuthStore()
 const loading = ref(true)

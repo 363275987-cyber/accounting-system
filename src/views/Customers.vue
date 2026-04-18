@@ -2,7 +2,7 @@
   <div>
     <!-- Header -->
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-xl font-bold text-gray-800">👥 客户管理</h1>
+      <h1 class="text-xl font-bold text-gray-800"><Icon name="users" class="inline w-4 h-4 -mt-0.5 mr-1" /> 客户管理</h1>
       <div class="flex items-center gap-2">
         <button
           @click="manualSync"
@@ -337,6 +337,7 @@ import { supabase } from '../lib/supabase'
 import { usePermission } from '../composables/usePermission'
 import { useAuthStore } from '../stores/auth'
 import Skeleton from '../components/Skeleton.vue'
+import Icon from '../components/icons/Icons.vue'
 
 const auth = useAuthStore()
 const { canDelete, loadRole } = usePermission()

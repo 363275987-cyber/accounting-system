@@ -63,7 +63,7 @@
               :class="{ 'bg-amber-50/50': isExpiringSoon(item) }">
               <td class="px-3 py-3 font-medium text-gray-800">
                 {{ item.name }}
-                <span v-if="isExpiringSoon(item)" class="ml-1 text-xs text-amber-600">⚠️ 即将到期</span>
+                <span v-if="isExpiringSoon(item)" class="ml-1 text-xs text-amber-600"><Icon name="alert-triangle" class="inline w-4 h-4 -mt-0.5 mr-1" /> 即将到期</span>
               </td>
               <td class="px-3 py-3 text-gray-600">{{ item.asset_type }}</td>
               <td class="px-3 py-3 text-gray-600">{{ item.registration_number || '-' }}</td>
@@ -105,7 +105,7 @@
               <div>
                 <div class="font-medium text-gray-800">
                   {{ item.name }}
-                  <span v-if="isExpiringSoon(item)" class="ml-1 text-xs text-amber-600">⚠️</span>
+                  <span v-if="isExpiringSoon(item)" class="ml-1 text-xs text-amber-600"><Icon name="alert-triangle" class="inline w-4 h-4 -mt-0.5 mr-1" /></span>
                 </div>
                 <div class="text-xs text-gray-500 mt-0.5">{{ item.asset_type }} · {{ item.registration_number || '无登记号' }}</div>
               </div>
@@ -219,6 +219,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { supabase } from '../lib/supabase'
 import { INTANGIBLE_ASSET_STATUS, INTANGIBLE_ASSET_STATUS_LABEL } from '../constants/enums'
+import Icon from '../components/icons/Icons.vue'
 
 const assetTypes = ['商标', '专利', '软件', '著作权', '其他']
 

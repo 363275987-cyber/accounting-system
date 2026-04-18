@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-xl font-bold text-gray-800 truncate">🔄 账户转账</h1>
+      <h1 class="text-xl font-bold text-gray-800 truncate"><Icon name="refresh" class="inline w-4 h-4 -mt-0.5 mr-1" /> 账户转账</h1>
       <div class="flex items-center gap-2 shrink-0">
         <div v-if="canDeleteTransfers" class="hidden md:inline-flex items-center gap-1">
           <select v-model="testCount" class="text-xs border border-dashed border-gray-300 rounded px-2 py-1 text-gray-500 bg-transparent outline-none cursor-pointer">
@@ -10,23 +10,21 @@
             <option :value="10">10条</option>
             <option :value="20">20条</option>
           </select>
-          <button @click="generateTestData(testCount)" class="text-xs px-2 py-1 border border-dashed border-gray-300 rounded text-gray-500 hover:bg-gray-50 hover:text-gray-600 cursor-pointer">
-            🎲 随机测试
+          <button @click="generateTestData(testCount)" class="text-xs px-2 py-1 border border-dashed border-gray-300 rounded text-gray-500 hover:bg-gray-50 hover:text-gray-600 cursor-pointer"><Icon name="dices" class="inline w-4 h-4 -mt-0.5 mr-1" /> 随机测试
           </button>
         </div>
         <button
           @click="showTextMode = !showTextMode"
           class="hidden md:inline-flex px-4 py-2 rounded-lg text-sm transition cursor-pointer whitespace-nowrap"
           :class="showTextMode ? 'bg-purple-600 text-white hover:bg-purple-700' : 'bg-purple-50 text-purple-700 hover:bg-purple-100'"
-        >
-          📋 文本模式
+        ><Icon name="clipboard" class="inline w-4 h-4 -mt-0.5 mr-1" /> 文本模式
         </button>
         <!-- 移动端更多菜单 -->
         <div class="relative md:hidden">
           <button @click="showMobileMenu = !showMobileMenu" class="px-2.5 py-2 rounded-lg text-sm border border-gray-200 text-gray-600 hover:bg-gray-50 cursor-pointer">⋯</button>
           <div v-if="showMobileMenu" class="absolute right-0 top-full mt-1 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50 min-w-[140px]">
-            <button @click="showTextMode = !showTextMode; showMobileMenu = false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer">📋 文本模式</button>
-            <button v-if="canDeleteTransfers" @click="generateTestData(testCount); showMobileMenu = false" class="w-full text-left px-4 py-2.5 text-sm text-gray-400 hover:bg-gray-50 cursor-pointer">🎲 随机测试</button>
+            <button @click="showTextMode = !showTextMode; showMobileMenu = false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer"><Icon name="clipboard" class="inline w-4 h-4 -mt-0.5 mr-1" /> 文本模式</button>
+            <button v-if="canDeleteTransfers" @click="generateTestData(testCount); showMobileMenu = false" class="w-full text-left px-4 py-2.5 text-sm text-gray-400 hover:bg-gray-50 cursor-pointer"><Icon name="dices" class="inline w-4 h-4 -mt-0.5 mr-1" /> 随机测试</button>
           </div>
         </div>
         <div v-if="showMobileMenu" class="fixed inset-0 z-40 md:hidden" @click="showMobileMenu = false"></div>
@@ -41,7 +39,7 @@
     <div v-if="showTextMode" class="mb-6">
       <div class="bg-white rounded-xl border border-gray-100 p-5">
         <div class="flex items-center justify-between mb-3">
-          <h3 class="text-sm font-semibold text-gray-700">📋 粘贴转账文本</h3>
+          <h3 class="text-sm font-semibold text-gray-700"><Icon name="clipboard" class="inline w-4 h-4 -mt-0.5 mr-1" /> 粘贴转账文本</h3>
           <button @click="showTextMode = false" class="text-gray-500 hover:text-gray-600 text-sm cursor-pointer">收起 ✕</button>
         </div>
         <textarea
@@ -52,7 +50,7 @@
         ></textarea>
         <div class="flex items-center gap-3 mt-3">
           <div class="flex items-center gap-2">
-            <span class="text-xs text-gray-500">📅 统一月份：</span>
+            <span class="text-xs text-gray-500"><Icon name="calendar" class="inline w-4 h-4 -mt-0.5 mr-1" /> 统一月份：</span>
             <input
               type="month"
               v-model="transferMonthStr"
@@ -66,8 +64,7 @@
             @click="handleParseTransfers"
             :disabled="!rawText.trim()"
             class="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition"
-          >
-            🔍 解析
+          ><Icon name="search" class="inline w-4 h-4 -mt-0.5 mr-1" /> 解析
           </button>
           <button
             @click="rawText = ''; parsedTransfers = []; parseError = ''"
@@ -87,13 +84,12 @@
           >
             <div class="text-xs text-gray-500 font-mono bg-gray-50 rounded px-2 py-1 mb-2 break-all whitespace-pre-wrap">{{ tr._rawText }}</div>
             <div class="flex items-center justify-between mb-2">
-              <span class="text-xs font-semibold text-blue-600">🔄 转账 {{ idx + 1 }}</span>
+              <span class="text-xs font-semibold text-blue-600"><Icon name="refresh" class="inline w-4 h-4 -mt-0.5 mr-1" /> 转账 {{ idx + 1 }}</span>
               <button
                 @click="submitParsedTransfer(idx)"
                 :disabled="submittingParsed"
                 class="px-3 py-1 bg-green-600 text-white rounded-md text-xs hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition"
-              >
-                ✅ 确认提交
+              ><Icon name="check-circle" class="inline w-4 h-4 -mt-0.5 mr-1" /> 确认提交
               </button>
             </div>
             <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
@@ -158,8 +154,7 @@
         </div>
 
         <!-- Parse Error -->
-        <div v-if="parseError" class="mt-3 text-red-500 text-sm bg-red-50 rounded-lg px-3 py-2">
-          ⚠️ {{ parseError }}
+        <div v-if="parseError" class="mt-3 text-red-500 text-sm bg-red-50 rounded-lg px-3 py-2"><Icon name="alert-triangle" class="inline w-4 h-4 -mt-0.5 mr-1" /> {{ parseError }}
         </div>
       </div>
     </div>
@@ -253,7 +248,7 @@
     <div v-if="showTransferModal" class="fixed inset-0 bg-black/30 flex items-center justify-center z-50" @click.self="showTransferModal = false">
       <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[85vh] flex flex-col overflow-hidden">
         <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
-          <h2 class="font-bold text-gray-800">🔄 新建转账</h2>
+          <h2 class="font-bold text-gray-800"><Icon name="refresh" class="inline w-4 h-4 -mt-0.5 mr-1" /> 新建转账</h2>
           <button @click="showTransferModal = false" class="text-gray-500 hover:text-gray-600 text-xl cursor-pointer">&times;</button>
         </div>
         <form @submit.prevent="handleTransfer" class="p-6 space-y-4 overflow-y-auto flex-1">
@@ -298,7 +293,7 @@
           <!-- 平台提现费用明细 -->
           <div v-if="isPlatformWithdraw" class="bg-blue-50 border border-blue-100 rounded-lg p-4 space-y-2">
             <div class="flex items-center justify-between">
-              <span class="text-sm font-medium text-blue-800">📋 {{ platformFeeLabel }}提现费用明细</span>
+              <span class="text-sm font-medium text-blue-800"><Icon name="clipboard" class="inline w-4 h-4 -mt-0.5 mr-1" /> {{ platformFeeLabel }}提现费用明细</span>
               <button type="button" @click="autoCalcFee" class="text-xs text-blue-600 hover:text-blue-800 cursor-pointer">自动计算</button>
             </div>
             <div class="grid grid-cols-2 gap-2 text-sm">
@@ -376,6 +371,7 @@ import { logOperation, getAccountBalance, formatMoneyStr } from '../utils/operat
 import SearchableSelect from '../components/SearchableSelect.vue'
 import Skeleton from '../components/Skeleton.vue'
 import { usePermission } from '../composables/usePermission'
+import Icon from '../components/icons/Icons.vue'
 
 const { canDelete, loadRole } = usePermission()
 

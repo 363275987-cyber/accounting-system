@@ -23,7 +23,7 @@
       <div class="bg-white rounded-xl border border-gray-100 p-4 mb-4 flex gap-3 items-center flex-wrap">
         <input v-model="coachSearch" placeholder="🔍 搜索教练..." class="px-3 py-2 border border-gray-200 rounded-lg text-sm w-60 outline-none focus:ring-2 focus:ring-blue-500">
         <span class="text-sm text-gray-500 ml-auto">共 {{ filteredCoaches.length }} 位教练</span>
-        <button @click="openCoachModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition">➕ 添加教练</button>
+        <button @click="openCoachModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition"><Icon name="plus" class="inline w-4 h-4 -mt-0.5 mr-1" /> 添加教练</button>
       </div>
       <div class="bg-white rounded-xl border border-gray-100 overflow-hidden">
         <table class="w-full text-sm">
@@ -68,7 +68,7 @@
       <div class="bg-white rounded-xl border border-gray-100 p-4 mb-4 flex gap-3 items-center flex-wrap">
         <input v-model="studentSearch" placeholder="🔍 搜索学员..." class="px-3 py-2 border border-gray-200 rounded-lg text-sm w-60 outline-none focus:ring-2 focus:ring-blue-500">
         <span class="text-sm text-gray-500 ml-auto">共 {{ filteredStudents.length }} 位学员</span>
-        <button @click="openStudentModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition">➕ 添加学员</button>
+        <button @click="openStudentModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition"><Icon name="plus" class="inline w-4 h-4 -mt-0.5 mr-1" /> 添加学员</button>
       </div>
       <div class="bg-white rounded-xl border border-gray-100 overflow-hidden">
         <table class="w-full text-sm">
@@ -108,7 +108,7 @@
       <div class="bg-white rounded-xl border border-gray-100 p-4 mb-4 flex gap-3 items-center flex-wrap">
         <input v-model="courseSearch" placeholder="🔍 搜索课程..." class="px-3 py-2 border border-gray-200 rounded-lg text-sm w-60 outline-none focus:ring-2 focus:ring-blue-500">
         <span class="text-sm text-gray-500 ml-auto">共 {{ filteredCourses.length }} 门课程</span>
-        <button @click="openCourseModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition">➕ 添加课程</button>
+        <button @click="openCourseModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition"><Icon name="plus" class="inline w-4 h-4 -mt-0.5 mr-1" /> 添加课程</button>
       </div>
       <div class="bg-white rounded-xl border border-gray-100 overflow-hidden">
         <table class="w-full text-sm">
@@ -150,7 +150,7 @@
       <div class="bg-white rounded-xl border border-gray-100 p-4 mb-4 flex gap-3 items-center flex-wrap">
         <input v-model="sessionSearch" placeholder="🔍 搜索记录..." class="px-3 py-2 border border-gray-200 rounded-lg text-sm w-60 outline-none focus:ring-2 focus:ring-blue-500">
         <span class="text-sm text-gray-500 ml-auto">共 {{ filteredSessions.length }} 条记录</span>
-        <button @click="openSessionModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition">➕ 添加记录</button>
+        <button @click="openSessionModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition"><Icon name="plus" class="inline w-4 h-4 -mt-0.5 mr-1" /> 添加记录</button>
       </div>
       <div class="bg-white rounded-xl border border-gray-100 overflow-hidden">
         <table class="w-full text-sm">
@@ -192,7 +192,7 @@
       <div class="bg-white rounded-xl border border-gray-100 p-4 mb-4 flex gap-3 items-center flex-wrap">
         <input v-model="paymentSearch" placeholder="🔍 搜索收款..." class="px-3 py-2 border border-gray-200 rounded-lg text-sm w-60 outline-none focus:ring-2 focus:ring-blue-500">
         <span class="text-sm text-gray-500 ml-auto">共 {{ filteredPayments.length }} 条收款</span>
-        <button @click="openPaymentModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition">➕ 添加收款</button>
+        <button @click="openPaymentModal()" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition"><Icon name="plus" class="inline w-4 h-4 -mt-0.5 mr-1" /> 添加收款</button>
       </div>
       <div class="bg-white rounded-xl border border-gray-100 overflow-hidden">
         <table class="w-full text-sm">
@@ -475,6 +475,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { supabase } from '../lib/supabase'
+import Icon from '../components/icons/Icons.vue'
 
 // ===== Tab =====
 const tabs = [

@@ -2,7 +2,7 @@
   <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
     <div class="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
       <div class="text-center mb-8">
-        <div class="text-4xl mb-2">🎱</div>
+        <div class="text-4xl mb-2"><Icon name="sparkle" class="inline w-4 h-4 -mt-0.5 mr-1" /></div>
         <h1 class="text-2xl font-bold text-gray-800">台球公司账目系统</h1>
         <p class="text-gray-500 text-sm mt-1">财务管理平台</p>
       </div>
@@ -105,7 +105,7 @@
       <!-- ==================== 模式3: 重置密码（设置新密码） ==================== -->
       <template v-else-if="mode === 'reset'">
         <div class="text-center mb-6">
-          <div class="text-3xl mb-2">🔒</div>
+          <div class="text-3xl mb-2"><Icon name="lock" class="inline w-4 h-4 -mt-0.5 mr-1" /></div>
           <h2 class="text-lg font-bold text-gray-800">设置新密码</h2>
           <p class="text-gray-500 text-sm mt-1">请输入您的新密码</p>
         </div>
@@ -153,6 +153,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { supabase } from '../lib/supabase'
+import Icon from '../components/icons/Icons.vue'
 
 const router = useRouter()
 const route = useRoute()

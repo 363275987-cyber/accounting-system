@@ -12,8 +12,7 @@
             <option :value="10">10条</option>
             <option :value="20">20条</option>
           </select>
-          <button @click="generateTestData(testCount)" class="text-xs px-2 py-1 border border-dashed border-gray-300 rounded text-gray-500 hover:bg-gray-50 hover:text-gray-600 cursor-pointer">
-            🎲 随机测试
+          <button @click="generateTestData(testCount)" class="text-xs px-2 py-1 border border-dashed border-gray-300 rounded text-gray-500 hover:bg-gray-50 hover:text-gray-600 cursor-pointer"><Icon name="dices" class="inline w-4 h-4 -mt-0.5 mr-1" /> 随机测试
           </button>
         </div>
         <button
@@ -21,14 +20,12 @@
           @click="showTextMode = !showTextMode"
           class="hidden md:inline-flex px-4 py-2 rounded-lg text-sm transition cursor-pointer whitespace-nowrap"
           :class="showTextMode ? 'bg-purple-600 text-white hover:bg-purple-700' : 'bg-purple-50 text-purple-700 hover:bg-purple-100'"
-        >
-          🧠 智能记账
+        ><Icon name="brain" class="inline w-4 h-4 -mt-0.5 mr-1" /> 智能记账
         </button>
         <button
           @click="showCategoryModal = true"
           class="hidden md:inline-flex border border-gray-200 text-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition cursor-pointer whitespace-nowrap"
-        >
-          🏷️ 类别
+        ><Icon name="tag" class="inline w-4 h-4 -mt-0.5 mr-1" /> 类别
         </button>
         <!-- 移动端更多菜单 -->
         <div class="relative md:hidden">
@@ -36,9 +33,9 @@
             ⋯
           </button>
           <div v-if="showMobileMenu" class="absolute right-0 top-full mt-1 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50 min-w-[140px]">
-            <button v-if="canDeleteExpenses" @click="showTextMode = !showTextMode; showMobileMenu = false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer">🧠 智能记账</button>
-            <button @click="showCategoryModal = true; showMobileMenu = false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer">🏷️ 类别</button>
-            <button v-if="canDeleteExpenses" @click="generateTestData(testCount); showMobileMenu = false" class="w-full text-left px-4 py-2.5 text-sm text-gray-400 hover:bg-gray-50 cursor-pointer">🎲 随机测试</button>
+            <button v-if="canDeleteExpenses" @click="showTextMode = !showTextMode; showMobileMenu = false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer"><Icon name="brain" class="inline w-4 h-4 -mt-0.5 mr-1" /> 智能记账</button>
+            <button @click="showCategoryModal = true; showMobileMenu = false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer"><Icon name="tag" class="inline w-4 h-4 -mt-0.5 mr-1" /> 类别</button>
+            <button v-if="canDeleteExpenses" @click="generateTestData(testCount); showMobileMenu = false" class="w-full text-left px-4 py-2.5 text-sm text-gray-400 hover:bg-gray-50 cursor-pointer"><Icon name="dices" class="inline w-4 h-4 -mt-0.5 mr-1" /> 随机测试</button>
           </div>
         </div>
         <button
@@ -56,7 +53,7 @@
     <div v-if="showTextMode" class="mb-6">
       <div class="bg-white rounded-xl border border-gray-100 p-5">
         <div class="flex items-center justify-between mb-3">
-          <h3 class="text-sm font-semibold text-gray-700">📋 智能记账 — 粘贴文本自动识别</h3>
+          <h3 class="text-sm font-semibold text-gray-700"><Icon name="clipboard" class="inline w-4 h-4 -mt-0.5 mr-1" /> 智能记账 — 粘贴文本自动识别</h3>
           <button @click="showTextMode = false" class="text-gray-500 hover:text-gray-600 text-sm cursor-pointer">收起 ✕</button>
         </div>
         <textarea
@@ -67,7 +64,7 @@
         ></textarea>
         <div class="flex items-center gap-3 mt-3">
           <div class="flex items-center gap-2">
-            <span class="text-xs text-gray-500">📅 统一月份：</span>
+            <span class="text-xs text-gray-500"><Icon name="calendar" class="inline w-4 h-4 -mt-0.5 mr-1" /> 统一月份：</span>
             <input
               type="month"
               v-model="expenseMonthStr"
@@ -81,8 +78,7 @@
             @click="handleParseExpenses"
             :disabled="!rawText.trim()"
             class="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition"
-          >
-            🔍 解析
+          ><Icon name="search" class="inline w-4 h-4 -mt-0.5 mr-1" /> 解析
           </button>
           <button
             @click="rawText = ''; parsedExpenses = []; parseError = ''"
@@ -93,15 +89,14 @@
           <button
             @click="showKeywordManager = !showKeywordManager"
             class="px-4 py-2 border border-gray-200 text-gray-600 rounded-lg text-sm hover:bg-gray-50 cursor-pointer transition ml-auto"
-          >
-            ⚙️ 管理识别词
+          ><Icon name="settings" class="inline w-4 h-4 -mt-0.5 mr-1" /> 管理识别词
           </button>
         </div>
 
         <!-- 关键词管理面板 -->
         <div v-if="showKeywordManager" class="mt-3 bg-gray-50 rounded-lg border border-gray-200 p-4">
           <div class="flex items-center justify-between mb-3">
-            <h4 class="text-sm font-semibold text-gray-700">⚙️ 类型识别关键词</h4>
+            <h4 class="text-sm font-semibold text-gray-700"><Icon name="settings" class="inline w-4 h-4 -mt-0.5 mr-1" /> 类型识别关键词</h4>
             <button @click="showKeywordManager = false" class="text-gray-400 hover:text-gray-600 text-sm cursor-pointer">✕</button>
           </div>
           <p class="text-xs text-gray-500 mb-3">当文本中包含以下关键词时，会自动识别为对应类型。你可以添加新词或删除不需要的。</p>
@@ -125,12 +120,12 @@
           <div class="flex gap-2 mt-3 pt-3 border-t border-gray-200">
             <select v-model="newKwType" class="px-2 py-1.5 border border-gray-200 rounded-lg text-xs bg-white cursor-pointer">
               <option value="fixed_asset">🏗️ 固定资产</option>
-              <option value="prepaid">📦 预付账款</option>
+              <option value="prepaid">预付账款</option>
               <option value="deferred_revenue">🎓 预收账款</option>
-              <option value="other_receivable">💰 押金/借出</option>
-              <option value="other_payable">📥 收到押金</option>
-              <option value="payable">📋 应付账款</option>
-              <option value="salary">👥 工资</option>
+              <option value="other_receivable">押金/借出</option>
+              <option value="other_payable">收到押金</option>
+              <option value="payable">应付账款</option>
+              <option value="salary">工资</option>
               <option value="dividend">💎 分红</option>
             </select>
             <input v-model="newKwText" @keydown.enter.prevent="addTypeKeyword" placeholder="输入新关键词，如：球桌、买灯"
@@ -156,7 +151,7 @@
               <div class="text-xs text-gray-500 font-mono bg-gray-50 rounded px-2 py-1 break-all whitespace-pre-wrap flex-1">{{ exp._rawText }}</div>
               <span v-if="exp._confidence >= 85" class="text-[9px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 whitespace-nowrap">✓ 高</span>
               <span v-else-if="exp._confidence >= 50" class="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 whitespace-nowrap">~ 中</span>
-              <span v-else-if="exp._confidence > 0" class="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 whitespace-nowrap">⚠ 低</span>
+              <span v-else-if="exp._confidence > 0" class="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 whitespace-nowrap"><Icon name="alert-triangle" class="inline w-4 h-4 -mt-0.5 mr-1" /> 低</span>
               <span v-else class="text-[9px] px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 whitespace-nowrap">? 未识别</span>
             </div>
 
@@ -164,17 +159,17 @@
             <div class="flex items-center justify-between mb-3">
               <div class="flex items-center gap-2">
                 <select v-model="exp._type" class="text-xs font-semibold border border-gray-200 rounded-lg px-2 py-1 bg-white cursor-pointer" @change="onTypeChange(exp)">
-                  <option value="expense">💸 支出</option>
-                  <option value="income">💰 收入</option>
-                  <option value="transfer">🔄 转账</option>
+                  <option value="expense">支出</option>
+                  <option value="income">收入</option>
+                  <option value="transfer">转账</option>
                   <option value="withdrawal">💱 店铺提现</option>
                   <option value="fixed_asset">🏗️ 固定资产</option>
-                  <option value="prepaid">📦 预付账款</option>
+                  <option value="prepaid">预付账款</option>
                   <option value="deferred_revenue">🎓 预收课程费</option>
-                  <option value="other_receivable">💰 押金/借出</option>
-                  <option value="other_payable">📥 收到押金</option>
-                  <option value="payable">📋 应付账款</option>
-                  <option value="salary">👥 工资</option>
+                  <option value="other_receivable">押金/借出</option>
+                  <option value="other_payable">收到押金</option>
+                  <option value="payable">应付账款</option>
+                  <option value="salary">工资</option>
                   <option value="dividend">💎 分红</option>
                 </select>
                 <span class="text-[10px] text-gray-400">{{ idx + 1 }}/{{ parsedExpenses.length }}</span>
@@ -194,7 +189,7 @@
             <!-- 学习提示：手动改了类型时显示 -->
             <div v-if="exp._typeChanged && exp._type !== 'expense' && exp._type !== 'income' && exp._type !== 'transfer'"
               class="flex items-center gap-2 mb-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-              <span class="text-xs text-amber-700 shrink-0">🧠 记住这个词？</span>
+              <span class="text-xs text-amber-700 shrink-0"><Icon name="brain" class="inline w-4 h-4 -mt-0.5 mr-1" /> 记住这个词？</span>
               <input v-model="exp._learnKeyword" placeholder="输入要记住的关键词"
                 class="flex-1 px-2 py-1 border border-amber-200 rounded text-xs bg-white outline-none focus:ring-1 focus:ring-amber-400" />
               <button @click="learnKeyword(exp)"
@@ -232,7 +227,7 @@
             <!-- 🧠 账户关键词学习提示：用户手动改了账户时显示 -->
             <div v-if="exp._accountChanged && exp.account_id && (exp._type === 'expense' || exp._type === 'income')"
               class="flex items-center gap-2 mb-3 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
-              <span class="text-xs text-emerald-700 shrink-0">🧠 记住「</span>
+              <span class="text-xs text-emerald-700 shrink-0"><Icon name="brain" class="inline w-4 h-4 -mt-0.5 mr-1" /> 记住「</span>
               <input v-model="exp._learnAccountKeyword" placeholder="关键词"
                 class="flex-1 max-w-[10rem] px-2 py-1 border border-emerald-200 rounded text-xs bg-white outline-none focus:ring-1 focus:ring-emerald-400" />
               <span class="text-xs text-emerald-700 shrink-0">」→ {{ getAccountName(exp.account_id) }}（{{ exp._type === 'income' ? '收入' : '支出' }}）？</span>
@@ -254,7 +249,7 @@
                   <option value="">请选择</option>
                   <option v-for="cat in categories" :key="cat.id || cat.name" :value="cat.name">{{ cat.name }}</option>
                 </select>
-                <span v-if="exp._confidence != null && exp._confidence < 50" class="text-[9px] text-amber-600">⚠ 低置信度，请确认</span>
+                <span v-if="exp._confidence != null && exp._confidence < 50" class="text-[9px] text-amber-600"><Icon name="alert-triangle" class="inline w-4 h-4 -mt-0.5 mr-1" /> 低置信度，请确认</span>
               </div>
               <div>
                 <span class="text-gray-500 text-[10px]">收款方</span>
@@ -498,8 +493,7 @@
         </div>
 
         <!-- Parse Error -->
-        <div v-if="parseError" class="mt-3 text-red-500 text-sm bg-red-50 rounded-lg px-3 py-2">
-          ⚠️ {{ parseError }}
+        <div v-if="parseError" class="mt-3 text-red-500 text-sm bg-red-50 rounded-lg px-3 py-2"><Icon name="alert-triangle" class="inline w-4 h-4 -mt-0.5 mr-1" /> {{ parseError }}
         </div>
       </div>
     </div>
@@ -577,8 +571,7 @@
           <button
             @click="handleExportExpenses"
             class="bg-green-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-green-700 transition cursor-pointer flex-shrink-0"
-          >
-            📥 导出CSV
+          ><Icon name="download" class="inline w-4 h-4 -mt-0.5 mr-1" /> 导出CSV
           </button>
         </div>
       </div>
@@ -661,14 +654,12 @@
                 <button
                   @click="handleApprove(expense, true)"
                   class="text-green-600 hover:text-green-700 text-xs font-medium mr-2 cursor-pointer"
-                >
-                  ✅ 批准
+                ><Icon name="check-circle" class="inline w-4 h-4 -mt-0.5 mr-1" /> 批准
                 </button>
                 <button
                   @click="handleApprove(expense, false)"
                   class="text-red-500 hover:text-red-600 text-xs font-medium cursor-pointer"
-                >
-                  ❌ 驳回
+                ><Icon name="x-circle" class="inline w-4 h-4 -mt-0.5 mr-1" /> 驳回
                 </button>
               </template>
               <!-- Approved: Confirm Payment -->
@@ -676,8 +667,7 @@
                 <button
                   @click="openPayModal(expense)"
                   class="text-blue-600 hover:text-blue-700 text-xs font-medium cursor-pointer"
-                >
-                  💰 确认付款
+                ><Icon name="wallet" class="inline w-4 h-4 -mt-0.5 mr-1" /> 确认付款
                 </button>
               </template>
               <!-- Paid: show paid info -->
@@ -691,8 +681,7 @@
                 <button
                   @click="openReeditModal(expense)"
                   class="text-blue-600 hover:text-blue-700 text-xs font-medium cursor-pointer"
-                >
-                  📝 重新编辑
+                ><Icon name="edit" class="inline w-4 h-4 -mt-0.5 mr-1" /> 重新编辑
                 </button>
               </template>
               <template v-if="expense.status === 'rejected' && !canApprove">
@@ -869,11 +858,9 @@
                 class="w-full pl-8 pr-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
               >
             </div>
-            <p v-if="form.amount > 2000 && !authStore.isAdmin" class="text-xs text-orange-500 mt-1">
-              ⚠️ 金额超过 ¥2,000，提交后将进入审批流程
+            <p v-if="form.amount > 2000 && !authStore.isAdmin" class="text-xs text-orange-500 mt-1"><Icon name="alert-triangle" class="inline w-4 h-4 -mt-0.5 mr-1" /> 金额超过 ¥2,000，提交后将进入审批流程
             </p>
-            <p v-if="authStore.isAdmin && form.amount > 2000" class="text-xs text-green-600 mt-1">
-              ✅ 超级管理员：所有金额自动审批通过
+            <p v-if="authStore.isAdmin && form.amount > 2000" class="text-xs text-green-600 mt-1"><Icon name="check-circle" class="inline w-4 h-4 -mt-0.5 mr-1" /> 超级管理员：所有金额自动审批通过
             </p>
           </div>
 
@@ -974,7 +961,7 @@
     >
       <div class="bg-white rounded-none md:rounded-2xl shadow-2xl w-full md:max-w-md md:mx-4  max-h-[80vh] overflow-hidden flex flex-col">
         <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
-          <h2 class="font-bold text-gray-800">💰 确认付款</h2>
+          <h2 class="font-bold text-gray-800"><Icon name="wallet" class="inline w-4 h-4 -mt-0.5 mr-1" /> 确认付款</h2>
           <button @click="showPayModal = false" class="text-gray-500 hover:text-gray-600 text-xl cursor-pointer">&times;</button>
         </div>
         <div class="p-6 space-y-4 overflow-y-auto flex-1">
@@ -1025,7 +1012,7 @@
     >
       <div class="bg-white rounded-none md:rounded-2xl shadow-2xl w-full md:max-w-2xl md:mx-4 max-h-[85vh] overflow-hidden flex flex-col ">
         <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
-          <h2 class="font-bold text-gray-800">🏷️ 支出类别管理</h2>
+          <h2 class="font-bold text-gray-800"><Icon name="tag" class="inline w-4 h-4 -mt-0.5 mr-1" /> 支出类别管理</h2>
           <button @click="showCategoryModal = false" class="text-gray-500 hover:text-gray-600 text-xl cursor-pointer">&times;</button>
         </div>
         <div class="p-6 space-y-4 overflow-y-auto flex-1">
@@ -1105,6 +1092,7 @@ import { usePermission } from '../composables/usePermission'
 import { randomPick, randomAmount, todayDate, PAYEES } from '../lib/testDataHelper'
 import { dayEnd } from '../utils/dateRange'
 import { ASSET_STATUS } from '../constants/enums'
+import Icon from '../components/icons/Icons.vue'
 
 const store = useExpenseStore()
 const accountStore = useAccountStore()

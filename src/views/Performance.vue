@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-xl font-bold text-gray-800">🏆 业绩统计</h1>
+      <h1 class="text-xl font-bold text-gray-800"><Icon name="trophy" class="inline w-4 h-4 -mt-0.5 mr-1" /> 业绩统计</h1>
     </div>
 
     <!-- Filters -->
@@ -16,14 +16,13 @@
         <option value="orders">按订单数排序</option>
         <option value="avg">按客单价排序</option>
       </select>
-      <button @click="loadData" class="px-3 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm hover:bg-gray-200 cursor-pointer">
-        🔄 刷新
+      <button @click="loadData" class="px-3 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm hover:bg-gray-200 cursor-pointer"><Icon name="refresh" class="inline w-4 h-4 -mt-0.5 mr-1" /> 刷新
       </button>
     </div>
 
     <!-- 加载错误提示（方便定位是 RPC 未部署还是无权限等）-->
     <div v-if="loadError && !loading" class="bg-red-50 border border-red-200 rounded-2xl p-3 mb-3 text-sm">
-      <div class="font-medium text-red-700 mb-1">⚠️ {{ loadError }}</div>
+      <div class="font-medium text-red-700 mb-1"><Icon name="alert-triangle" class="inline w-4 h-4 -mt-0.5 mr-1" /> {{ loadError }}</div>
       <div class="text-xs text-red-500 mb-2">如持续无法加载，请联系管理员检查 get_performance_data / sales_targets 权限。</div>
       <button @click="loadData" class="px-3 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600 cursor-pointer">重试</button>
     </div>
@@ -40,19 +39,19 @@
       <!-- Team Summary -->
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div class="bg-white rounded-xl border border-gray-100 p-5">
-          <div class="text-sm text-gray-500 mb-1">💰 团队总金额</div>
+          <div class="text-sm text-gray-500 mb-1"><Icon name="wallet" class="inline w-4 h-4 -mt-0.5 mr-1" /> 团队总金额</div>
           <div class="text-2xl font-bold text-green-600">{{ formatMoney(teamTotal.amount) }}</div>
         </div>
         <div class="bg-white rounded-xl border border-gray-100 p-5">
-          <div class="text-sm text-gray-500 mb-1">📦 总订单数</div>
+          <div class="text-sm text-gray-500 mb-1"><Icon name="package" class="inline w-4 h-4 -mt-0.5 mr-1" /> 总订单数</div>
           <div class="text-2xl font-bold text-blue-600">{{ teamTotal.orders }}</div>
         </div>
         <div class="bg-white rounded-xl border border-gray-100 p-5">
-          <div class="text-sm text-gray-500 mb-1">📋 平均客单价</div>
+          <div class="text-sm text-gray-500 mb-1"><Icon name="clipboard" class="inline w-4 h-4 -mt-0.5 mr-1" /> 平均客单价</div>
           <div class="text-2xl font-bold text-purple-600">{{ formatMoney(teamTotal.avg) }}</div>
         </div>
         <div class="bg-white rounded-xl border border-gray-100 p-5">
-          <div class="text-sm text-gray-500 mb-1">🎯 达标人数</div>
+          <div class="text-sm text-gray-500 mb-1"><Icon name="target" class="inline w-4 h-4 -mt-0.5 mr-1" /> 达标人数</div>
           <div class="text-2xl font-bold text-orange-500">{{ targetAchievedCount }}/{{ targetTotalCount }}</div>
         </div>
       </div>
@@ -60,7 +59,7 @@
       <!-- Ranking Table -->
       <div class="bg-white rounded-xl border border-gray-100 overflow-hidden mb-6">
         <div class="px-4 py-3 border-b border-gray-100">
-          <h2 class="font-bold text-gray-700">📊 业绩排行榜</h2>
+          <h2 class="font-bold text-gray-700"><Icon name="gauge" class="inline w-4 h-4 -mt-0.5 mr-1" /> 业绩排行榜</h2>
         </div>
         <table class="w-full text-sm">
           <thead>
@@ -121,7 +120,7 @@
 
       <!-- Sales Targets Section -->
       <div v-if="auth.isFinance && targets.length > 0" class="bg-white rounded-xl border border-gray-100 p-5">
-        <h2 class="font-bold text-gray-700 mb-4">🎯 本月销售目标</h2>
+        <h2 class="font-bold text-gray-700 mb-4"><Icon name="target" class="inline w-4 h-4 -mt-0.5 mr-1" /> 本月销售目标</h2>
         <div class="space-y-3">
           <div v-for="t in targets" :key="t.id" class="flex items-center gap-4">
             <div class="w-24 text-sm text-gray-600 truncate">{{ t.user_name }}</div>
@@ -151,7 +150,7 @@
       <!-- Leader: Group Performance Section -->
       <div v-if="isGroupLeader && myGroupPerformance.length > 0" class="bg-white rounded-xl border border-gray-100 overflow-hidden mt-6">
         <div class="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
-          <h2 class="font-bold text-gray-700">🏷️ 我的小组业绩</h2>
+          <h2 class="font-bold text-gray-700"><Icon name="tag" class="inline w-4 h-4 -mt-0.5 mr-1" /> 我的小组业绩</h2>
           <span class="text-xs text-gray-500">（{{ myGroupInfo?.group_name || '' }}）</span>
         </div>
         <div class="grid grid-cols-3 gap-4 p-4 border-b border-gray-50">
@@ -200,6 +199,7 @@ import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/auth'
 import { formatMoney, toast } from '../lib/utils'
 import Skeleton from '../components/Skeleton.vue'
+import Icon from '../components/icons/Icons.vue'
 
 const auth = useAuthStore()
 const loading = ref(true)

@@ -96,7 +96,8 @@
         </div>
         <button @click="loadDetailMatrix" :disabled="detailLoading"
           class="ml-auto px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 cursor-pointer">
-          {{ detailLoading ? '加载中…' : '🔄 刷新' }}
+          <Icon name="refresh" class="inline w-3 h-3" :class="detailLoading && 'animate-spin'" />
+          {{ detailLoading ? '加载中…' : '刷新' }}
         </button>
       </div>
 

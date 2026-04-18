@@ -2,12 +2,12 @@
   <div class="space-y-6">
     <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
       <div class="bg-white rounded-xl border border-gray-100 p-4">
-        <div class="text-2xl mb-1">🏢</div>
+        <div class="text-2xl mb-1"><Icon name="building" class="inline w-4 h-4 -mt-0.5 mr-1" /></div>
         <div class="text-2xl font-bold text-gray-800">¥{{ formatNum(summary.totalOriginal) }}</div>
         <div class="text-xs text-gray-500">资产原值总额</div>
       </div>
       <div class="bg-white rounded-xl border border-gray-100 p-4">
-        <div class="text-2xl mb-1">📉</div>
+        <div class="text-2xl mb-1"><Icon name="trending-down" class="inline w-4 h-4 -mt-0.5 mr-1" /></div>
         <div class="text-2xl font-bold text-gray-800">¥{{ formatNum(summary.totalDepreciation) }}</div>
         <div class="text-xs text-gray-500">累计折旧</div>
       </div>
@@ -17,12 +17,12 @@
         <div class="text-xs text-gray-500">资产净值</div>
       </div>
       <div class="bg-white rounded-xl border border-gray-100 p-4">
-        <div class="text-2xl mb-1">📅</div>
+        <div class="text-2xl mb-1"><Icon name="calendar" class="inline w-4 h-4 -mt-0.5 mr-1" /></div>
         <div class="text-2xl font-bold text-gray-800">¥{{ formatNum(summary.monthlyTotal) }}</div>
         <div class="text-xs text-gray-500">本月折旧额</div>
       </div>
       <div class="bg-white rounded-xl border border-gray-100 p-4">
-        <div class="text-2xl mb-1">📊</div>
+        <div class="text-2xl mb-1"><Icon name="gauge" class="inline w-4 h-4 -mt-0.5 mr-1" /></div>
         <div class="text-2xl font-bold text-gray-800">{{ summary.activeCount }} / {{ summary.totalCount }}</div>
         <div class="text-xs text-gray-500">在用 / 总数量</div>
       </div>
@@ -292,6 +292,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { supabase } from '../lib/supabase'
 import { ASSET_STATUS, ASSET_STATUS_LABEL } from '../constants/enums'
+import Icon from '../components/icons/Icons.vue'
 
 const categories = ['装修', '设备', '器材', '办公家具', '车辆', '其他']
 

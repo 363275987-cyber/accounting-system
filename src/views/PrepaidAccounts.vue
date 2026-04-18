@@ -2,18 +2,18 @@
   <div>
     <!-- Header -->
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-xl font-bold text-gray-800">💳 预付账款管理</h1>
+      <h1 class="text-xl font-bold text-gray-800"><Icon name="credit-card" class="inline w-4 h-4 -mt-0.5 mr-1" /> 预付账款管理</h1>
     </div>
 
     <!-- Summary Cards -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
       <div class="bg-white rounded-xl border border-gray-100 p-4">
-        <div class="text-sm text-gray-500 mb-1">💰 预付总额</div>
+        <div class="text-sm text-gray-500 mb-1"><Icon name="wallet" class="inline w-4 h-4 -mt-0.5 mr-1" /> 预付总额</div>
         <div class="text-2xl font-bold text-blue-600">{{ formatMoney(stats.totalAmount) }}</div>
         <div class="text-xs text-gray-500 mt-1">共 {{ list.length }} 笔</div>
       </div>
       <div class="bg-white rounded-xl border border-gray-100 p-4">
-        <div class="text-sm text-gray-500 mb-1">✅ 已核销</div>
+        <div class="text-sm text-gray-500 mb-1"><Icon name="check-circle" class="inline w-4 h-4 -mt-0.5 mr-1" /> 已核销</div>
         <div class="text-2xl font-bold text-green-600">{{ formatMoney(stats.settledAmount) }}</div>
       </div>
       <div class="bg-white rounded-xl border border-gray-100 p-4">
@@ -21,7 +21,7 @@
         <div class="text-2xl font-bold text-orange-500">{{ formatMoney(stats.remainingAmount) }}</div>
       </div>
       <div class="bg-white rounded-xl border border-gray-100 p-4">
-        <div class="text-sm text-gray-500 mb-1">📋 待核销笔数</div>
+        <div class="text-sm text-gray-500 mb-1"><Icon name="clipboard" class="inline w-4 h-4 -mt-0.5 mr-1" /> 待核销笔数</div>
         <div class="text-2xl font-bold text-purple-600">{{ stats.pendingCount }}</div>
       </div>
     </div>
@@ -52,7 +52,7 @@
 
     <!-- Empty -->
     <div v-else-if="filteredList.length === 0" class="text-center py-20">
-      <div class="text-4xl mb-3">💳</div>
+      <div class="text-4xl mb-3"><Icon name="credit-card" class="inline w-4 h-4 -mt-0.5 mr-1" /></div>
       <div class="text-gray-500">暂无预付账款记录</div>
       <button @click="openModal()" class="mt-3 text-blue-600 text-sm hover:underline cursor-pointer">
         添加第一笔预付款
@@ -198,6 +198,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { supabase } from '../lib/supabase'
+import Icon from '../components/icons/Icons.vue'
 
 const TABLE = 'prepaid_accounts'
 

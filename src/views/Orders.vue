@@ -2,7 +2,7 @@
   <div>
     <!-- Header -->
     <div class="flex items-center justify-between mb-4 md:mb-6">
-      <h1 class="text-lg md:text-xl font-bold text-gray-800 truncate">📋 订单管理</h1>
+      <h1 class="text-lg md:text-xl font-bold text-gray-800 truncate"><Icon name="clipboard" class="inline w-4 h-4 -mt-0.5 mr-1" /> 订单管理</h1>
       <div class="flex items-center gap-2 shrink-0">
         <!-- 桌面端按钮 -->
         <div v-if="isAdmin" class="hidden md:inline-flex items-center gap-1">
@@ -12,16 +12,14 @@
             <option :value="10">10条</option>
             <option :value="20">20条</option>
           </select>
-          <button @click="generateTestData(testCount)" class="text-xs px-2 py-1 border border-dashed border-gray-300 rounded text-gray-500 hover:bg-gray-50 hover:text-gray-600 cursor-pointer">
-            🎲 随机测试
+          <button @click="generateTestData(testCount)" class="text-xs px-2 py-1 border border-dashed border-gray-300 rounded text-gray-500 hover:bg-gray-50 hover:text-gray-600 cursor-pointer"><Icon name="dices" class="inline w-4 h-4 -mt-0.5 mr-1" /> 随机测试
           </button>
         </div>
         <button
           v-if="isAdmin || isFinance"
           @click="openPendingRefunds"
           class="relative hidden md:inline-flex px-4 py-2 rounded-lg text-sm transition cursor-pointer whitespace-nowrap bg-orange-50 text-orange-700 hover:bg-orange-100"
-        >
-          💳 待审批退款
+        ><Icon name="credit-card" class="inline w-4 h-4 -mt-0.5 mr-1" /> 待审批退款
           <span v-if="pendingRefundCount > 0" class="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">{{ pendingRefundCount > 99 ? '99+' : pendingRefundCount }}</span>
         </button>
         <button
@@ -29,15 +27,13 @@
           @click="showTextMode = !showTextMode"
           class="hidden md:inline-flex px-4 py-2 rounded-lg text-sm transition cursor-pointer whitespace-nowrap"
           :class="showTextMode ? 'bg-purple-600 text-white hover:bg-purple-700' : 'bg-purple-50 text-purple-700 hover:bg-purple-100'"
-        >
-          📋 文本模式
+        ><Icon name="clipboard" class="inline w-4 h-4 -mt-0.5 mr-1" /> 文本模式
         </button>
         <button
           v-if="canCreate"
           @click="openImportModal()"
           class="hidden md:inline-flex bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700 transition cursor-pointer whitespace-nowrap"
-        >
-          📥 导入
+        ><Icon name="download" class="inline w-4 h-4 -mt-0.5 mr-1" /> 导入
         </button>
         <!-- 移动端更多菜单 -->
         <div class="relative md:hidden">
@@ -45,13 +41,12 @@
             ⋯
           </button>
           <div v-if="showMobileMenu" class="absolute right-0 top-full mt-1 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50 min-w-[140px]">
-            <button v-if="isAdmin || isFinance" @click="openPendingRefunds(); showMobileMenu = false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer flex items-center gap-2">
-              💳 待审批退款
+            <button v-if="isAdmin || isFinance" @click="openPendingRefunds(); showMobileMenu = false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer flex items-center gap-2"><Icon name="credit-card" class="inline w-4 h-4 -mt-0.5 mr-1" /> 待审批退款
               <span v-if="pendingRefundCount > 0" class="bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[16px] h-[16px] flex items-center justify-center px-1">{{ pendingRefundCount }}</span>
             </button>
-            <button v-if="canCreate" @click="showTextMode = !showTextMode; showMobileMenu = false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer">📋 文本模式</button>
-            <button v-if="canCreate" @click="openImportModal(); showMobileMenu = false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer">📥 导入</button>
-            <button v-if="isAdmin" @click="generateTestData(testCount); showMobileMenu = false" class="w-full text-left px-4 py-2.5 text-sm text-gray-400 hover:bg-gray-50 cursor-pointer">🎲 随机测试</button>
+            <button v-if="canCreate" @click="showTextMode = !showTextMode; showMobileMenu = false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer"><Icon name="clipboard" class="inline w-4 h-4 -mt-0.5 mr-1" /> 文本模式</button>
+            <button v-if="canCreate" @click="openImportModal(); showMobileMenu = false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer"><Icon name="download" class="inline w-4 h-4 -mt-0.5 mr-1" /> 导入</button>
+            <button v-if="isAdmin" @click="generateTestData(testCount); showMobileMenu = false" class="w-full text-left px-4 py-2.5 text-sm text-gray-400 hover:bg-gray-50 cursor-pointer"><Icon name="dices" class="inline w-4 h-4 -mt-0.5 mr-1" /> 随机测试</button>
           </div>
         </div>
         <button
@@ -70,7 +65,7 @@
     <div v-if="showTextMode" class="mb-6">
       <div class="bg-white rounded-xl border border-gray-100 p-5">
         <div class="flex items-center justify-between mb-3">
-          <h3 class="text-sm font-semibold text-gray-700">📋 粘贴订单文本</h3>
+          <h3 class="text-sm font-semibold text-gray-700"><Icon name="clipboard" class="inline w-4 h-4 -mt-0.5 mr-1" /> 粘贴订单文本</h3>
           <button @click="showTextMode = false" class="text-gray-500 hover:text-gray-600 text-sm cursor-pointer">收起 ✕</button>
         </div>
         <textarea
@@ -84,8 +79,7 @@
             @click="handleParse"
             :disabled="!rawText.trim()"
             class="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition"
-          >
-            🔍 解析
+          ><Icon name="search" class="inline w-4 h-4 -mt-0.5 mr-1" /> 解析
           </button>
           <button
             @click="rawText = ''; parsedOrders = []"
@@ -194,8 +188,7 @@
         </div>
 
         <!-- Parse Error -->
-        <div v-if="parseError" class="mt-3 text-red-500 text-sm bg-red-50 rounded-lg px-3 py-2">
-          ⚠️ {{ parseError }}
+        <div v-if="parseError" class="mt-3 text-red-500 text-sm bg-red-50 rounded-lg px-3 py-2"><Icon name="alert-triangle" class="inline w-4 h-4 -mt-0.5 mr-1" /> {{ parseError }}
         </div>
 
         <!-- Quick Add Account Modal -->
@@ -252,24 +245,24 @@
     <!-- Stats Cards -->
     <div v-if="!filters.category && !filters.status && !filters.dateFrom && !filters.dateTo" class="grid grid-cols-3 md:grid-cols-5 gap-3 md:gap-4 mb-4 md:mb-5">
       <div class="bg-white rounded-xl border border-gray-100 p-4">
-        <div class="text-xs text-gray-500 mb-1">📋 今日订单</div>
+        <div class="text-xs text-gray-500 mb-1"><Icon name="clipboard" class="inline w-4 h-4 -mt-0.5 mr-1" /> 今日订单</div>
         <div class="text-2xl font-bold text-gray-800">{{ stats.todayCount }}</div>
       </div>
       <div class="bg-white rounded-xl border border-gray-100 p-4">
-        <div class="text-xs text-gray-500 mb-1">📦 本月订单</div>
+        <div class="text-xs text-gray-500 mb-1"><Icon name="package" class="inline w-4 h-4 -mt-0.5 mr-1" /> 本月订单</div>
         <div class="text-2xl font-bold text-gray-800">{{ stats.monthCount }}</div>
       </div>
       <div class="bg-white rounded-xl border border-gray-100 p-4">
-        <div class="text-xs text-gray-500 mb-1">💰 本月金额</div>
+        <div class="text-xs text-gray-500 mb-1"><Icon name="wallet" class="inline w-4 h-4 -mt-0.5 mr-1" /> 本月金额</div>
         <div class="text-2xl font-bold text-green-600">{{ formatMoney(stats.monthAmount) }}</div>
       </div>
       <div class="bg-white rounded-xl border border-gray-100 p-4">
-        <div class="text-xs text-gray-500 mb-1">💳 本月退款</div>
+        <div class="text-xs text-gray-500 mb-1"><Icon name="credit-card" class="inline w-4 h-4 -mt-0.5 mr-1" /> 本月退款</div>
         <div class="text-2xl font-bold text-orange-600">{{ stats.monthRefundCount }}</div>
         <div v-if="stats.monthRefundAmount > 0" class="text-xs text-orange-500 mt-0.5">-{{ formatMoney(stats.monthRefundAmount) }}</div>
       </div>
       <div class="bg-white rounded-xl border border-gray-100 p-4">
-        <div class="text-xs text-gray-500 mb-1">📊 退款率</div>
+        <div class="text-xs text-gray-500 mb-1"><Icon name="gauge" class="inline w-4 h-4 -mt-0.5 mr-1" /> 退款率</div>
         <div class="text-2xl font-bold" :class="stats.refundRate > 10 ? 'text-red-600' : 'text-gray-800'">{{ stats.refundRate }}%</div>
       </div>
     </div>
@@ -332,8 +325,7 @@
           <button
             @click="handleExportOrders"
             class="bg-green-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-green-700 transition cursor-pointer flex-shrink-0"
-          >
-            📥 导出CSV
+          ><Icon name="download" class="inline w-4 h-4 -mt-0.5 mr-1" /> 导出CSV
           </button>
         </div>
       </div>
@@ -540,7 +532,7 @@
     >
       <div class="bg-white rounded-2xl shadow-2xl w-full md:max-w-lg md:mx-4 overflow-hidden max-h-[90vh] flex flex-col">
         <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
-          <h2 class="font-bold text-gray-800">📋 订单详情</h2>
+          <h2 class="font-bold text-gray-800"><Icon name="clipboard" class="inline w-4 h-4 -mt-0.5 mr-1" /> 订单详情</h2>
           <button @click="showDetailModal = false" class="text-gray-500 hover:text-gray-600 text-xl cursor-pointer">&times;</button>
         </div>
         <div class="p-6 overflow-y-auto space-y-3" v-if="detailOrder">
@@ -642,7 +634,7 @@
 
           <!-- 退款记录 -->
           <div v-if="detailRefunds.length > 0" class="bg-orange-50/60 rounded-lg p-4 space-y-2">
-            <div class="text-sm font-medium text-orange-700 mb-2">💳 退款记录</div>
+            <div class="text-sm font-medium text-orange-700 mb-2"><Icon name="credit-card" class="inline w-4 h-4 -mt-0.5 mr-1" /> 退款记录</div>
             <div v-for="r in detailRefunds" :key="r.id" class="flex items-center justify-between text-sm border-b border-orange-100 last:border-0 pb-2 last:pb-0">
               <div class="space-y-0.5">
                 <div class="text-gray-700">{{ r.reason }}</div>
@@ -784,12 +776,12 @@
             </div>
             <div v-else class="space-y-2 relative" ref="productListRef">
               <div v-for="(item, idx) in form.productItems" :key="idx" class="flex items-center gap-2 rounded-lg px-3 py-2" :class="item.is_gift ? 'bg-purple-50 border border-purple-100' : 'bg-gray-50'">
-                <span v-if="item.is_gift" class="text-purple-400 text-sm flex-shrink-0">🎁</span>
+                <span v-if="item.is_gift" class="text-purple-400 text-sm flex-shrink-0"><Icon name="gift" class="inline w-4 h-4 -mt-0.5 mr-1" /></span>
                 <input v-model="item.name" :id="'product-input-' + idx" placeholder="输入关键字搜索产品库" class="flex-1 min-w-0 px-2 py-1.5 border border-gray-200 rounded text-sm bg-white outline-none focus:ring-1 focus:ring-blue-500" @input="onItemNameInput(idx)" @focus="onItemNameInput(idx)" @blur="onProductBlur" />
                 <span v-if="item.sale_price > 0 && !item.is_gift" class="text-sm text-green-600 font-medium whitespace-nowrap flex-shrink-0">¥{{ item.sale_price }}</span>
                 <span v-if="item.is_gift" class="text-xs text-purple-400 whitespace-nowrap flex-shrink-0">¥0</span>
                 <input v-model.number="item.qty" type="number" min="1" placeholder="数量" class="w-16 px-2 py-1.5 border border-gray-200 rounded text-sm text-center bg-white outline-none focus:ring-1 focus:ring-blue-500" />
-                <button v-if="!item.is_gift && item.product_id" type="button" @click="openGiftSelector(idx)" class="text-purple-500 hover:text-purple-700 text-xs whitespace-nowrap cursor-pointer" title="选赠品">🎁 赠品</button>
+                <button v-if="!item.is_gift && item.product_id" type="button" @click="openGiftSelector(idx)" class="text-purple-500 hover:text-purple-700 text-xs whitespace-nowrap cursor-pointer" title="选赠品"><Icon name="gift" class="inline w-4 h-4 -mt-0.5 mr-1" /> 赠品</button>
                 <button type="button" @click="removeProductItem(idx)" class="text-gray-500 hover:text-red-500 cursor-pointer text-lg leading-none">&times;</button>
               </div>
             </div>
@@ -890,7 +882,7 @@
             <select v-model="form.order_source"
               class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer">
               <option value="sales_guided">🤝 销售引导（微信沟通→下单）</option>
-              <option value="organic">🛒 有机流量（客户自己下的）</option>
+              <option value="organic">有机流量（客户自己下的）</option>
               <option value="cs_service">🎧 客服处理（电商客服）</option>
               <option value="shared">👫 平分单（两个销售共同服务）</option>
             </select>
@@ -961,7 +953,7 @@
     >
       <div class="bg-white rounded-2xl shadow-2xl w-full md:max-w-5xl md:mx-4 overflow-hidden max-h-[90vh] flex flex-col">
         <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
-          <h2 class="font-bold text-gray-800">📥 批量导入订单</h2>
+          <h2 class="font-bold text-gray-800"><Icon name="download" class="inline w-4 h-4 -mt-0.5 mr-1" /> 批量导入订单</h2>
           <button @click="showImportModal = false" class="text-gray-500 hover:text-gray-600 text-xl cursor-pointer">&times;</button>
         </div>
 
@@ -995,13 +987,12 @@
               />
             </label>
             <div v-else class="border-2 border-dashed border-blue-300 rounded-lg p-8 text-center bg-blue-50/50">
-              <div class="text-3xl mb-2 animate-pulse">📊</div>
+              <div class="text-3xl mb-2 animate-pulse"><Icon name="gauge" class="inline w-4 h-4 -mt-0.5 mr-1" /></div>
               <div class="text-sm text-blue-600 font-medium">正在解析文件...</div>
               <div class="text-xs text-blue-400 mt-1">大文件可能需要几十秒，请耐心等待</div>
             </div>
 
-            <div v-if="importError" class="text-red-500 text-sm bg-red-50 rounded-lg px-3 py-2">
-              ⚠️ {{ importError }}
+            <div v-if="importError" class="text-red-500 text-sm bg-red-50 rounded-lg px-3 py-2"><Icon name="alert-triangle" class="inline w-4 h-4 -mt-0.5 mr-1" /> {{ importError }}
             </div>
           </div>
 
@@ -1179,11 +1170,10 @@
     <div v-if="showPendingRefundsModal" class="fixed inset-0 bg-black/30 flex items-center justify-center z-50" @click.self="showPendingRefundsModal = false">
       <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 max-h-[85vh] flex flex-col">
         <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
-          <h2 class="font-bold text-gray-800">💳 待审批退款 <span v-if="pendingRefundList.length" class="text-sm font-normal text-gray-500">({{ pendingRefundList.length }}笔)</span></h2>
+          <h2 class="font-bold text-gray-800"><Icon name="credit-card" class="inline w-4 h-4 -mt-0.5 mr-1" /> 待审批退款 <span v-if="pendingRefundList.length" class="text-sm font-normal text-gray-500">({{ pendingRefundList.length }}笔)</span></h2>
           <div class="flex items-center gap-2">
             <button v-if="pendingRefundList.length >= 2" @click="handleBatchApproveAll"
-              class="px-3 py-1.5 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 cursor-pointer transition">
-              ✅ 一键全部审批
+              class="px-3 py-1.5 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 cursor-pointer transition"><Icon name="check-circle" class="inline w-4 h-4 -mt-0.5 mr-1" /> 一键全部审批
             </button>
             <button @click="showPendingRefundsModal = false" class="text-gray-500 hover:text-gray-600 text-xl cursor-pointer">&times;</button>
           </div>
@@ -1251,6 +1241,7 @@ import { dayEnd } from '../utils/dateRange'
 import Skeleton from '../components/Skeleton.vue'
 import GiftSelector from '../components/GiftSelector.vue'
 import RefundModal from '../components/RefundModal.vue'
+import Icon from '../components/icons/Icons.vue'
 
 // ---------- permission ----------
 const { canDelete, canSeeCost, isAdmin: permIsAdmin, loadRole } = usePermission()

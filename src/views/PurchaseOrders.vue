@@ -3,7 +3,7 @@
     <!-- Header -->
     <div class="flex items-center justify-between mb-6">
       <div>
-        <h1 class="text-lg md:text-xl font-bold text-gray-800">📦 产品订货</h1>
+        <h1 class="text-lg md:text-xl font-bold text-gray-800"><Icon name="package" class="inline w-4 h-4 -mt-0.5 mr-1" /> 产品订货</h1>
         <p class="text-xs text-gray-500 mt-0.5">向厂商下单采购，跟踪到货进度</p>
       </div>
       <button @click="openCreateModal" class="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 cursor-pointer">+ 新建采购单</button>
@@ -111,7 +111,7 @@
               </td>
               <td class="px-4 py-3 text-right text-blue-500">{{ p.in_transit }}</td>
               <td class="px-4 py-3 text-center">
-                <span v-if="p.low_stock" class="px-2 py-0.5 rounded-full text-xs bg-red-100 text-red-600 font-medium">⚠️ 库存不足</span>
+                <span v-if="p.low_stock" class="px-2 py-0.5 rounded-full text-xs bg-red-100 text-red-600 font-medium"><Icon name="alert-triangle" class="inline w-4 h-4 -mt-0.5 mr-1" /> 库存不足</span>
                 <span v-else-if="p.days_remaining <= 30" class="px-2 py-0.5 rounded-full text-xs bg-amber-50 text-amber-600">偏低</span>
                 <span v-else class="px-2 py-0.5 rounded-full text-xs bg-green-50 text-green-600">充足</span>
               </td>
@@ -358,6 +358,7 @@
 import { ref, computed, onMounted, reactive } from 'vue'
 import { supabase } from '../lib/supabase'
 import { toast, PRODUCT_ITEM_CATEGORIES } from '../lib/utils'
+import Icon from '../components/icons/Icons.vue'
 
 const loading = ref(false)
 const forecastLoading = ref(false)

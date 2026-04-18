@@ -2,7 +2,7 @@
   <div class="max-w-6xl mx-auto pb-20">
     <!-- 非财务屏蔽 -->
     <div v-if="!auth.isFinance" class="text-center py-20 text-gray-500">
-      <div class="text-5xl mb-3">🔒</div>
+      <div class="text-5xl mb-3"><Icon name="lock" class="inline w-4 h-4 -mt-0.5 mr-1" /></div>
       <div class="text-sm">工资管理仅对管理员和财务人员开放</div>
     </div>
 
@@ -15,12 +15,12 @@
             @click="viewMode = 'monthly'"
             :class="viewMode === 'monthly' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'"
             class="px-3 py-1.5 rounded-md cursor-pointer transition-all"
-          >📅 按月管理</button>
+          ><Icon name="calendar" class="inline w-4 h-4 -mt-0.5 mr-1" /> 按月管理</button>
           <button
             @click="switchToYearly"
             :class="viewMode === 'yearly' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-700'"
             class="px-3 py-1.5 rounded-md cursor-pointer transition-all"
-          >📊 年度看板</button>
+          ><Icon name="gauge" class="inline w-4 h-4 -mt-0.5 mr-1" /> 年度看板</button>
         </div>
       </div>
 
@@ -42,7 +42,7 @@
 
         <!-- 月度趋势条形图 -->
         <div class="bg-white rounded-2xl border border-gray-100 p-4 mb-3">
-          <div class="text-sm font-medium text-gray-700 mb-3">📈 {{ yearPick }} 年月度趋势</div>
+          <div class="text-sm font-medium text-gray-700 mb-3"><Icon name="trending-up" class="inline w-4 h-4 -mt-0.5 mr-1" /> {{ yearPick }} 年月度趋势</div>
           <div v-if="yearLoading" class="text-xs text-gray-400 py-8 text-center">加载中...</div>
           <div v-else class="grid grid-cols-12 gap-1 h-40 items-end">
             <div
@@ -64,16 +64,14 @@
               </div>
             </div>
           </div>
-          <p class="text-xs text-gray-400 mt-3">💡 点击柱子可以跳到对应月份详情</p>
+          <p class="text-xs text-gray-400 mt-3"><Icon name="bulb" class="inline w-4 h-4 -mt-0.5 mr-1" /> 点击柱子可以跳到对应月份详情</p>
         </div>
 
         <!-- 员工全年汇总表 -->
         <div class="bg-white rounded-2xl border border-gray-100 overflow-hidden mb-3">
           <div class="px-4 py-3 border-b border-gray-100 text-sm font-medium text-gray-700 flex items-center justify-between gap-3 flex-wrap">
-            <span class="flex items-center gap-2">
-              👥 员工全年汇总
-              <span v-if="yearDuplicateGroups.length > 0" class="text-xs text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full" :title="yearDuplicateGroups.map(g => g.join('/')).join('；')">
-                ⚠ 疑似同一人被拆分：{{ yearDuplicateGroups.length }} 组
+            <span class="flex items-center gap-2"><Icon name="users" class="inline w-4 h-4 -mt-0.5 mr-1" /> 员工全年汇总
+              <span v-if="yearDuplicateGroups.length > 0" class="text-xs text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full" :title="yearDuplicateGroups.map(g => g.join('/')).join('；')"><Icon name="alert-triangle" class="inline w-4 h-4 -mt-0.5 mr-1" /> 疑似同一人被拆分：{{ yearDuplicateGroups.length }} 组
               </span>
             </span>
             <div class="flex items-center gap-2">
@@ -87,7 +85,7 @@
                 v-if="yearData.byEmployee.length > 0"
                 @click="exportYearCsv"
                 class="text-xs text-blue-600 hover:text-blue-700 cursor-pointer"
-              >📥 导出 CSV</button>
+              ><Icon name="download" class="inline w-4 h-4 -mt-0.5 mr-1" /> 导出 CSV</button>
             </div>
           </div>
           <div v-if="yearLoading" class="py-8 text-center text-xs text-gray-400">加载中...</div>
@@ -110,7 +108,7 @@
                 <tr v-for="emp in filteredYearEmployees" :key="emp.name" class="border-t border-gray-50 hover:bg-gray-50" :class="emp._likelyDup ? 'bg-orange-50/50' : ''">
                   <td class="px-3 py-2 sticky left-0 bg-white hover:bg-gray-50 font-medium text-gray-700" :class="emp._likelyDup ? 'bg-orange-50/50 hover:bg-orange-100/50' : ''">
                     <span>{{ emp.name }}</span>
-                    <span v-if="emp._likelyDup" class="ml-1 text-[10px] text-orange-600" :title="'疑似与其他行同一人：' + emp._dupPeers.join('、')">⚠</span>
+                    <span v-if="emp._likelyDup" class="ml-1 text-[10px] text-orange-600" :title="'疑似与其他行同一人：' + emp._dupPeers.join('、')"><Icon name="alert-triangle" class="inline w-4 h-4 -mt-0.5 mr-1" /></span>
                   </td>
                   <td v-for="(amt, mi) in emp.months" :key="mi" class="px-2 py-2 text-right font-mono text-xs" :class="amt > 0 ? 'text-gray-700' : 'text-gray-300'">
                     {{ amt > 0 ? amt.toFixed(0) : '-' }}
@@ -154,9 +152,8 @@
               @click="downloadTemplate"
               class="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 cursor-pointer"
               title="下载 Excel 导入模板"
-            >📥 下载模板</button>
-            <label class="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 cursor-pointer">
-              📤 上传 Excel
+            ><Icon name="download" class="inline w-4 h-4 -mt-0.5 mr-1" /> 下载模板</button>
+            <label class="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 cursor-pointer"><Icon name="upload" class="inline w-4 h-4 -mt-0.5 mr-1" /> 上传 Excel
               <input ref="fileInput" type="file" accept=".xlsx,.xls" class="hidden" @change="handleFile" />
             </label>
             <button
@@ -168,11 +165,10 @@
               @click="exportMonthCsv"
               class="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600 hover:bg-gray-50 cursor-pointer"
               title="把当前月份工资导出为 CSV"
-            >📥 导出 CSV</button>
+            ><Icon name="download" class="inline w-4 h-4 -mt-0.5 mr-1" /> 导出 CSV</button>
           </div>
         </div>
-        <p class="text-xs text-gray-500 mt-2">
-          ⚠️ 工资按"应发月份"权责发生制计提到当月利润表；实发请点右侧"发放"扣账户余额。
+        <p class="text-xs text-gray-500 mt-2"><Icon name="alert-triangle" class="inline w-4 h-4 -mt-0.5 mr-1" /> 工资按"应发月份"权责发生制计提到当月利润表；实发请点右侧"发放"扣账户余额。
         </p>
       </div>
 
@@ -245,11 +241,11 @@
         <button
           @click="openPayModalBatch"
           class="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs hover:bg-green-700 cursor-pointer"
-        >💰 批量发放</button>
+        ><Icon name="wallet" class="inline w-4 h-4 -mt-0.5 mr-1" /> 批量发放</button>
         <button
           @click="batchPayslip"
           class="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-xs hover:bg-purple-700 cursor-pointer"
-        >🧾 批量工资条</button>
+        ><Icon name="receipt" class="inline w-4 h-4 -mt-0.5 mr-1" /> 批量工资条</button>
         <button
           @click="batchDelete"
           class="px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs hover:bg-red-600 cursor-pointer"
@@ -280,7 +276,7 @@
 
       <!-- 加载错误展示(便于 debug) -->
       <div v-if="loadError" class="bg-red-50 border border-red-200 rounded-2xl p-3 mb-3 text-sm">
-        <div class="font-medium text-red-700 mb-1">⚠️ 加载工资数据失败</div>
+        <div class="font-medium text-red-700 mb-1"><Icon name="alert-triangle" class="inline w-4 h-4 -mt-0.5 mr-1" /> 加载工资数据失败</div>
         <div class="text-xs text-red-600 font-mono break-all">{{ loadError }}</div>
         <button @click="loadSalaries" class="mt-2 px-3 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600 cursor-pointer">重试</button>
       </div>
@@ -493,7 +489,7 @@
             </table>
           </div>
           <div v-if="importError" class="mx-6 mb-3 bg-red-50 border border-red-200 rounded-lg p-2 text-xs shrink-0">
-            <div class="font-medium text-red-700 mb-1">⚠️ 导入失败</div>
+            <div class="font-medium text-red-700 mb-1"><Icon name="alert-triangle" class="inline w-4 h-4 -mt-0.5 mr-1" /> 导入失败</div>
             <div class="text-red-600 font-mono break-all">{{ importError }}</div>
           </div>
           <div class="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-2 shrink-0">
@@ -527,8 +523,7 @@
               <datalist id="salary-employee-list">
                 <option v-for="name in knownEmployees" :key="name" :value="name"></option>
               </datalist>
-              <p v-if="knownEmployees.length > 0" class="text-xs text-gray-400 mt-1">
-                💡 从历史记录中提取了 {{ knownEmployees.length }} 个姓名，输入时会自动补全
+              <p v-if="knownEmployees.length > 0" class="text-xs text-gray-400 mt-1"><Icon name="bulb" class="inline w-4 h-4 -mt-0.5 mr-1" /> 从历史记录中提取了 {{ knownEmployees.length }} 个姓名，输入时会自动补全
               </p>
             </div>
             <div class="grid grid-cols-2 gap-3">
@@ -608,7 +603,7 @@
               <textarea v-model="form.note" rows="2" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"></textarea>
             </div>
             <div v-if="formError" class="bg-red-50 border border-red-200 rounded-lg p-2 text-xs">
-              <div class="font-medium text-red-700 mb-1">⚠️ 保存失败</div>
+              <div class="font-medium text-red-700 mb-1"><Icon name="alert-triangle" class="inline w-4 h-4 -mt-0.5 mr-1" /> 保存失败</div>
               <div class="text-red-600 font-mono break-all">{{ formError }}</div>
             </div>
             <div class="flex justify-end gap-2 pt-2">
@@ -625,8 +620,7 @@
       <div v-if="showPayModal" class="fixed inset-0 bg-black/30 flex items-center justify-center z-50" @click.self="showPayModal = false">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4">
           <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-            <h2 class="font-bold text-gray-800">
-              💰 发放工资
+            <h2 class="font-bold text-gray-800"><Icon name="wallet" class="inline w-4 h-4 -mt-0.5 mr-1" /> 发放工资
               <span class="text-sm text-gray-500 font-normal ml-2">
                 （{{ payTargets.length === 1 ? payTargets[0].employee_name : `${payTargets.length} 人` }}，合计 {{ formatMoney(payTotalAmount) }}）
               </span>
@@ -705,7 +699,7 @@
                   class="text-blue-600 hover:text-blue-700 cursor-pointer"
                 >自动把差额填到最后一行</button>
               </div>
-              <p v-if="payBalanceWarn" class="text-xs text-red-500 mt-1">⚠️ {{ payBalanceWarn }}</p>
+              <p v-if="payBalanceWarn" class="text-xs text-red-500 mt-1"><Icon name="alert-triangle" class="inline w-4 h-4 -mt-0.5 mr-1" /> {{ payBalanceWarn }}</p>
             </div>
 
             <div>
@@ -798,9 +792,9 @@
       <div v-if="showPayslipModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50 payslip-overlay" @click.self="showPayslipModal = false">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] flex flex-col">
           <div class="px-6 py-3 border-b border-gray-100 flex items-center justify-between payslip-hide">
-            <h2 class="font-bold text-gray-800">🧾 工资条 <span class="text-sm text-gray-400 font-normal ml-2">{{ payslipRows.length }} 人</span></h2>
+            <h2 class="font-bold text-gray-800"><Icon name="receipt" class="inline w-4 h-4 -mt-0.5 mr-1" /> 工资条 <span class="text-sm text-gray-400 font-normal ml-2">{{ payslipRows.length }} 人</span></h2>
             <div class="flex items-center gap-2">
-              <button @click="copyPayslipText" class="px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-600 hover:bg-gray-50 cursor-pointer">📋 复制文本</button>
+              <button @click="copyPayslipText" class="px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-600 hover:bg-gray-50 cursor-pointer"><Icon name="clipboard" class="inline w-4 h-4 -mt-0.5 mr-1" /> 复制文本</button>
               <button @click="printPayslip" class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs hover:bg-blue-700 cursor-pointer">🖨 打印</button>
               <button @click="showPayslipModal = false" class="text-gray-500 hover:text-gray-600 text-xl cursor-pointer">×</button>
             </div>
@@ -876,6 +870,7 @@
 <script setup>
 import { ref, reactive, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { loadXLSX } from '../lib/xlsxLoader'
+import Icon from '../components/icons/Icons.vue'
 // 懒加载 xlsx 后赋值到模块级变量,保持同步函数 (tryParseWorkbook) 可用
 let XLSX = null
 import { supabase } from '../lib/supabase'

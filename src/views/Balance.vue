@@ -2,16 +2,17 @@
   <div>
     <!-- Header -->
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-xl font-bold text-gray-800">📊 余额对账</h1>
+      <h1 class="text-xl font-bold text-gray-800"><Icon name="gauge" class="inline w-4 h-4 -mt-0.5 mr-1" /> 余额对账</h1>
       <button v-if="auth.isAdmin" @click="showLegacy = !showLegacy"
-        class="text-xs px-3 py-1.5 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50 cursor-pointer">
-        {{ showLegacy ? '▲ 收起月度快照' : '📅 月度快照（管理员）' }}
+        class="text-xs px-3 py-1.5 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50 cursor-pointer inline-flex items-center gap-1">
+        <Icon :name="showLegacy ? 'chevron-down' : 'calendar'" class="w-3.5 h-3.5" :class="showLegacy && 'rotate-180'" />
+        <span>{{ showLegacy ? '收起月度快照' : '月度快照（管理员）' }}</span>
       </button>
     </div>
 
     <!-- 漂移巡检 banner:live_balance 与 RPC closing 不一致时提示 -->
     <div v-if="drift.length > 0" class="mb-4 bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-3">
-      <div class="text-amber-500 text-lg">⚠️</div>
+      <div class="text-amber-500 text-lg"><Icon name="alert-triangle" class="inline w-4 h-4 -mt-0.5 mr-1" /></div>
       <div class="flex-1 text-sm">
         <div class="font-medium text-amber-800">{{ drift.length }} 个账户余额对不齐</div>
         <div class="text-xs text-amber-700 mt-0.5">
@@ -50,8 +51,9 @@
         仅看有变化的账户
       </label>
       <button @click="loadMatrix" :disabled="loading"
-        class="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 cursor-pointer">
-        {{ loading ? '加载中…' : '🔄 刷新' }}
+        class="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 cursor-pointer inline-flex items-center gap-1">
+        <Icon name="refresh" class="w-3.5 h-3.5" :class="loading && 'animate-spin'" />
+        <span>{{ loading ? '加载中…' : '刷新' }}</span>
       </button>
     </div>
 
@@ -154,7 +156,7 @@
     <!-- ===== Legacy 月度快照（管理员收纳区） ===== -->
     <div v-if="showLegacy" class="mt-6 bg-white rounded-xl border border-gray-100 p-5">
       <div class="flex items-center justify-between mb-4">
-        <h2 class="font-bold text-gray-700">📅 月度快照 / 结算</h2>
+        <h2 class="font-bold text-gray-700"><Icon name="calendar" class="inline w-4 h-4 -mt-0.5 mr-1" /> 月度快照 / 结算</h2>
         <div class="flex items-center gap-2">
           <button @click="prevMonth" :disabled="legacyLoading"
             class="px-2 py-1 border border-gray-200 rounded text-xs hover:bg-gray-50 cursor-pointer">← 上月</button>
@@ -162,7 +164,7 @@
           <button @click="nextMonth" :disabled="legacyLoading"
             class="px-2 py-1 border border-gray-200 rounded text-xs hover:bg-gray-50 cursor-pointer">下月 →</button>
           <button @click="showSettleModal = true"
-            class="ml-2 px-3 py-1 bg-purple-600 text-white rounded text-xs hover:bg-purple-700 cursor-pointer">🔧 手动结算</button>
+            class="ml-2 px-3 py-1 bg-purple-600 text-white rounded text-xs hover:bg-purple-700 cursor-pointer"><Icon name="settings" class="inline w-4 h-4 -mt-0.5 mr-1" /> 手动结算</button>
         </div>
       </div>
 
@@ -197,7 +199,7 @@
       <div v-if="showSettleModal" class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" @click.self="closeSettleModal">
         <div class="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
           <div class="flex items-center justify-between p-5 border-b border-gray-100">
-            <h2 class="text-lg font-bold text-gray-800">🔧 手动结算</h2>
+            <h2 class="text-lg font-bold text-gray-800"><Icon name="settings" class="inline w-4 h-4 -mt-0.5 mr-1" /> 手动结算</h2>
             <button @click="closeSettleModal" class="text-gray-500 hover:text-gray-600 text-xl">✕</button>
           </div>
           <div class="p-5 space-y-4">
@@ -225,7 +227,7 @@
                 </div>
               </div>
             </div>
-            <div v-if="settleError" class="p-3 bg-red-50 rounded-lg text-sm text-red-600">❌ {{ settleError }}</div>
+            <div v-if="settleError" class="p-3 bg-red-50 rounded-lg text-sm text-red-600"><Icon name="x-circle" class="inline w-4 h-4 -mt-0.5 mr-1" /> {{ settleError }}</div>
           </div>
           <div class="flex justify-end gap-3 p-5 border-t border-gray-100">
             <button @click="closeSettleModal" class="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">关闭</button>
@@ -247,6 +249,7 @@ import { useAuthStore } from '../stores/auth'
 import { useAccountStore } from '../stores/accounts'
 import { formatMoney, toast } from '../lib/utils'
 import BalanceFlowDrawer from '../components/BalanceFlowDrawer.vue'
+import Icon from '../components/icons/Icons.vue'
 
 const auth = useAuthStore()
 const accountStore = useAccountStore()

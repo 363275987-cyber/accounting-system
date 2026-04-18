@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-xl font-bold text-gray-800">💰 提成管理</h1>
+      <h1 class="text-xl font-bold text-gray-800"><Icon name="wallet" class="inline w-4 h-4 -mt-0.5 mr-1" /> 提成管理</h1>
       <div class="flex gap-2">
         <!-- Tab switcher -->
         <button v-for="tab in tabs" :key="tab.key" @click="activeTab = tab.key"
@@ -15,20 +15,18 @@
     <!-- ==================== 规则配置 Tab ==================== -->
     <template v-if="activeTab === 'rules'">
       <!-- Admin only guard -->
-      <div v-if="!auth.isAdmin" class="bg-white rounded-xl border border-gray-100 p-12 text-center text-gray-500">
-        🔒 仅管理员可访问提成规则配置
+      <div v-if="!auth.isAdmin" class="bg-white rounded-xl border border-gray-100 p-12 text-center text-gray-500"><Icon name="lock" class="inline w-4 h-4 -mt-0.5 mr-1" /> 仅管理员可访问提成规则配置
       </div>
       <template v-else>
         <!-- Add rule button -->
         <div class="flex justify-end mb-4">
-          <button @click="openRuleModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 cursor-pointer">
-            ➕ 添加规则
+          <button @click="openRuleModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 cursor-pointer"><Icon name="plus" class="inline w-4 h-4 -mt-0.5 mr-1" /> 添加规则
           </button>
         </div>
 
         <!-- Loading -->
         <div v-if="rulesLoading" class="bg-white rounded-xl border border-gray-100 p-12 text-center">
-          <div class="text-2xl mb-2 animate-pulse">⚙️</div>
+          <div class="text-2xl mb-2 animate-pulse"><Icon name="settings" class="inline w-4 h-4 -mt-0.5 mr-1" /></div>
           <div class="text-gray-500 text-sm">加载规则数据...</div>
         </div>
 
@@ -69,8 +67,7 @@
                 </td>
                 <td class="px-4 py-3 text-center">
                   <div class="flex items-center justify-center gap-1">
-                    <button @click="openRuleModal(rule)" class="px-2 py-1 text-blue-600 hover:bg-blue-50 rounded cursor-pointer" title="编辑">
-                      ✏️
+                    <button @click="openRuleModal(rule)" class="px-2 py-1 text-blue-600 hover:bg-blue-50 rounded cursor-pointer" title="编辑"><Icon name="edit" class="inline w-4 h-4 -mt-0.5 mr-1" />
                     </button>
                     <button @click="toggleRuleStatus(rule)" class="px-2 py-1 hover:bg-gray-50 rounded cursor-pointer" :title="rule.status === 'active' ? '停用' : '启用'">
                       {{ rule.status === 'active' ? '⏸️' : '▶️' }}
@@ -93,14 +90,13 @@
       <div class="bg-white rounded-xl border border-gray-100 p-4 mb-4 flex gap-3 items-center flex-wrap">
         <input v-model="summaryMonth" type="month"
           class="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500">
-        <button @click="loadSummary" class="px-3 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm hover:bg-gray-200 cursor-pointer">
-          🔄 刷新
+        <button @click="loadSummary" class="px-3 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm hover:bg-gray-200 cursor-pointer"><Icon name="refresh" class="inline w-4 h-4 -mt-0.5 mr-1" /> 刷新
         </button>
       </div>
 
       <!-- Loading -->
       <div v-if="summaryLoading" class="bg-white rounded-xl border border-gray-100 p-12 text-center">
-        <div class="text-2xl mb-2 animate-pulse">📊</div>
+        <div class="text-2xl mb-2 animate-pulse"><Icon name="gauge" class="inline w-4 h-4 -mt-0.5 mr-1" /></div>
         <div class="text-gray-500 text-sm">加载提成汇总...</div>
       </div>
 
@@ -108,11 +104,11 @@
         <!-- Summary cards -->
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <div class="bg-white rounded-xl border border-gray-100 p-5">
-            <div class="text-sm text-gray-500 mb-1">💰 提成总额</div>
+            <div class="text-sm text-gray-500 mb-1"><Icon name="wallet" class="inline w-4 h-4 -mt-0.5 mr-1" /> 提成总额</div>
             <div class="text-2xl font-bold text-green-600">{{ formatMoney(summaryStats.totalCommission) }}</div>
           </div>
           <div class="bg-white rounded-xl border border-gray-100 p-5">
-            <div class="text-sm text-gray-500 mb-1">👥 发放人数</div>
+            <div class="text-sm text-gray-500 mb-1"><Icon name="users" class="inline w-4 h-4 -mt-0.5 mr-1" /> 发放人数</div>
             <div class="text-2xl font-bold text-blue-600">{{ summaryStats.totalPeople }}</div>
           </div>
           <div class="bg-white rounded-xl border border-gray-100 p-5">
@@ -120,7 +116,7 @@
             <div class="text-2xl font-bold text-orange-500">{{ summaryStats.pendingCount }}</div>
           </div>
           <div class="bg-white rounded-xl border border-gray-100 p-5">
-            <div class="text-sm text-gray-500 mb-1">✅ 已发放</div>
+            <div class="text-sm text-gray-500 mb-1"><Icon name="check-circle" class="inline w-4 h-4 -mt-0.5 mr-1" /> 已发放</div>
             <div class="text-2xl font-bold text-green-500">{{ summaryStats.paidCount }}</div>
           </div>
         </div>
@@ -128,7 +124,7 @@
         <!-- Summary table -->
         <div class="bg-white rounded-xl border border-gray-100 overflow-hidden">
           <div class="px-4 py-3 border-b border-gray-100">
-            <h2 class="font-bold text-gray-700">📋 提成明细</h2>
+            <h2 class="font-bold text-gray-700"><Icon name="clipboard" class="inline w-4 h-4 -mt-0.5 mr-1" /> 提成明细</h2>
           </div>
           <table class="w-full text-sm">
             <thead>
@@ -273,6 +269,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/auth'
 import { formatMoney, toast, COMMISSION_STATUS, COMMISSION_SOURCE } from '../lib/utils'
+import Icon from '../components/icons/Icons.vue'
 
 const auth = useAuthStore()
 

@@ -2,7 +2,7 @@
   <div>
     <!-- Header -->
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-xl font-bold text-gray-800">🏦 股东垫资</h1>
+      <h1 class="text-xl font-bold text-gray-800"><Icon name="building" class="inline w-4 h-4 -mt-0.5 mr-1" /> 股东垫资</h1>
       <button
         @click="openCreateModal"
         class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition cursor-pointer"
@@ -14,7 +14,7 @@
     <!-- Stats Cards -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
       <div class="bg-white rounded-xl border border-gray-100 p-5">
-        <div class="text-sm text-gray-500 mb-1">💰 垫资总额</div>
+        <div class="text-sm text-gray-500 mb-1"><Icon name="wallet" class="inline w-4 h-4 -mt-0.5 mr-1" /> 垫资总额</div>
         <div class="text-2xl font-bold text-blue-600">{{ formatMoney(stats.totalLoan) }}</div>
         <div class="text-xs text-gray-500 mt-1">共 {{ loans.length }} 笔</div>
       </div>
@@ -24,12 +24,12 @@
         <div class="text-xs text-gray-500 mt-1">待还款本金</div>
       </div>
       <div class="bg-white rounded-xl border border-gray-100 p-5">
-        <div class="text-sm text-gray-500 mb-1">📅 累计利息</div>
+        <div class="text-sm text-gray-500 mb-1"><Icon name="calendar" class="inline w-4 h-4 -mt-0.5 mr-1" /> 累计利息</div>
         <div class="text-2xl font-bold text-red-500">{{ formatMoney(stats.totalInterest) }}</div>
         <div class="text-xs text-gray-500 mt-1">至 {{ todayStr }}</div>
       </div>
       <div class="bg-white rounded-xl border border-gray-100 p-5">
-        <div class="text-sm text-gray-500 mb-1">✅ 已还总额</div>
+        <div class="text-sm text-gray-500 mb-1"><Icon name="check-circle" class="inline w-4 h-4 -mt-0.5 mr-1" /> 已还总额</div>
         <div class="text-2xl font-bold text-green-600">{{ formatMoney(stats.totalRepaid) }}</div>
         <div class="text-xs text-gray-500 mt-1">含本金+利息</div>
       </div>
@@ -42,7 +42,7 @@
 
     <!-- Empty State -->
     <div v-else-if="loans.length === 0" class="text-center py-20">
-      <div class="text-4xl mb-3">🏦</div>
+      <div class="text-4xl mb-3"><Icon name="building" class="inline w-4 h-4 -mt-0.5 mr-1" /></div>
       <div class="text-gray-500">暂无垫资记录</div>
       <button @click="openCreateModal" class="mt-3 text-blue-600 text-sm hover:underline cursor-pointer">
         新增第一笔垫资
@@ -80,9 +80,9 @@
 
         <!-- Date Range -->
         <div class="flex items-center gap-4 text-sm text-gray-500 mb-3">
-          <span>📅 {{ formatDate(loan.start_date) }}</span>
+          <span><Icon name="calendar" class="inline w-4 h-4 -mt-0.5 mr-1" /> {{ formatDate(loan.start_date) }}</span>
           <span>→</span>
-          <span>📅 {{ formatDate(loan.end_date) }}</span>
+          <span><Icon name="calendar" class="inline w-4 h-4 -mt-0.5 mr-1" /> {{ formatDate(loan.end_date) }}</span>
         </div>
 
         <!-- Progress -->
@@ -122,12 +122,10 @@
         <div class="flex items-center gap-2 pt-3 border-t border-gray-50">
           <button @click="openRepayModal(loan)"
             class="flex-1 bg-green-50 text-green-700 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-green-100 transition cursor-pointer"
-            :disabled="loan.status === 'repaid'">
-            💰 还款
+            :disabled="loan.status === 'repaid'"><Icon name="wallet" class="inline w-4 h-4 -mt-0.5 mr-1" /> 还款
           </button>
           <button @click="toggleRepayments(loan)"
-            class="flex-1 bg-gray-50 text-gray-600 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-gray-100 transition cursor-pointer">
-            📋 还款记录
+            class="flex-1 bg-gray-50 text-gray-600 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-gray-100 transition cursor-pointer"><Icon name="clipboard" class="inline w-4 h-4 -mt-0.5 mr-1" /> 还款记录
           </button>
         </div>
 
@@ -291,6 +289,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useShareholderLoanStore } from '../stores/shareholderLoans'
 import { supabase } from '../lib/supabase'
 import SearchableSelect from '../components/SearchableSelect.vue'
+import Icon from '../components/icons/Icons.vue'
 
 const store = useShareholderLoanStore()
 const loans = computed(() => store.loans)

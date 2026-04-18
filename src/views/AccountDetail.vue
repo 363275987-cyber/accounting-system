@@ -4,7 +4,7 @@
       <button @click="$router.back()" class="text-gray-500 hover:text-gray-700 transition cursor-pointer">
         ← 返回
       </button>
-      <h1 class="text-xl font-bold text-gray-800">🏦 账户详情</h1>
+      <h1 class="text-xl font-bold text-gray-800"><Icon name="building" class="inline w-4 h-4 -mt-0.5 mr-1" /> 账户详情</h1>
     </div>
 
     <!-- Account Info -->
@@ -82,6 +82,7 @@ import { useRoute } from 'vue-router'
 import { supabase } from '../lib/supabase'
 import { formatMoney, toast, formatDate, PLATFORM_LABELS } from '../lib/utils'
 import { dayEnd } from '../utils/dateRange'
+import Icon from '../components/icons/Icons.vue'
 
 const route = useRoute()
 const accountId = route.params.id

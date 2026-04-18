@@ -58,10 +58,10 @@
             </div>
             <div class="space-y-1 text-sm">
               <div v-if="asset.assigned_to" class="flex items-center gap-1 text-gray-600">
-                <span>👤</span><span>{{ asset.assigned_to }}</span>
+                <span><Icon name="user" class="inline w-4 h-4 -mt-0.5 mr-1" /></span><span>{{ asset.assigned_to }}</span>
               </div>
               <div v-if="asset.monthly_cost > 0" class="flex items-center gap-1 text-gray-600">
-                <span>💰</span><span>¥{{ Number(asset.monthly_cost).toFixed(2) }}/月</span>
+                <span><Icon name="wallet" class="inline w-4 h-4 -mt-0.5 mr-1" /></span><span>¥{{ Number(asset.monthly_cost).toFixed(2) }}/月</span>
               </div>
               <div v-if="asset.bind_group" class="flex items-center gap-1 text-purple-600">
                 <span>🔗</span><span>{{ asset.bind_group }}</span>
@@ -124,7 +124,7 @@
               <option value="phone">📱 手机</option>
               <option value="wechat">💬 微信号</option>
               <option value="sim_card">📶 SIM卡</option>
-              <option value="bank_card">💳 银行卡</option>
+              <option value="bank_card">银行卡</option>
             </select>
           </div>
           <div>
@@ -222,6 +222,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { supabase } from '../lib/supabase'
 import { ASSET_STATUS } from '../constants/enums'
+import Icon from '../components/icons/Icons.vue'
 
 const tabs = [
   { key: 'phone', label: '手机', icon: '📱' },

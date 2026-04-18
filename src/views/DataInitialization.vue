@@ -2,14 +2,14 @@
   <div class="max-w-5xl mx-auto pb-20">
     <!-- 非财务屏蔽 -->
     <div v-if="!auth.isFinance" class="text-center py-20 text-gray-500">
-      <div class="text-5xl mb-3">🔒</div>
+      <div class="text-5xl mb-3"><Icon name="lock" class="inline w-4 h-4 -mt-0.5 mr-1" /></div>
       <div class="text-sm">数据初始化仅对管理员和财务人员开放</div>
     </div>
 
     <template v-else>
       <!-- Header -->
       <div class="flex items-center justify-between mb-4 pt-2 flex-wrap gap-3">
-        <h1 class="text-xl font-bold text-gray-800">⚠️ 数据初始化</h1>
+        <h1 class="text-xl font-bold text-gray-800"><Icon name="alert-triangle" class="inline w-4 h-4 -mt-0.5 mr-1" /> 数据初始化</h1>
         <div class="text-xs text-gray-400">仅财务/管理员可用 · 操作不可逆</div>
       </div>
 
@@ -155,6 +155,7 @@ import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/auth'
 import { useAccountStore } from '../stores/accounts'
 import { toast } from '../lib/utils'
+import Icon from '../components/icons/Icons.vue'
 
 /**
  * 数据初始化 —— 清空交易流水，保留基础数据

@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-xl font-bold text-gray-800">📋 操作日志</h1>
+      <h1 class="text-xl font-bold text-gray-800"><Icon name="clipboard" class="inline w-4 h-4 -mt-0.5 mr-1" /> 操作日志</h1>
     </div>
 
     <!-- Filters -->
@@ -88,8 +88,8 @@
             <p class="text-sm text-gray-700 mb-1.5">{{ log.description }}</p>
             <!-- Meta row -->
             <div class="flex items-center gap-4 text-xs text-gray-500">
-              <span v-if="log.user_name">👤 {{ log.user_name }}</span>
-              <span v-if="log.account_name">🏦 {{ log.account_name }}</span>
+              <span v-if="log.user_name"><Icon name="user" class="inline w-4 h-4 -mt-0.5 mr-1" /> {{ log.user_name }}</span>
+              <span v-if="log.account_name"><Icon name="building" class="inline w-4 h-4 -mt-0.5 mr-1" /> {{ log.account_name }}</span>
               <span v-if="log.balance_before != null && log.balance_after != null"
                 class="text-gray-500">
                 余额 {{ formatMoneyStr(log.balance_before) }} → {{ formatMoneyStr(log.balance_after) }}
@@ -116,6 +116,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { supabase } from '../lib/supabase'
+import Icon from '../components/icons/Icons.vue'
 
 const logs = ref([])
 const loading = ref(true)

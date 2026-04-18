@@ -1,6 +1,6 @@
 <template>
   <div class="max-w-4xl mx-auto space-y-6">
-    <h1 class="text-2xl font-bold text-gray-800">⚙️ 系统设置</h1>
+    <h1 class="text-2xl font-bold text-gray-800"><Icon name="settings" class="inline w-4 h-4 -mt-0.5 mr-1" /> 系统设置</h1>
 
     <!-- 快捷入口 -->
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
@@ -20,7 +20,7 @@
 
     <!-- 审批设置 -->
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-      <h2 class="text-lg font-semibold text-gray-700 mb-4">📋 审批设置</h2>
+      <h2 class="text-lg font-semibold text-gray-700 mb-4"><Icon name="clipboard" class="inline w-4 h-4 -mt-0.5 mr-1" /> 审批设置</h2>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
           <label class="block text-sm font-medium text-gray-600 mb-1">支出审批限额（元）</label>
@@ -41,7 +41,7 @@
 
     <!-- 提成设置 -->
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-      <h2 class="text-lg font-semibold text-gray-700 mb-4">💰 提成设置</h2>
+      <h2 class="text-lg font-semibold text-gray-700 mb-4"><Icon name="wallet" class="inline w-4 h-4 -mt-0.5 mr-1" /> 提成设置</h2>
       <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div>
           <label class="block text-sm font-medium text-gray-600 mb-1">IP直播提成比例（%）</label>
@@ -134,7 +134,7 @@
 
     <!-- 修改密码 -->
     <div class="mt-8 bg-white rounded-xl border border-gray-100 p-6">
-      <h3 class="text-base font-bold text-gray-800 mb-4">🔒 修改密码</h3>
+      <h3 class="text-base font-bold text-gray-800 mb-4"><Icon name="lock" class="inline w-4 h-4 -mt-0.5 mr-1" /> 修改密码</h3>
       <div class="space-y-3 max-w-sm">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">当前密码</label>
@@ -171,6 +171,7 @@
 import { ref, onMounted, reactive } from 'vue'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/auth'
+import Icon from '../components/icons/Icons.vue'
 
 const auth = useAuthStore()
 const saving = ref(false)

@@ -2,13 +2,12 @@
   <div class="p-4 md:p-6 space-y-6">
     <!-- Header -->
     <div class="flex items-center justify-between">
-      <h1 class="text-xl font-bold text-gray-800">💰 分红管理</h1>
+      <h1 class="text-xl font-bold text-gray-800"><Icon name="wallet" class="inline w-4 h-4 -mt-0.5 mr-1" /> 分红管理</h1>
       <button
         v-if="canEdit"
         @click="showDistributeModal = true"
         class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition cursor-pointer"
-      >
-        📊 按利润分红
+      ><Icon name="gauge" class="inline w-4 h-4 -mt-0.5 mr-1" /> 按利润分红
       </button>
     </div>
 
@@ -24,12 +23,12 @@
     <!-- Summary Cards -->
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
       <div class="bg-white rounded-xl border border-gray-100 p-5">
-        <div class="text-sm text-gray-500 mb-1">💰 本年已分红总额</div>
+        <div class="text-sm text-gray-500 mb-1"><Icon name="wallet" class="inline w-4 h-4 -mt-0.5 mr-1" /> 本年已分红总额</div>
         <div class="text-2xl font-bold text-blue-600">{{ formatMoney(summaryStats.yearPaidTotal) }}</div>
         <div class="text-xs text-gray-500 mt-1">{{ currentYear }} 年度</div>
       </div>
       <div class="bg-white rounded-xl border border-gray-100 p-5">
-        <div class="text-sm text-gray-500 mb-1">👑 任凯智 已分红</div>
+        <div class="text-sm text-gray-500 mb-1"><Icon name="crown" class="inline w-4 h-4 -mt-0.5 mr-1" /> 任凯智 已分红</div>
         <div class="text-2xl font-bold text-purple-600">{{ formatMoney(summaryStats.yearPaidRen) }}</div>
         <div class="text-xs text-gray-500 mt-1">占比 60%</div>
       </div>
@@ -68,7 +67,7 @@
 
     <!-- Empty State -->
     <div v-else-if="filteredRecords.length === 0" class="text-center py-20">
-      <div class="text-4xl mb-3">💰</div>
+      <div class="text-4xl mb-3"><Icon name="wallet" class="inline w-4 h-4 -mt-0.5 mr-1" /></div>
       <div class="text-gray-500">暂无分红记录</div>
       <button v-if="canEdit" @click="showDistributeModal = true" class="mt-3 text-blue-600 text-sm hover:underline cursor-pointer">
         创建第一笔分红
@@ -147,8 +146,8 @@
           <span class="text-xl font-bold text-gray-800">{{ formatAmount(row.amount) }}</span>
         </div>
         <div class="flex items-center gap-4 text-xs text-gray-500 mb-2">
-          <span>📅 {{ row.period || '-' }}</span>
-          <span v-if="row.pay_date">💳 {{ formatDate(row.pay_date) }}</span>
+          <span><Icon name="calendar" class="inline w-4 h-4 -mt-0.5 mr-1" /> {{ row.period || '-' }}</span>
+          <span v-if="row.pay_date"><Icon name="credit-card" class="inline w-4 h-4 -mt-0.5 mr-1" /> {{ formatDate(row.pay_date) }}</span>
         </div>
         <div v-if="row.note" class="text-xs text-gray-500 mb-2 truncate">💬 {{ row.note }}</div>
         <div v-if="row.status === 'pending' && canEdit" class="flex items-center gap-2 pt-2 border-t border-gray-50">
@@ -168,7 +167,7 @@
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
       <div class="bg-white rounded-xl border border-gray-100 p-5">
         <div class="flex items-center gap-3 mb-4">
-          <div class="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center text-lg">👑</div>
+          <div class="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center text-lg"><Icon name="crown" class="inline w-4 h-4 -mt-0.5 mr-1" /></div>
           <div>
             <div class="font-semibold text-gray-800">任凯智</div>
             <div class="text-xs text-gray-500">董事长 · 60%</div>
@@ -217,7 +216,7 @@
     <!-- Distribute Modal -->
     <div v-if="showDistributeModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50" @click.self="showDistributeModal = false">
       <div class="bg-white rounded-2xl w-full max-w-md mx-4 p-6">
-        <h2 class="text-lg font-bold text-gray-800 mb-4">📊 按利润分红</h2>
+        <h2 class="text-lg font-bold text-gray-800 mb-4"><Icon name="gauge" class="inline w-4 h-4 -mt-0.5 mr-1" /> 按利润分红</h2>
         <div class="space-y-4">
           <div>
             <label class="block text-sm text-gray-600 mb-1">分红总额（元）</label>
@@ -227,7 +226,7 @@
           <!-- Auto-calc preview -->
           <div v-if="Number(distForm.totalAmount) > 0" class="bg-blue-50 rounded-lg p-3 space-y-2">
             <div class="flex items-center justify-between text-sm">
-              <span class="text-gray-600">👑 任凯智（60%）</span>
+              <span class="text-gray-600"><Icon name="crown" class="inline w-4 h-4 -mt-0.5 mr-1" /> 任凯智（60%）</span>
               <span class="font-bold text-purple-600">¥{{ formatAmount(Number(distForm.totalAmount) * 0.6) }}</span>
             </div>
             <div class="flex items-center justify-between text-sm">
@@ -281,6 +280,7 @@ import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/auth'
 import { useAccountStore } from '../stores/accounts'
 import SearchableSelect from '../components/SearchableSelect.vue'
+import Icon from '../components/icons/Icons.vue'
 
 const auth = useAuthStore()
 const accountStore = useAccountStore()

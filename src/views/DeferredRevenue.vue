@@ -2,7 +2,7 @@
   <div>
     <!-- Header -->
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-xl font-bold text-gray-800">📋 预收账款管理</h1>
+      <h1 class="text-xl font-bold text-gray-800"><Icon name="clipboard" class="inline w-4 h-4 -mt-0.5 mr-1" /> 预收账款管理</h1>
       <button
         @click="openCreateModal"
         class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition cursor-pointer"
@@ -14,11 +14,11 @@
     <!-- Summary Cards -->
     <div class="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
       <div class="bg-white rounded-xl border border-gray-100 p-4">
-        <div class="text-sm text-gray-500 mb-1">💰 预收总额</div>
+        <div class="text-sm text-gray-500 mb-1"><Icon name="wallet" class="inline w-4 h-4 -mt-0.5 mr-1" /> 预收总额</div>
         <div class="text-2xl font-bold text-blue-600">{{ formatMoney(stats.totalAmount) }}</div>
       </div>
       <div class="bg-white rounded-xl border border-gray-100 p-4">
-        <div class="text-sm text-gray-500 mb-1">✅ 已消课金额</div>
+        <div class="text-sm text-gray-500 mb-1"><Icon name="check-circle" class="inline w-4 h-4 -mt-0.5 mr-1" /> 已消课金额</div>
         <div class="text-2xl font-bold text-green-600">{{ formatMoney(stats.consumedAmount) }}</div>
       </div>
       <div class="bg-white rounded-xl border border-gray-100 p-4">
@@ -64,7 +64,7 @@
 
     <!-- Empty State -->
     <div v-else-if="filteredList.length === 0" class="text-center py-20">
-      <div class="text-4xl mb-3">📋</div>
+      <div class="text-4xl mb-3"><Icon name="clipboard" class="inline w-4 h-4 -mt-0.5 mr-1" /></div>
       <div class="text-gray-500">暂无预收账款记录</div>
       <button @click="openCreateModal" class="mt-3 text-blue-600 text-sm hover:underline cursor-pointer">
         添加第一笔预收
@@ -252,6 +252,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { supabase } from '../lib/supabase'
+import Icon from '../components/icons/Icons.vue'
 
 const loading = ref(false)
 const saving = ref(false)

@@ -2,18 +2,18 @@
   <div>
     <!-- 顶部标题 -->
     <div class="flex items-center justify-between mb-4">
-      <h1 class="text-xl font-bold text-gray-800 truncate">📦 产品库</h1>
+      <h1 class="text-xl font-bold text-gray-800 truncate"><Icon name="package" class="inline w-4 h-4 -mt-0.5 mr-1" /> 产品库</h1>
       <div class="flex items-center gap-2 shrink-0">
-        <button @click="exportType='single'; showExportModal=true" class="hidden md:inline-flex bg-green-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-green-700 transition cursor-pointer whitespace-nowrap">🎱 导出单品+赠品</button>
-        <button @click="exportType='bundle'; showExportModal=true" class="hidden md:inline-flex bg-orange-500 text-white px-3 py-2 rounded-lg text-sm hover:bg-orange-600 transition cursor-pointer whitespace-nowrap">📦 导出套装+赠品</button>
-        <button v-if="canEdit" @click="showImportModal=true" class="hidden md:inline-flex bg-blue-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-blue-700 transition cursor-pointer whitespace-nowrap">📥 导入</button>
+        <button @click="exportType='single'; showExportModal=true" class="hidden md:inline-flex bg-green-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-green-700 transition cursor-pointer whitespace-nowrap"><Icon name="sparkle" class="inline w-4 h-4 -mt-0.5 mr-1" /> 导出单品+赠品</button>
+        <button @click="exportType='bundle'; showExportModal=true" class="hidden md:inline-flex bg-orange-500 text-white px-3 py-2 rounded-lg text-sm hover:bg-orange-600 transition cursor-pointer whitespace-nowrap"><Icon name="package" class="inline w-4 h-4 -mt-0.5 mr-1" /> 导出套装+赠品</button>
+        <button v-if="canEdit" @click="showImportModal=true" class="hidden md:inline-flex bg-blue-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-blue-700 transition cursor-pointer whitespace-nowrap"><Icon name="download" class="inline w-4 h-4 -mt-0.5 mr-1" /> 导入</button>
         <!-- 移动端更多菜单 -->
         <div class="relative md:hidden">
           <button @click="showMobileMenu = !showMobileMenu" class="px-2.5 py-2 rounded-lg text-sm border border-gray-200 text-gray-600 hover:bg-gray-50 cursor-pointer">⋯</button>
           <div v-if="showMobileMenu" class="absolute right-0 top-full mt-1 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50 min-w-[160px]">
-            <button @click="exportType='single'; showExportModal=true; showMobileMenu=false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer">🎱 导出单品+赠品</button>
-            <button @click="exportType='bundle'; showExportModal=true; showMobileMenu=false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer">📦 导出套装+赠品</button>
-            <button v-if="canEdit" @click="showImportModal=true; showMobileMenu=false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer">📥 导入</button>
+            <button @click="exportType='single'; showExportModal=true; showMobileMenu=false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer"><Icon name="sparkle" class="inline w-4 h-4 -mt-0.5 mr-1" /> 导出单品+赠品</button>
+            <button @click="exportType='bundle'; showExportModal=true; showMobileMenu=false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer"><Icon name="package" class="inline w-4 h-4 -mt-0.5 mr-1" /> 导出套装+赠品</button>
+            <button v-if="canEdit" @click="showImportModal=true; showMobileMenu=false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer"><Icon name="download" class="inline w-4 h-4 -mt-0.5 mr-1" /> 导入</button>
             <button v-if="canEdit" @click="openProductModal('bundle'); showMobileMenu=false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer">+ 套装</button>
           </div>
         </div>
@@ -26,19 +26,19 @@
     <!-- 统计卡片 -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
       <div class="bg-white rounded-xl border border-gray-100 p-3">
-        <div class="text-xs text-gray-500">📦 产品总数</div>
+        <div class="text-xs text-gray-500"><Icon name="package" class="inline w-4 h-4 -mt-0.5 mr-1" /> 产品总数</div>
         <div class="text-xl font-bold text-gray-800">{{ summary.total }}</div>
       </div>
       <div class="bg-white rounded-xl border border-gray-100 p-3">
-        <div class="text-xs text-gray-500">🎱 球杆/前支</div>
+        <div class="text-xs text-gray-500"><Icon name="sparkle" class="inline w-4 h-4 -mt-0.5 mr-1" /> 球杆/前支</div>
         <div class="text-xl font-bold text-blue-600">{{ summary.cue }}</div>
       </div>
       <div class="bg-white rounded-xl border border-gray-100 p-3">
-        <div class="text-xs text-gray-500">🔧 配件/耗材</div>
+        <div class="text-xs text-gray-500"><Icon name="settings" class="inline w-4 h-4 -mt-0.5 mr-1" /> 配件/耗材</div>
         <div class="text-xl font-bold text-purple-600">{{ summary.accessory }}</div>
       </div>
       <div class="bg-white rounded-xl border border-gray-100 p-3">
-        <div class="text-xs text-gray-500">📦 套装/福袋</div>
+        <div class="text-xs text-gray-500"><Icon name="package" class="inline w-4 h-4 -mt-0.5 mr-1" /> 套装/福袋</div>
         <div class="text-xl font-bold text-orange-500">{{ summary.bundle }}</div>
       </div>
     </div>
@@ -47,8 +47,8 @@
     <div class="bg-white rounded-xl border border-gray-100 p-3 mb-4">
       <!-- Tab 切换 -->
       <div class="flex gap-1 mb-3 border-b border-gray-100 pb-2">
-        <button @click="activeTab='single'; loadProducts()" :class="activeTab==='single' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'" class="px-4 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer">🎱 单品 <span class="text-xs opacity-70">{{ summary.total - summary.bundle }}</span></button>
-        <button @click="activeTab='bundle'; loadProducts()" :class="activeTab==='bundle' ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'" class="px-4 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer">📦 套装 <span class="text-xs opacity-70">{{ summary.bundle }}</span></button>
+        <button @click="activeTab='single'; loadProducts()" :class="activeTab==='single' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'" class="px-4 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer"><Icon name="sparkle" class="inline w-4 h-4 -mt-0.5 mr-1" /> 单品 <span class="text-xs opacity-70">{{ summary.total - summary.bundle }}</span></button>
+        <button @click="activeTab='bundle'; loadProducts()" :class="activeTab==='bundle' ? 'bg-orange-500 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'" class="px-4 py-1.5 rounded-lg text-sm font-medium transition cursor-pointer"><Icon name="package" class="inline w-4 h-4 -mt-0.5 mr-1" /> 套装 <span class="text-xs opacity-70">{{ summary.bundle }}</span></button>
       </div>
       <!-- 筛选行 -->
       <div class="flex gap-2 items-center flex-wrap">
@@ -69,7 +69,7 @@
     <!-- 产品卡片列表 -->
     <div v-if="productStore.loading" class="py-16 text-center text-gray-500 text-sm">加载中…</div>
     <div v-else-if="productStore.products.length === 0" class="bg-white rounded-xl border border-gray-100 py-16 text-center text-gray-500">
-      <div class="text-4xl mb-2">📦</div>
+      <div class="text-4xl mb-2"><Icon name="package" class="inline w-4 h-4 -mt-0.5 mr-1" /></div>
       <div>暂无产品</div>
     </div>
     <div v-else class="grid gap-3">
@@ -122,7 +122,7 @@
                         <span>零售: <span class="text-gray-600">¥{{ s.retail_price || 0 }}</span></span>
                         <span>库存: <span :class="(s.stock - (s.reserved||0)) < 5 ? 'text-red-500 font-medium' : 'text-gray-600'">{{ s.stock || 0 }}</span></span>
                         <span v-if="s.reserved">预留: {{ s.reserved }}</span>
-                        <span v-if="s.barcode" class="text-gray-300">📦{{ s.barcode }}</span>
+                        <span v-if="s.barcode" class="text-gray-300"><Icon name="package" class="inline w-4 h-4 -mt-0.5 mr-1" />{{ s.barcode }}</span>
                       </div>
                     </div>
                     <div v-if="canEdit" class="shrink-0 flex gap-1">
@@ -161,7 +161,7 @@
         <!-- 卡片底部操作栏 -->
         <div v-if="canEdit || canDelete" class="border-t border-gray-50 px-4 py-2 flex items-center justify-end gap-1 bg-white">
           <button v-if="canEdit" @click.stop="openProductModal(p)" class="text-xs text-gray-500 hover:text-blue-600 px-2 py-1 rounded hover:bg-blue-50 cursor-pointer">编辑</button>
-          <button v-if="canEdit && p.product_type !== 'bundle' && p.product_type !== 'gift_bag'" @click.stop="openBundleModal(p)" class="text-xs text-gray-500 hover:text-purple-600 px-2 py-1 rounded hover:bg-purple-50 cursor-pointer" title="赠品管理">🎁赠品</button>
+          <button v-if="canEdit && p.product_type !== 'bundle' && p.product_type !== 'gift_bag'" @click.stop="openBundleModal(p)" class="text-xs text-gray-500 hover:text-purple-600 px-2 py-1 rounded hover:bg-purple-50 cursor-pointer" title="赠品管理"><Icon name="gift" class="inline w-4 h-4 -mt-0.5 mr-1" />赠品</button>
           <button v-if="canDelete" @click.stop="handleDeleteProduct(p)" class="text-xs text-red-400 hover:text-red-600 px-2 py-1 rounded hover:bg-red-50 cursor-pointer">删除</button>
         </div>
       </div>
@@ -202,7 +202,7 @@
               <label class="block text-sm font-medium text-gray-700 mb-1">SKU编码 <span class="text-red-400">*</span></label>
               <input v-model="pform.sku_code" required placeholder="如：DAA001" class="w-full px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
                 :class="skuCodeDuplicate ? 'border-red-400 bg-red-50' : 'border-gray-200'" @blur="checkSkuDuplicate" @input="skuCodeDuplicate=false" />
-              <p v-if="skuCodeDuplicate" class="text-xs text-red-500 mt-0.5">⚠️ 该SKU编码已存在</p>
+              <p v-if="skuCodeDuplicate" class="text-xs text-red-500 mt-0.5"><Icon name="alert-triangle" class="inline w-4 h-4 -mt-0.5 mr-1" /> 该SKU编码已存在</p>
             </div>
             <div class="grid grid-cols-2 gap-3">
               <div v-if="canSeeCost">
@@ -227,7 +227,7 @@
             <!-- 赠品区域 -->
             <div>
               <div class="flex items-center justify-between mb-2">
-                <label class="text-sm font-medium text-gray-700">🎁 赠品（随产品赠送）</label>
+                <label class="text-sm font-medium text-gray-700"><Icon name="gift" class="inline w-4 h-4 -mt-0.5 mr-1" /> 赠品（随产品赠送）</label>
                 <button type="button" @click="addGiftRow" class="text-xs text-blue-600 hover:text-blue-800 cursor-pointer">+ 添加赠品</button>
               </div>
               <div v-if="pform.gifts.length === 0" class="text-xs text-gray-500 text-center py-2 border border-dashed border-gray-200 rounded-lg">暂无赠品</div>
@@ -249,7 +249,7 @@
               <label class="block text-sm font-medium text-gray-700 mb-1">套装SKU编码 <span class="text-red-400">*</span></label>
               <input v-model="pform.sku_code" required placeholder="如：TA001" class="w-full px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500"
                 :class="skuCodeDuplicate ? 'border-red-400 bg-red-50' : 'border-gray-200'" @blur="checkSkuDuplicate" @input="skuCodeDuplicate=false" />
-              <p v-if="skuCodeDuplicate" class="text-xs text-red-500 mt-0.5">⚠️ 该SKU编码已存在</p>
+              <p v-if="skuCodeDuplicate" class="text-xs text-red-500 mt-0.5"><Icon name="alert-triangle" class="inline w-4 h-4 -mt-0.5 mr-1" /> 该SKU编码已存在</p>
             </div>
             <div class="grid grid-cols-2 gap-3">
               <div v-if="canSeeCost">
@@ -268,7 +268,7 @@
             <!-- 子商品列表 -->
             <div>
               <div class="flex items-center justify-between mb-2">
-                <label class="text-sm font-medium text-gray-700">📋 包含子商品</label>
+                <label class="text-sm font-medium text-gray-700"><Icon name="clipboard" class="inline w-4 h-4 -mt-0.5 mr-1" /> 包含子商品</label>
                 <button type="button" @click="addBundleItemRow" class="text-xs text-blue-600 hover:text-blue-800 cursor-pointer">+ 添加子商品</button>
               </div>
               <div v-if="pform.bundle_items.length === 0" class="text-xs text-gray-500 text-center py-2 border border-dashed border-gray-200 rounded-lg">请添加子商品</div>
@@ -282,7 +282,7 @@
             <!-- 赠品区域 -->
             <div>
               <div class="flex items-center justify-between mb-2">
-                <label class="text-sm font-medium text-gray-700">🎁 赠品（随套装赠送）</label>
+                <label class="text-sm font-medium text-gray-700"><Icon name="gift" class="inline w-4 h-4 -mt-0.5 mr-1" /> 赠品（随套装赠送）</label>
                 <button type="button" @click="addGiftRow" class="text-xs text-blue-600 hover:text-blue-800 cursor-pointer">+ 添加赠品</button>
               </div>
               <div v-if="pform.gifts.length === 0" class="text-xs text-gray-500 text-center py-2 border border-dashed border-gray-200 rounded-lg">暂无赠品</div>
@@ -450,7 +450,7 @@
     <!-- ============ 导入弹窗 ============ -->
     <div v-if="showImportModal" class="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" @click.self="showImportModal=false">
       <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6">
-        <h2 class="font-bold text-lg text-gray-800 mb-1">📥 导入产品</h2>
+        <h2 class="font-bold text-lg text-gray-800 mb-1"><Icon name="download" class="inline w-4 h-4 -mt-0.5 mr-1" /> 导入产品</h2>
         <p class="text-xs text-gray-500 mb-3">上传 Excel 文件，按 SKU 编码匹配：已有则更新，没有则新建</p>
 
         <!-- 步骤1：上传文件 -->
@@ -462,8 +462,8 @@
             <input ref="importFile" type="file" accept=".xlsx,.xls" class="hidden" @change="onImportFileSelected" />
           </div>
           <div class="flex items-center gap-3">
-            <button @click="downloadSingleTemplate" class="text-xs text-blue-600 hover:text-blue-800 cursor-pointer">📥 下载单品模板</button>
-            <button @click="downloadBundleTemplate" class="text-xs text-orange-600 hover:text-orange-800 cursor-pointer">📦 下载套装模板</button>
+            <button @click="downloadSingleTemplate" class="text-xs text-blue-600 hover:text-blue-800 cursor-pointer"><Icon name="download" class="inline w-4 h-4 -mt-0.5 mr-1" /> 下载单品模板</button>
+            <button @click="downloadBundleTemplate" class="text-xs text-orange-600 hover:text-orange-800 cursor-pointer"><Icon name="package" class="inline w-4 h-4 -mt-0.5 mr-1" /> 下载套装模板</button>
           </div>
           <div v-if="importFile" class="text-sm bg-blue-50 rounded-lg p-3 flex items-center justify-between">
             <span>📄 {{ importFile.name }}</span>
@@ -548,7 +548,7 @@
 
         <!-- 步骤3：完成 -->
         <div v-if="importStep===3" class="text-center py-6">
-          <div class="text-4xl mb-3">✅</div>
+          <div class="text-4xl mb-3"><Icon name="check-circle" class="inline w-4 h-4 -mt-0.5 mr-1" /></div>
           <div class="text-lg font-bold text-gray-800">导入完成</div>
           <div class="text-sm text-gray-500 mt-1">
             新增 {{ importResult.created }} 条，更新 {{ importResult.updated }} 条
@@ -569,6 +569,7 @@ import { useProductStore } from '../stores/products'
 import { formatMoney, PRODUCT_ITEM_CATEGORIES, toast } from '../lib/utils'
 import GiftSelector from '../components/GiftSelector.vue'
 import { loadXLSX } from '../lib/xlsxLoader'
+import Icon from '../components/icons/Icons.vue'
 
 const authStore = useAuthStore()
 const productStore = useProductStore()

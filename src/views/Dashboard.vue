@@ -1,25 +1,24 @@
 <template>
   <div class="max-w-5xl mx-auto pb-20 bg-gray-50 min-h-screen">
     <!-- 数据库连接错误提示 -->
-    <div v-if="dbError" class="bg-orange-50 border border-orange-200 rounded-2xl p-4 mb-4 text-sm text-orange-700">
-      ⚠️ {{ dbError }}
+    <div v-if="dbError" class="bg-orange-50 border border-orange-200 rounded-2xl p-4 mb-4 text-sm text-orange-700"><Icon name="alert-triangle" class="inline w-4 h-4 -mt-0.5 mr-1" /> {{ dbError }}
     </div>
 
     <!-- 非财务人员提示 -->
     <div v-if="!authStore.isFinance" class="text-center py-20 text-gray-500">
-      <div class="text-5xl mb-3">🔒</div>
+      <div class="text-5xl mb-3"><Icon name="lock" class="inline w-4 h-4 -mt-0.5 mr-1" /></div>
       <div class="text-sm">收支总览仅对管理员和财务人员开放</div>
     </div>
 
     <template v-if="authStore.isFinance">
       <!-- 页面标题 -->
-      <h1 class="text-xl font-bold text-gray-800 mb-4 pt-2">📊 收支总览</h1>
+      <h1 class="text-xl font-bold text-gray-800 mb-4 pt-2"><Icon name="gauge" class="inline w-4 h-4 -mt-0.5 mr-1" /> 收支总览</h1>
 
       <!-- ========== 顶部3卡片 ========== -->
       <div class="grid grid-cols-3 gap-3 mb-4">
         <!-- 今日销售额 -->
         <div class="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
-          <div class="text-xs text-gray-500 mb-1">💰 今日销售额</div>
+          <div class="text-xs text-gray-500 mb-1"><Icon name="wallet" class="inline w-4 h-4 -mt-0.5 mr-1" /> 今日销售额</div>
           <div v-if="loading" class="h-8 w-24 bg-gray-100 rounded-lg animate-pulse"></div>
           <div v-else class="text-2xl font-bold text-gray-800">
             {{ todayStats.todaySales !== null ? formatMoney(todayStats.todaySales) : '--' }}
@@ -29,7 +28,7 @@
 
         <!-- 今日订单数 -->
         <div class="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
-          <div class="text-xs text-gray-500 mb-1">📦 今日订单数</div>
+          <div class="text-xs text-gray-500 mb-1"><Icon name="package" class="inline w-4 h-4 -mt-0.5 mr-1" /> 今日订单数</div>
           <div v-if="loading" class="h-8 w-24 bg-gray-100 rounded-lg animate-pulse"></div>
           <div v-else class="text-2xl font-bold text-gray-800">
             {{ todayStats.todayOrders !== null ? todayStats.todayOrders + ' 笔' : '--' }}
@@ -39,7 +38,7 @@
 
         <!-- 本月利润 -->
         <div class="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
-          <div class="text-xs text-gray-500 mb-1">📈 本月利润</div>
+          <div class="text-xs text-gray-500 mb-1"><Icon name="trending-up" class="inline w-4 h-4 -mt-0.5 mr-1" /> 本月利润</div>
           <div v-if="loading" class="h-8 w-24 bg-gray-100 rounded-lg animate-pulse"></div>
           <div v-else class="text-2xl font-bold" :class="(stats.profit || 0) >= 0 ? 'text-green-500' : 'text-red-500'">
             {{ stats.profit !== null ? formatMoney(stats.profit) : '--' }}
@@ -130,6 +129,7 @@ import { ref, computed, onMounted } from 'vue'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/auth'
 import { formatMoney, formatDate, PLATFORM_LABELS, PRODUCT_CATEGORIES, ECOMMERCE_PLATFORMS, EXPENSE_STATUS, EXPENSE_CATEGORIES } from '../lib/utils'
+import Icon from '../components/icons/Icons.vue'
 // BUG-4 残留修复：Dashboard 的"本月利润"原本和 Reports Overview tab 不一致
 //（Dashboard 用 approved+paid、不算工资和转账费），导致用户看两个地方的利润
 // 数字对不上。改为统一调用 computeOverviewProfit。

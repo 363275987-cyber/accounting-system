@@ -1,10 +1,9 @@
 <template>
   <div>
     <div class="flex items-center justify-between mb-6">
-      <h1 class="text-xl font-bold text-gray-800">📊 财务报表</h1>
+      <h1 class="text-xl font-bold text-gray-800"><Icon name="gauge" class="inline w-4 h-4 -mt-0.5 mr-1" /> 财务报表</h1>
       <button v-if="!loading && hasData" @click="exportExcel"
-        class="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 cursor-pointer">
-        📥 导出Excel
+        class="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 cursor-pointer"><Icon name="download" class="inline w-4 h-4 -mt-0.5 mr-1" /> 导出Excel
       </button>
     </div>
 
@@ -32,14 +31,13 @@
         <button @click="setQuickRange('this_quarter')" class="px-2 py-1 text-xs rounded bg-gray-100 hover:bg-blue-100 hover:text-blue-700 cursor-pointer">本季度</button>
         <button @click="setQuickRange('this_year')" class="px-2 py-1 text-xs rounded bg-gray-100 hover:bg-blue-100 hover:text-blue-700 cursor-pointer">本年</button>
       </div>
-      <button @click="loadReport" class="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 cursor-pointer ml-auto">
-        🔄 查询
+      <button @click="loadReport" class="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 cursor-pointer ml-auto"><Icon name="refresh" class="inline w-4 h-4 -mt-0.5 mr-1" /> 查询
       </button>
     </div>
 
     <!-- Loading -->
     <div v-if="loading" class="bg-white rounded-xl border border-gray-100 p-12 text-center">
-      <div class="text-2xl mb-2 animate-pulse">📊</div>
+      <div class="text-2xl mb-2 animate-pulse"><Icon name="gauge" class="inline w-4 h-4 -mt-0.5 mr-1" /></div>
       <div class="text-gray-500 text-sm">加载报表数据...</div>
     </div>
 
@@ -48,22 +46,22 @@
       <!-- Summary Cards -->
       <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div class="bg-white rounded-xl border border-gray-100 p-5">
-          <div class="text-sm text-gray-500 mb-1">💰 总收入</div>
+          <div class="text-sm text-gray-500 mb-1"><Icon name="wallet" class="inline w-4 h-4 -mt-0.5 mr-1" /> 总收入</div>
           <div class="text-2xl font-bold text-green-600">{{ fmt(overviewData.totalIncome) }}</div>
           <div class="text-xs text-gray-400 mt-1">
             私域 {{ fmt(overviewData.privateIncome) }} + 电商 {{ fmt(overviewData.ecommerceIncome) }}<template v-if="overviewData.otherIncome > 0"> + 其他 {{ fmt(overviewData.otherIncome) }}</template>
           </div>
         </div>
         <div class="bg-white rounded-xl border border-gray-100 p-5">
-          <div class="text-sm text-gray-500 mb-1">💸 总支出</div>
+          <div class="text-sm text-gray-500 mb-1"><Icon name="wallet" class="inline w-4 h-4 -mt-0.5 mr-1" /> 总支出</div>
           <div class="text-2xl font-bold text-red-600">{{ fmt(overviewData.totalExpense) }}</div>
         </div>
         <div class="bg-white rounded-xl border border-gray-100 p-5">
-          <div class="text-sm text-gray-500 mb-1">📊 净利润</div>
+          <div class="text-sm text-gray-500 mb-1"><Icon name="gauge" class="inline w-4 h-4 -mt-0.5 mr-1" /> 净利润</div>
           <div class="text-2xl font-bold" :class="overviewData.netProfit >= 0 ? 'text-blue-600' : 'text-red-600'">{{ fmtSigned(overviewData.netProfit) }}</div>
         </div>
         <div class="bg-white rounded-xl border border-gray-100 p-5">
-          <div class="text-sm text-gray-500 mb-1">📈 利润率</div>
+          <div class="text-sm text-gray-500 mb-1"><Icon name="trending-up" class="inline w-4 h-4 -mt-0.5 mr-1" /> 利润率</div>
           <div class="text-2xl font-bold text-purple-600">{{ overviewData.profitRate }}%</div>
         </div>
       </div>
@@ -252,7 +250,7 @@
       <!-- Income Composition Card -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
         <div class="bg-white rounded-xl border border-gray-100 p-4">
-          <h3 class="font-semibold text-sm text-gray-700 mb-3">💰 收入构成</h3>
+          <h3 class="font-semibold text-sm text-gray-700 mb-3"><Icon name="wallet" class="inline w-4 h-4 -mt-0.5 mr-1" /> 收入构成</h3>
           <div class="space-y-2">
             <div class="flex items-center justify-between">
               <span class="text-sm text-gray-600">私域销售收入</span>
@@ -284,7 +282,7 @@
           </div>
         </div>
         <div class="bg-white rounded-xl border border-gray-100 p-4">
-          <h3 class="font-semibold text-sm text-gray-700 mb-3">📊 电商提现明细</h3>
+          <h3 class="font-semibold text-sm text-gray-700 mb-3"><Icon name="gauge" class="inline w-4 h-4 -mt-0.5 mr-1" /> 电商提现明细</h3>
           <div v-if="incomeData.withdrawalDetail && incomeData.withdrawalDetail.length > 0" class="space-y-1.5">
             <div v-for="(w, idx) in incomeData.withdrawalDetail" :key="idx" class="flex items-center justify-between text-sm">
               <span class="text-gray-600 truncate">{{ w.storeName }}</span>
@@ -450,7 +448,7 @@
       <!-- Detail Cards -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
         <div v-if="balanceData.assets.cashDetail.length" class="bg-white rounded-xl border border-gray-100 p-4">
-          <h3 class="font-semibold text-sm text-gray-700 mb-3">💰 现金账户明细</h3>
+          <h3 class="font-semibold text-sm text-gray-700 mb-3"><Icon name="wallet" class="inline w-4 h-4 -mt-0.5 mr-1" /> 现金账户明细</h3>
           <table class="w-full text-xs">
             <thead><tr class="text-gray-500"><th class="text-left pb-2">账户</th><th class="text-left pb-2">平台</th><th class="text-right pb-2">余额</th></tr></thead>
             <tbody class="divide-y divide-gray-50">
@@ -463,7 +461,7 @@
           </table>
         </div>
         <div v-if="balanceData.assets.ecommerceDetail.length" class="bg-white rounded-xl border border-gray-100 p-4">
-          <h3 class="font-semibold text-sm text-gray-700 mb-3">🛒 电商平台余额明细</h3>
+          <h3 class="font-semibold text-sm text-gray-700 mb-3"><Icon name="shopping-bag" class="inline w-4 h-4 -mt-0.5 mr-1" /> 电商平台余额明细</h3>
           <table class="w-full text-xs">
             <thead><tr class="text-gray-500"><th class="text-left pb-2">店铺</th><th class="text-left pb-2">平台</th><th class="text-right pb-2">余额</th></tr></thead>
             <tbody class="divide-y divide-gray-50">
@@ -491,7 +489,7 @@
           </table>
         </div>
         <div v-if="balanceData.liabilities.loansDetail.length" class="bg-white rounded-xl border border-gray-100 p-4">
-          <h3 class="font-semibold text-sm text-gray-700 mb-3">🏦 股东垫资明细</h3>
+          <h3 class="font-semibold text-sm text-gray-700 mb-3"><Icon name="building" class="inline w-4 h-4 -mt-0.5 mr-1" /> 股东垫资明细</h3>
           <table class="w-full text-xs">
             <thead><tr class="text-gray-500"><th class="text-left pb-2">股东</th><th class="text-right pb-2">垫资额</th><th class="text-right pb-2">已还</th><th class="text-right pb-2">剩余</th></tr></thead>
             <tbody class="divide-y divide-gray-50">
@@ -505,7 +503,7 @@
           </table>
         </div>
         <div v-if="balanceData.liabilities.payableDetail && balanceData.liabilities.payableDetail.length" class="bg-white rounded-xl border border-gray-100 p-4">
-          <h3 class="font-semibold text-sm text-gray-700 mb-3">📋 应付账款明细</h3>
+          <h3 class="font-semibold text-sm text-gray-700 mb-3"><Icon name="clipboard" class="inline w-4 h-4 -mt-0.5 mr-1" /> 应付账款明细</h3>
           <table class="w-full text-xs">
             <thead><tr class="text-gray-500"><th class="text-left pb-2">供应商</th><th class="text-right pb-2">未付金额</th></tr></thead>
             <tbody class="divide-y divide-gray-50">
@@ -529,7 +527,7 @@
           </table>
         </div>
         <div v-if="balanceData.assets.prepaidDetail && balanceData.assets.prepaidDetail.length" class="bg-white rounded-xl border border-gray-100 p-4">
-          <h3 class="font-semibold text-sm text-gray-700 mb-3">💳 预付账款明细</h3>
+          <h3 class="font-semibold text-sm text-gray-700 mb-3"><Icon name="credit-card" class="inline w-4 h-4 -mt-0.5 mr-1" /> 预付账款明细</h3>
           <table class="w-full text-xs">
             <thead><tr class="text-gray-500"><th class="text-left pb-2">供应商</th><th class="text-right pb-2">未核销</th></tr></thead>
             <tbody class="divide-y divide-gray-50">
@@ -541,7 +539,7 @@
           </table>
         </div>
         <div v-if="balanceData.assets.otherRecvDetail && balanceData.assets.otherRecvDetail.length" class="bg-white rounded-xl border border-gray-100 p-4">
-          <h3 class="font-semibold text-sm text-gray-700 mb-3">📝 其他应收款明细</h3>
+          <h3 class="font-semibold text-sm text-gray-700 mb-3"><Icon name="edit" class="inline w-4 h-4 -mt-0.5 mr-1" /> 其他应收款明细</h3>
           <table class="w-full text-xs">
             <thead><tr class="text-gray-500"><th class="text-left pb-2">类型</th><th class="text-left pb-2">对方</th><th class="text-right pb-2">未收金额</th></tr></thead>
             <tbody class="divide-y divide-gray-50">
@@ -717,7 +715,7 @@
       <!-- Shareholder Allocation -->
       <div class="bg-white rounded-xl border border-gray-100 mt-4 overflow-hidden">
         <div class="px-6 py-4 border-b border-gray-100">
-          <h3 class="font-bold text-gray-800">👥 股东权益分配</h3>
+          <h3 class="font-bold text-gray-800"><Icon name="users" class="inline w-4 h-4 -mt-0.5 mr-1" /> 股东权益分配</h3>
           <p class="text-xs text-gray-500 mt-1">任凯智 60%（董事长） / 王孟南 40%（IP）</p>
         </div>
         <div class="overflow-x-auto">
@@ -743,7 +741,7 @@
 
     <!-- Empty State -->
     <div v-if="!loading && !hasData" class="bg-white rounded-xl border border-gray-100 p-12 text-center">
-      <div class="text-4xl mb-3">📊</div>
+      <div class="text-4xl mb-3"><Icon name="gauge" class="inline w-4 h-4 -mt-0.5 mr-1" /></div>
       <div class="text-gray-500">请选择日期范围后点击「查询」生成财务报表</div>
     </div>
   </div>
@@ -754,6 +752,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/auth'
 import { loadXLSX } from '../lib/xlsxLoader'
+import Icon from '../components/icons/Icons.vue'
 // BUG-4 修复：所有"账面净利润"统一从 financialMetrics.computeIncomeStatement 取
 // loadIncome 和 loadEquity 都调用此函数，确保跨 tab 数字一致
 import { computeIncomeStatement } from '../utils/financialMetrics'

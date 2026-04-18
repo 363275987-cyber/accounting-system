@@ -12,8 +12,7 @@
           {{ showCreateForm ? '收起' : '+ 批量创建' }}
         </button>
         <button @click="triggerImport"
-          class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700 transition cursor-pointer">
-          📥 Excel导入
+          class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700 transition cursor-pointer"><Icon name="download" class="inline w-4 h-4 -mt-0.5 mr-1" /> Excel导入
         </button>
         <input ref="fileInput" type="file" accept=".xlsx,.xls,.csv" class="hidden" @change="handleImport" />
       </div>
@@ -65,7 +64,7 @@
       <div class="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[80vh] flex flex-col mx-4">
         <div class="flex items-center justify-between p-5 border-b border-gray-100">
           <div>
-            <h2 class="font-semibold text-gray-800">📥 Excel导入预览</h2>
+            <h2 class="font-semibold text-gray-800"><Icon name="download" class="inline w-4 h-4 -mt-0.5 mr-1" /> Excel导入预览</h2>
             <p class="text-xs text-gray-500 mt-1">已解析 {{ importData.length }} 条，可编辑后提交</p>
           </div>
           <button @click="showImportPreview = false" class="text-gray-500 hover:text-gray-600 text-lg cursor-pointer">✕</button>
@@ -274,6 +273,7 @@ import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/auth'
 import { formatDate, formatMoney, toast, debounce } from '../lib/utils'
 import Skeleton from '../components/Skeleton.vue'
+import Icon from '../components/icons/Icons.vue'
 
 const authStore = useAuthStore()
 const loading = ref(false)

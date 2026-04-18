@@ -3,7 +3,7 @@
     <!-- Header -->
     <div class="flex items-center justify-between mb-6">
       <div>
-        <h1 class="text-xl font-bold text-gray-800">🏷️ 支出类别管理</h1>
+        <h1 class="text-xl font-bold text-gray-800"><Icon name="tag" class="inline w-4 h-4 -mt-0.5 mr-1" /> 支出类别管理</h1>
         <p class="text-sm text-gray-500 mt-1">管理支出分类，新增、编辑或停用类别</p>
       </div>
       <button @click="showCreateForm = !showCreateForm"
@@ -123,6 +123,7 @@ import { ref, computed, nextTick, onMounted } from 'vue'
 import { supabase } from '../lib/supabase'
 import { formatDate, toast } from '../lib/utils'
 import Skeleton from '../components/Skeleton.vue'
+import Icon from '../components/icons/Icons.vue'
 
 const loading = ref(false)
 const creating = ref(false)

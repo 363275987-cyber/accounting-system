@@ -3,12 +3,12 @@
     <!-- Header -->
     <div class="flex items-center justify-between mb-4 md:mb-6">
       <div>
-        <h1 class="text-lg md:text-xl font-bold text-gray-800 truncate">🛒 电商订单</h1>
+        <h1 class="text-lg md:text-xl font-bold text-gray-800 truncate"><Icon name="shopping-bag" class="inline w-4 h-4 -mt-0.5 mr-1" /> 电商订单</h1>
         <p class="text-xs text-gray-500 mt-0.5">管理所有电商平台导入的订单</p>
       </div>
       <div class="flex items-center gap-2 shrink-0">
-        <button v-if="canDelete" @click="showImportModal = true" class="hidden md:inline-flex bg-green-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-green-700 transition cursor-pointer whitespace-nowrap">📥 导入订单</button>
-        <button @click="handleExport" class="hidden md:inline-flex px-3 py-2 rounded-lg text-sm border border-gray-200 text-gray-600 hover:bg-gray-50 cursor-pointer transition">📤 导出</button>
+        <button v-if="canDelete" @click="showImportModal = true" class="hidden md:inline-flex bg-green-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-green-700 transition cursor-pointer whitespace-nowrap"><Icon name="download" class="inline w-4 h-4 -mt-0.5 mr-1" /> 导入订单</button>
+        <button @click="handleExport" class="hidden md:inline-flex px-3 py-2 rounded-lg text-sm border border-gray-200 text-gray-600 hover:bg-gray-50 cursor-pointer transition"><Icon name="upload" class="inline w-4 h-4 -mt-0.5 mr-1" /> 导出</button>
         <button v-if="selectedOrders.length > 0 && canDelete" @click="handleBatchDelete"
           class="px-3 py-2 bg-red-50 text-red-600 rounded-lg text-sm hover:bg-red-100 cursor-pointer transition">
           🗑️ 删除 ({{ selectedOrders.length }})
@@ -17,8 +17,8 @@
         <div class="relative md:hidden">
           <button @click="showMobileMenu = !showMobileMenu" class="px-2.5 py-2 rounded-lg text-sm border border-gray-200 text-gray-600 hover:bg-gray-50 cursor-pointer">⋯</button>
           <div v-if="showMobileMenu" class="absolute right-0 top-full mt-1 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50 min-w-[140px]">
-            <button v-if="canDelete" @click="showImportModal = true; showMobileMenu = false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer">📥 导入订单</button>
-            <button @click="handleExport(); showMobileMenu = false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer">📤 导出</button>
+            <button v-if="canDelete" @click="showImportModal = true; showMobileMenu = false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer"><Icon name="download" class="inline w-4 h-4 -mt-0.5 mr-1" /> 导入订单</button>
+            <button @click="handleExport(); showMobileMenu = false" class="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 cursor-pointer"><Icon name="upload" class="inline w-4 h-4 -mt-0.5 mr-1" /> 导出</button>
           </div>
         </div>
       </div>
@@ -68,7 +68,7 @@
       <input type="date" v-model="filters.dateFrom" @change="loadOrders" class="px-2 py-2 border border-gray-200 rounded-lg text-sm">
       <span class="text-gray-400 text-xs">~</span>
       <input type="date" v-model="filters.dateTo" @change="loadOrders" class="px-2 py-2 border border-gray-200 rounded-lg text-sm">
-      <button @click="loadOrders" class="px-3 py-2 bg-blue-50 text-blue-600 rounded-lg text-sm hover:bg-blue-100 cursor-pointer">🔍</button>
+      <button @click="loadOrders" class="px-3 py-2 bg-blue-50 text-blue-600 rounded-lg text-sm hover:bg-blue-100 cursor-pointer"><Icon name="search" class="inline w-4 h-4 -mt-0.5 mr-1" /></button>
       <button v-if="hasActiveFilters" @click="clearFilters" class="px-3 py-2 text-gray-500 rounded-lg text-sm hover:bg-gray-100 cursor-pointer">✕ 清除</button>
       <span class="text-xs text-gray-500 ml-auto">共 {{ pagination.total }} 条</span>
     </div>
@@ -187,7 +187,7 @@
     <div v-if="showDetail" class="fixed inset-0 bg-black/30 flex items-center justify-center z-50" @click.self="showDetail = false">
       <div class="bg-white rounded-2xl shadow-2xl w-full md:max-w-lg md:mx-4 overflow-hidden max-h-[90vh] flex flex-col">
         <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
-          <h2 class="font-bold text-gray-800">🛒 电商订单详情</h2>
+          <h2 class="font-bold text-gray-800"><Icon name="shopping-bag" class="inline w-4 h-4 -mt-0.5 mr-1" /> 电商订单详情</h2>
           <button @click="showDetail = false" class="text-gray-500 hover:text-gray-600 text-xl cursor-pointer">&times;</button>
         </div>
         <div class="p-6 overflow-y-auto space-y-3" v-if="detailOrder">
@@ -284,7 +284,7 @@
     <div v-if="showImportModal" class="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] pb-16 md:pb-0" @click.self="showImportModal = false">
       <div class="bg-white rounded-2xl w-full max-w-lg mx-4 max-h-[85vh] flex flex-col overflow-hidden">
         <div class="shrink-0 px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-          <h2 class="font-bold text-gray-800">🛒 电商订单导入</h2>
+          <h2 class="font-bold text-gray-800"><Icon name="shopping-bag" class="inline w-4 h-4 -mt-0.5 mr-1" /> 电商订单导入</h2>
           <button @click="closeImport" class="text-gray-500 hover:text-gray-600 cursor-pointer text-xl">&times;</button>
         </div>
         <div class="flex-1 overflow-y-auto px-6 py-4 space-y-4">
@@ -318,9 +318,9 @@
             <div v-else class="text-left">
               <div class="text-sm font-medium text-gray-800 mb-2">📄 {{ importFileName }}</div>
               <div class="text-xs text-gray-600 space-y-1">
-                <div>📦 销售订单：{{ importSalesCount }} 条</div>
+                <div><Icon name="package" class="inline w-4 h-4 -mt-0.5 mr-1" /> 销售订单：{{ importSalesCount }} 条</div>
                 <div>↩️ 售后订单：{{ importAfterSalesCount }} 条</div>
-                <div class="text-green-600 font-medium">✅ 对冲后有效订单：{{ importEffectiveCount }} 条</div>
+                <div class="text-green-600 font-medium"><Icon name="check-circle" class="inline w-4 h-4 -mt-0.5 mr-1" /> 对冲后有效订单：{{ importEffectiveCount }} 条</div>
                 <div v-if="importSkipped > 0" class="text-gray-500">⏭️ 跳过：{{ importSkipped }} 条</div>
               </div>
             </div>
@@ -334,9 +334,9 @@
           <div v-if="importResult" class="rounded-lg p-3" :class="importResult.failures?.length ? 'bg-orange-50' : 'bg-green-50'">
             <div class="text-sm font-medium mb-1" :class="importResult.failures?.length ? 'text-orange-700' : 'text-green-700'">导入完成</div>
             <div class="text-xs space-y-0.5">
-              <div class="text-green-600">✅ 成功：{{ importResult.success }} 条</div>
+              <div class="text-green-600"><Icon name="check-circle" class="inline w-4 h-4 -mt-0.5 mr-1" /> 成功：{{ importResult.success }} 条</div>
               <div v-if="importResult.duplicate" class="text-gray-500">⏭️ 重复跳过：{{ importResult.duplicate }} 条</div>
-              <div v-if="importResult.failures?.length" class="text-red-500">❌ 失败：{{ importResult.failures.length }} 条</div>
+              <div v-if="importResult.failures?.length" class="text-red-500"><Icon name="x-circle" class="inline w-4 h-4 -mt-0.5 mr-1" /> 失败：{{ importResult.failures.length }} 条</div>
             </div>
           </div>
         </div>
@@ -361,6 +361,7 @@ import { formatMoney, PLATFORM_LABELS, toast } from '../lib/utils'
 import { useAuthStore } from '../stores/auth'
 import { logOperation } from '../utils/operationLogger'
 import { dayEnd } from '../utils/dateRange'
+import Icon from '../components/icons/Icons.vue'
 
 const auth = useAuthStore()
 
