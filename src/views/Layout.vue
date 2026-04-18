@@ -26,10 +26,12 @@
       :class="isMobile ? (sidebarOpen ? 'translate-x-0' : '-translate-x-full') : 'translate-x-0'"
     >
       <div class="p-5 border-b border-gray-100">
-        <div class="flex items-center gap-2">
-          <span class="text-2xl">🎱</span>
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center shadow-sm shadow-blue-500/30">
+            <Icon name="sparkle" class="w-4 h-4" />
+          </div>
           <div>
-            <div class="font-bold text-gray-800 text-sm">台球账目系统</div>
+            <div class="font-bold text-gray-800 text-sm tracking-tight">台球账目系统</div>
             <div class="text-xs text-gray-500">{{ profile?.name || '未登录' }}</div>
           </div>
         </div>
@@ -43,7 +45,7 @@
           :class="$route.path === '/' ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-50'"
           @click="closeSidebar"
         >
-          <span class="text-base">📊</span>
+          <Icon name="home" class="w-4 h-4" />
           <span class="flex-1">收支总览</span>
         </router-link>
 
@@ -53,10 +55,10 @@
             class="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 transition cursor-pointer mt-1"
           >
             <span class="flex items-center gap-2.5">
-              <span class="text-base">{{ group.icon }}</span>
+              <Icon :name="group.icon" class="w-4 h-4 text-gray-500" />
               <span>{{ group.label }}</span>
             </span>
-            <svg class="w-3.5 h-3.5 text-gray-300 transition-transform duration-200 flex-shrink-0" :class="collapsedGroups[gIndex] ? '' : 'rotate-180'" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
+            <Icon name="chevron-down" class="w-3.5 h-3.5 text-gray-300 transition-transform duration-200 flex-shrink-0" :class="collapsedGroups[gIndex] ? '-rotate-90' : ''" />
           </button>
           <div v-show="!collapsedGroups[gIndex]" class="space-y-0.5 ml-2 pl-3 border-l-2 border-gray-100">
             <router-link
@@ -96,25 +98,25 @@
     </main>
 
     <!-- Mobile Bottom Tab Bar -->
-    <nav v-if="isMobile" aria-label="底部导航" class="fixed bottom-0 left-0 right-0 h-14 bg-white border-t border-gray-200 z-50 flex items-center justify-around md:hidden">
-      <router-link to="/" class="flex flex-col items-center justify-center flex-1 h-full transition-colors active:scale-90 active:opacity-70" :class="$route.path === '/' ? 'text-blue-600' : 'text-gray-500'">
-        <span class="text-lg leading-none mb-0.5">📊</span>
-        <span class="text-[10px] leading-none">首页</span>
+    <nav v-if="isMobile" aria-label="底部导航" class="fixed bottom-0 left-0 right-0 h-14 bg-white/90 backdrop-blur-xl border-t border-gray-200 z-50 flex items-center justify-around md:hidden">
+      <router-link to="/boss" class="flex flex-col items-center justify-center flex-1 h-full transition-colors active:scale-90 active:opacity-70" :class="$route.path === '/boss' ? 'text-blue-600' : 'text-gray-500'">
+        <Icon name="gauge" class="w-5 h-5 mb-0.5" />
+        <span class="text-[10px] leading-none">看板</span>
       </router-link>
       <router-link to="/orders" class="flex flex-col items-center justify-center flex-1 h-full transition-colors active:scale-90 active:opacity-70" :class="$route.path === '/orders' ? 'text-blue-600' : 'text-gray-500'">
-        <span class="text-lg leading-none mb-0.5">📝</span>
+        <Icon name="edit" class="w-5 h-5 mb-0.5" />
         <span class="text-[10px] leading-none">订单</span>
       </router-link>
       <router-link to="/expenses" class="flex flex-col items-center justify-center flex-1 h-full transition-colors active:scale-90 active:opacity-70" :class="$route.path === '/expenses' ? 'text-blue-600' : 'text-gray-500'">
-        <span class="text-lg leading-none mb-0.5">💸</span>
+        <Icon name="wallet" class="w-5 h-5 mb-0.5" />
         <span class="text-[10px] leading-none">收支</span>
       </router-link>
       <router-link to="/accounts" class="flex flex-col items-center justify-center flex-1 h-full transition-colors active:scale-90 active:opacity-70" :class="$route.path === '/accounts' ? 'text-blue-600' : 'text-gray-500'">
-        <span class="text-lg leading-none mb-0.5">🏦</span>
+        <Icon name="building" class="w-5 h-5 mb-0.5" />
         <span class="text-[10px] leading-none">账户</span>
       </router-link>
       <button @click="sidebarOpen = true" aria-label="更多菜单" class="flex flex-col items-center justify-center flex-1 h-full text-gray-500 transition-colors active:scale-90 active:opacity-70 cursor-pointer">
-        <span class="text-lg leading-none mb-0.5">☰</span>
+        <svg class="w-5 h-5 mb-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
         <span class="text-[10px] leading-none">更多</span>
       </button>
     </nav>
@@ -127,6 +129,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { usePermission } from '../composables/usePermission'
 import { supabase } from '../lib/supabase'
+import Icon from '../components/icons/Icons.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -232,7 +235,7 @@ const menuGroups = computed(() => {
   // 仓库角色只能看库存相关
   if (r === 'warehouse') {
     groups.push({
-      icon: '🗄️',
+      icon: 'database',
       label: '库存管理',
       items: [
         { label: '仓库管理', path: '/warehouses' },
@@ -251,7 +254,7 @@ const menuGroups = computed(() => {
 
   // 📊 经营看板(手机端老板首选)
   groups.push({
-    icon: '📊',
+    icon: 'gauge',
     label: '经营看板',
     items: [
       { label: '老板看板', path: '/boss' },
@@ -260,7 +263,7 @@ const menuGroups = computed(() => {
 
   // ✏️ 业务登记
   groups.push({
-    icon: '✏️',
+    icon: 'edit',
     label: '业务登记',
     items: [
       { label: '订单管理', path: '/orders' },
@@ -271,7 +274,7 @@ const menuGroups = computed(() => {
 
   // 📦 产品与电商
   groups.push({
-    icon: '📦',
+    icon: 'package',
     label: '产品与电商',
     items: [
       { label: '产品库', path: '/products' },
@@ -284,7 +287,7 @@ const menuGroups = computed(() => {
 
   // 💰 资金管理
   groups.push({
-    icon: '💰',
+    icon: 'wallet',
     label: '资金管理',
     items: [
       { label: '账户管理', path: '/accounts' },
@@ -298,7 +301,7 @@ const menuGroups = computed(() => {
 
   // 📒 财务台账
   groups.push({
-    icon: '📒',
+    icon: 'book-open',
     label: '财务台账',
     items: [
       { label: '固定资产', path: '/fixed-assets' },
@@ -314,7 +317,7 @@ const menuGroups = computed(() => {
 
   // 👥 团队与业绩
   groups.push({
-    icon: '👥',
+    icon: 'users',
     label: '团队与业绩',
     items: [
       { label: '业绩总览', path: '/performance' },
@@ -329,7 +332,7 @@ const menuGroups = computed(() => {
 
   // 🏪 平台与对接
   groups.push({
-    icon: '🏪',
+    icon: 'store',
     label: '平台与对接',
     items: [
       { label: '平台管理', path: '/platforms' },
@@ -340,7 +343,7 @@ const menuGroups = computed(() => {
 
   // 🗄️ 库存管理
   groups.push({
-    icon: '🗄️',
+    icon: 'database',
     label: '库存管理',
     items: [
       { label: '仓库管理', path: '/warehouses' },
@@ -352,7 +355,7 @@ const menuGroups = computed(() => {
 
   // 📊 报表
   groups.push({
-    icon: '📊',
+    icon: 'gauge',
     label: '报表',
     items: [
       { label: '财务报表', path: '/reports' },
@@ -362,7 +365,7 @@ const menuGroups = computed(() => {
   // ⚙️ 系统
   if (auth.isFinance) {
     groups.push({
-      icon: '⚙️',
+      icon: 'settings',
       label: '系统',
       items: [
         { label: '用户管理', path: '/users' },

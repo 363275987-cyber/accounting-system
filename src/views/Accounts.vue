@@ -26,29 +26,29 @@
       <div @click="filters.category = 'personal'; activeTab = 'active'"
         :class="filters.category === 'personal' && activeTab === 'active' ? 'border-blue-300 ring-2 ring-blue-100' : 'border-gray-100'"
         class="bg-white rounded-xl border p-3 cursor-pointer hover:shadow-sm transition">
-        <div class="text-xs text-gray-500 mb-1">👤 个人账户</div>
-        <div class="text-xl md:text-2xl font-bold" :class="personalTotal >= 0 ? 'text-green-600' : 'text-red-500'">{{ formatMoney(personalTotal) }}</div>
+        <div class="text-xs text-gray-500 mb-1 flex items-center gap-1"><Icon name="user" class="w-3 h-3"/> 个人账户</div>
+        <div class="text-xl md:text-2xl font-bold tabular-nums" :class="personalTotal >= 0 ? 'text-green-600' : 'text-red-500'">{{ formatMoney(personalTotal) }}</div>
         <div class="text-[11px] text-gray-500 mt-1">{{ personalCount }} 个账户</div>
       </div>
       <div @click="filters.category = 'company'; activeTab = 'active'"
         :class="filters.category === 'company' && activeTab === 'active' ? 'border-blue-300 ring-2 ring-blue-100' : 'border-gray-100'"
         class="bg-white rounded-xl border p-3 cursor-pointer hover:shadow-sm transition">
-        <div class="text-xs text-gray-500 mb-1">🏢 企业账户</div>
-        <div class="text-xl md:text-2xl font-bold" :class="companyTotal >= 0 ? 'text-green-600' : 'text-red-500'">{{ formatMoney(companyTotal) }}</div>
+        <div class="text-xs text-gray-500 mb-1 flex items-center gap-1"><Icon name="building" class="w-3 h-3"/> 企业账户</div>
+        <div class="text-xl md:text-2xl font-bold tabular-nums" :class="companyTotal >= 0 ? 'text-green-600' : 'text-red-500'">{{ formatMoney(companyTotal) }}</div>
         <div class="text-[11px] text-gray-500 mt-1">{{ companyCount }} 个账户</div>
       </div>
       <div @click="activeTab = 'detail'; setDetailToday()"
         :class="activeTab === 'detail' ? 'border-blue-300 ring-2 ring-blue-100' : 'border-gray-100'"
         class="bg-white rounded-xl border p-3 cursor-pointer hover:shadow-sm transition">
-        <div class="text-xs text-gray-500 mb-1">📈 今日收入</div>
-        <div class="text-xl md:text-2xl font-bold text-green-600">+{{ formatMoney(todayStats.increase) }}</div>
+        <div class="text-xs text-gray-500 mb-1 flex items-center gap-1"><Icon name="trending-up" class="w-3 h-3 text-emerald-500"/> 今日收入</div>
+        <div class="text-xl md:text-2xl font-bold text-green-600 tabular-nums">+{{ formatMoney(todayStats.increase) }}</div>
         <div class="text-[11px] text-gray-500 mt-1">{{ todayStats.incAccounts }} 个账户入账</div>
       </div>
       <div @click="activeTab = 'detail'; setDetailToday()"
         :class="activeTab === 'detail' ? 'border-blue-300 ring-2 ring-blue-100' : 'border-gray-100'"
         class="bg-white rounded-xl border p-3 cursor-pointer hover:shadow-sm transition">
-        <div class="text-xs text-gray-500 mb-1">📉 今日支出</div>
-        <div class="text-xl md:text-2xl font-bold text-red-500">-{{ formatMoney(todayStats.decrease) }}</div>
+        <div class="text-xs text-gray-500 mb-1 flex items-center gap-1"><Icon name="trending-down" class="w-3 h-3 text-rose-500"/> 今日支出</div>
+        <div class="text-xl md:text-2xl font-bold text-red-500 tabular-nums">-{{ formatMoney(todayStats.decrease) }}</div>
         <div class="text-[11px] text-gray-500 mt-1">{{ todayStats.decAccounts }} 个账户出账</div>
       </div>
     </div>
@@ -649,6 +649,7 @@
 <script setup>
 import { ref, computed, onMounted, reactive, watch } from 'vue'
 import BalanceFlowDrawer from '../components/BalanceFlowDrawer.vue'
+import Icon from '../components/icons/Icons.vue'
 import { useAuthStore } from '../stores/auth'
 import { useAccountStore } from '../stores/accounts'
 import { supabase } from '../lib/supabase'
