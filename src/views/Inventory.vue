@@ -523,12 +523,12 @@ function openEditModal(item) {
 
 async function submitEdit() {
   if (editForm.newQuantity === null || editForm.newQuantity === '') {
-    alert('请输入新库存数量')
+    toast('请输入新库存数量', 'error')
     return
   }
   const diff = editForm.newQuantity - editForm.currentQuantity
   if (diff === 0) {
-    alert('库存数量未变化')
+    toast('库存数量未变化', 'error')
     return
   }
   submitting.value = true
@@ -541,11 +541,11 @@ async function submitEdit() {
       p_note: editForm.note || `编辑调整：${editForm.currentQuantity} → ${editForm.newQuantity}`,
     })
     if (error) throw error
-    alert('库存修改成功')
+    toast('库存修改成功', 'success')
     showEditModal.value = false
     loadData()
   } catch (e) {
-    alert('操作失败：' + (e.message || '未知错误'))
+    toast('操作失败：' + (e.message || '未知错误'), 'error')
   } finally {
     submitting.value = false
   }
@@ -571,10 +571,10 @@ async function deleteItem(item) {
     
     const { error } = await supabase.from('inventory').delete().eq('id', item.id)
     if (error) throw error
-    alert('删除成功')
+    toast('删除成功', 'success')
     loadData()
   } catch (e) {
-    alert('删除失败：' + (e.message || '未知错误'))
+    toast('删除失败：' + (e.message || '未知错误'), 'error')
   }
 }
 
@@ -590,7 +590,7 @@ function openAdjustModal() {
 
 async function submitAdjust() {
   if (!adjustForm.warehouseId || !adjustForm.productId || !adjustForm.type || !adjustForm.quantity) {
-    alert('请填写所有必填字段')
+    toast('请填写所有必填字段', 'error')
     return
   }
   submitting.value = true
@@ -602,11 +602,11 @@ async function submitAdjust() {
       adjustForm.type,
       adjustForm.note
     )
-    alert('库存调整成功')
+    toast('库存调整成功', 'success')
     showAdjustModal.value = false
     loadData()
   } catch (e) {
-    alert('操作失败：' + (e.message || '未知错误'))
+    toast('操作失败：' + (e.message || '未知错误'), 'error')
   } finally {
     submitting.value = false
   }
@@ -623,11 +623,11 @@ function openTransferModal() {
 
 async function submitTransfer() {
   if (!transferForm.fromWarehouseId || !transferForm.toWarehouseId || !transferForm.productId || !transferForm.quantity) {
-    alert('请填写所有必填字段')
+    toast('请填写所有必填字段', 'error')
     return
   }
   if (transferForm.fromWarehouseId === transferForm.toWarehouseId) {
-    alert('源仓库和目标仓库不能相同')
+    toast('源仓库和目标仓库不能相同', 'error')
     return
   }
   submitting.value = true
@@ -639,11 +639,11 @@ async function submitTransfer() {
       transferForm.quantity,
       transferForm.note
     )
-    alert('调拨成功')
+    toast('调拨成功', 'success')
     showTransferModal.value = false
     loadData()
   } catch (e) {
-    alert('操作失败：' + (e.message || '未知错误'))
+    toast('操作失败：' + (e.message || '未知错误'), 'error')
   } finally {
     submitting.value = false
   }

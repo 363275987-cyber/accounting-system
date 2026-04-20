@@ -334,6 +334,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { supabase } from '../lib/supabase'
+import { toast } from '../lib/utils'
 import { usePermission } from '../composables/usePermission'
 import { useAuthStore } from '../stores/auth'
 import Skeleton from '../components/Skeleton.vue'
@@ -555,10 +556,10 @@ async function saveCustomer() {
     }
     if (editingCustomer.value) {
       const { error } = await supabase.from('customers').update(payload).eq('id', editingCustomer.value.id)
-      if (error) return alert('保存失败：' + error.message)
+      if (error) { toast('保存失败：' + error.message, 'error'); return }
     } else {
       const { error } = await supabase.from('customers').insert(payload)
-      if (error) return alert('添加失败：' + error.message)
+      if (error) { toast('添加失败：' + error.message, 'error'); return }
     }
     showModal.value = false
     await loadData()
@@ -582,7 +583,7 @@ async function openDetail(id) {
       .eq('id', id)
       .maybeSingle()
     if (ce) throw ce
-    if (!cust) { alert('未找到客户'); return }
+    if (!cust) { toast('未找到客户', 'error'); return }
 
     // 2) 按 phone 拉订单
     let orders = []
@@ -642,7 +643,7 @@ async function openDetail(id) {
     }
   } catch (e) {
     console.error('openDetail exception:', e)
-    alert('加载异常: ' + (e.message || '未知错误'))
+    toast('加载异常: ' + (e.message || '未知错误'), 'error')
   }
 }
 
@@ -695,14 +696,14 @@ async function manualSync() {
     const { error } = await supabase.rpc('sync_customers_from_orders')
     if (error) {
       console.error('[Customers] sync_customers_from_orders error:', error)
-      alert('同步失败：' + error.message)
+      toast('同步失败：' + error.message, 'error')
       return
     }
     await Promise.all([loadData(), loadSummary(), loadTodayNewCustomers()])
-    alert('同步完成')
+    toast('同步完成', 'success')
   } catch (e) {
     console.error('[Customers] sync_customers_from_orders exception:', e)
-    alert('同步异常：' + (e?.message || '未知错误'))
+    toast('同步异常：' + (e?.message || '未知错误'), 'error')
   } finally {
     syncing.value = false
   }

@@ -1491,7 +1491,8 @@ async function deleteTypeKeyword(id) {
   const kw = typeKeywords.value.find(t => t.id === id)
   if (!kw) return
   if (!confirm(`确定删除关键词「${kw.keyword}」？`)) return
-  await supabase.from('transaction_type_keywords').delete().eq('id', id)
+  const { error } = await supabase.from('transaction_type_keywords').delete().eq('id', id)
+  if (error) { toast('删除失败：' + error.message, 'error'); return }
   typeKeywords.value = typeKeywords.value.filter(t => t.id !== id)
   toast('已删除', 'success')
 }
@@ -2772,43 +2773,22 @@ async function handleReceiptUpload(event, target) {
   }
   target._uploading = true
   try {
-    const ext = file.name.split('.').pop() || 'jpg'
+    const ext = (file.name.split('.').pop() || 'jpg').toLowerCase()
+    const ALLOWED_EXT = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf']
+    if (!ALLOWED_EXT.includes(ext)) {
+      toast('不支持的文件类型，请上传图片或 PDF', 'error')
+      event.target.value = ''
+      target._uploading = false
+      return
+    }
     const fileName = `receipts/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`
 
-    // 先尝试用当前 session 上传（需 RLS 策略）
-    let uploadData = null
-    let uploadError = null
-    const result = await supabase.storage.from('expense-receipts').upload(fileName, file, {
+    const { data: uploadData, error: uploadError } = await supabase.storage.from('expense-receipts').upload(fileName, file, {
       cacheControl: '3600',
       upsert: false,
     })
-    uploadData = result.data
-    uploadError = result.error
 
-    // 如果 RLS 拒绝了，用 fetch + service role key 直接上传（内部系统可信场景）
-    if (uploadError && (uploadError.message?.includes('row-level security') || uploadError.statusCode === '403' || uploadError.statusCode === 403)) {
-      console.warn('[凭证上传] RLS 拦截，使用 service role 上传...')
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-      const serviceKey = import.meta.env.VITE_SUPABASE_SERVICE_KEY
-      if (!serviceKey) {
-        throw new Error('凭证上传需要配置 VITE_SUPABASE_SERVICE_KEY 环境变量（或在 Supabase 控制台为 expense-receipts 桶添加 INSERT 策略）')
-      }
-      const resp = await fetch(`${supabaseUrl}/storage/v1/object/expense-receipts/${fileName}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${serviceKey}`,
-          'Content-Type': file.type || 'application/octet-stream',
-          'x-upsert': 'false',
-        },
-        body: file,
-      })
-      if (!resp.ok) {
-        const errBody = await resp.text()
-        throw new Error(`上传失败 (${resp.status}): ${errBody}`)
-      }
-      const respData = await resp.json()
-      uploadData = { path: respData.Key || fileName }
-    } else if (uploadError) {
+    if (uploadError) {
       throw uploadError
     }
 

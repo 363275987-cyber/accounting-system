@@ -203,10 +203,9 @@ async function loadDashboard() {
   dbError.value = null
 
   try {
-    await loadTodayStats()
-    if (authStore.isFinance) {
-      await loadFinanceDashboard()
-    }
+    const tasks = [loadTodayStats()]
+    if (authStore.isFinance) tasks.push(loadFinanceDashboard())
+    await Promise.all(tasks)
   } catch (err) {
     console.error('加载仪表盘失败:', err)
     dbError.value = '数据库未连接，部分数据加载失败'
@@ -246,6 +245,7 @@ async function loadTodayStats() {
     }
   } catch (e) {
     console.error('加载今日数据失败:', e)
+    dbError.value = '今日数据加载失败，请刷新页面'
   }
 }
 

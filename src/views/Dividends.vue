@@ -110,12 +110,12 @@
             <td class="px-4 py-3 text-sm text-gray-500 max-w-[150px] truncate">{{ row.note || '-' }}</td>
             <td class="px-4 py-3 text-center">
               <div v-if="row.status === 'pending' && canEdit" class="flex items-center justify-center gap-2">
-                <button @click="confirmPay(row)"
-                  class="text-xs text-green-600 hover:text-green-700 font-medium cursor-pointer">
+                <button @click="confirmPay(row)" :disabled="paying === row.id || deleting === row.id"
+                  class="text-xs text-green-600 hover:text-green-700 font-medium cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
                   确认发放
                 </button>
-                <button @click="softDelete(row)"
-                  class="text-xs text-red-500 hover:text-red-600 font-medium cursor-pointer">
+                <button @click="softDelete(row)" :disabled="paying === row.id || deleting === row.id"
+                  class="text-xs text-red-500 hover:text-red-600 font-medium cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
                   删除
                 </button>
               </div>
@@ -151,12 +151,12 @@
         </div>
         <div v-if="row.note" class="text-xs text-gray-500 mb-2 truncate">💬 {{ row.note }}</div>
         <div v-if="row.status === 'pending' && canEdit" class="flex items-center gap-2 pt-2 border-t border-gray-50">
-          <button @click="confirmPay(row)"
-            class="flex-1 bg-green-50 text-green-700 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-green-100 transition cursor-pointer">
+          <button @click="confirmPay(row)" :disabled="paying === row.id || deleting === row.id"
+            class="flex-1 bg-green-50 text-green-700 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-green-100 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
             确认发放
           </button>
-          <button @click="softDelete(row)"
-            class="flex-1 bg-red-50 text-red-600 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-red-100 transition cursor-pointer">
+          <button @click="softDelete(row)" :disabled="paying === row.id || deleting === row.id"
+            class="flex-1 bg-red-50 text-red-600 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-red-100 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
             删除
           </button>
         </div>
@@ -329,6 +329,8 @@ const yearOptions = computed(() => {
 // --- Distribute Modal ---
 const showDistributeModal = ref(false)
 const distributing = ref(false)
+const paying = ref(null)
+const deleting = ref(null)
 const distForm = reactive({
   totalAmount: '',
   period: '',
@@ -499,8 +501,9 @@ async function handleDistribute() {
 
 // --- Confirm Pay ---
 async function confirmPay(row) {
+  if (paying.value === row.id) return
   if (!confirm(`确认发放 ${row.shareholder_name} 的 ¥${formatAmount(row.amount)} 分红？`)) return
-
+  paying.value = row.id
   try {
     const today = new Date().toISOString().split('T')[0]
     const { error } = await supabase
@@ -514,13 +517,16 @@ async function confirmPay(row) {
   } catch (e) {
     console.error('Failed to confirm pay:', e)
     toast('确认发放失败: ' + (e.message || '未知错误'), 'error')
+  } finally {
+    paying.value = null
   }
 }
 
 // --- Soft Delete ---
 async function softDelete(row) {
+  if (deleting.value === row.id) return
   if (!confirm(`确认删除 ${row.shareholder_name} 的 ¥${formatAmount(row.amount)} 分红记录？`)) return
-
+  deleting.value = row.id
   try {
     const { error } = await supabase
       .from('dividends')
@@ -533,6 +539,8 @@ async function softDelete(row) {
   } catch (e) {
     console.error('Failed to delete dividend:', e)
     toast('删除失败: ' + (e.message || '未知错误'), 'error')
+  } finally {
+    deleting.value = null
   }
 }
 
