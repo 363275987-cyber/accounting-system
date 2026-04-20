@@ -1,5 +1,5 @@
 const SUPABASE_URL = 'https://cmswoyiuoeqzeassubvw.supabase.co'
-const MANAGEMENT_TOKEN = 'sbp_a256e53dbedbe3c3b40186afd90eb227ffcb76b7'
+const MANAGEMENT_TOKEN = process.env.SUPABASE_MGMT_TOKEN
 const fs = require('fs')
 
 const sql = fs.readFileSync('migrations/002_ecommerce_stores.sql', 'utf-8')

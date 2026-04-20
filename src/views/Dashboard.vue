@@ -237,6 +237,7 @@ async function loadTodayStats() {
         .is('deleted_at', null),
     ])
 
+    if (salesRes.error || orderCountRes.error) throw salesRes.error || orderCountRes.error
     const todaySales = salesRes.data?.reduce((s, r) => s + (Number(r.payment_amount) || 0), 0) || 0
 
     todayStats.value = {

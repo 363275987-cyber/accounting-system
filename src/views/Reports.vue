@@ -1510,24 +1510,27 @@ async function loadEquity() {
   const endISO = endDate.value + 'T23:59:59'
 
   // 期末资产
-  const { data: accounts } = await supabase
+  const { data: accounts, error: accErr } = await supabase
     .from('accounts')
     .select('balance')
     .eq('status', 'active')
+  if (accErr) throw accErr
   const currentAssets = (accounts || []).reduce((s, a) => s + num(a.balance), 0)
 
   // 固定资产
-  const { data: assets } = await supabase
+  const { data: assets, error: assetErr } = await supabase
     .from('assets')
     .select('current_value')
     .eq('status', 'active')
+  if (assetErr) throw assetErr
   const fixedAssets = (assets || []).reduce((s, a) => s + num(a.current_value), 0)
 
   // 期末负债
-  const { data: loans } = await supabase
+  const { data: loans, error: loanErr } = await supabase
     .from('shareholder_loans')
     .select('remaining_principal')
     .eq('status', 'active')
+  if (loanErr) throw loanErr
   const currentLiabilities = (loans || []).reduce((s, l) => s + num(l.remaining_principal), 0)
   const endingEquity = currentAssets + fixedAssets - currentLiabilities
 

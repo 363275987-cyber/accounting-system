@@ -1,5 +1,5 @@
 const fetch = globalThis.fetch
-const MGMT = 'sbp_8219ec827fa5581a888bb317f149fa522b08ffd1'
+const MGMT = process.env.SUPABASE_MGMT_TOKEN
 const PROJECT = 'cmswoyiuoeqzeassubvw'
 
 async function runSQL(sql) {

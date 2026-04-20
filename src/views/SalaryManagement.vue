@@ -1600,7 +1600,7 @@ async function refundExpensesForSalary(row) {
           .eq('id', ex.id)
         if (delErr) {
           // 软删失败：把刚退的钱再扣回来，保持账目一致
-          try { await accountStore.updateBalance(ex.account_id, -amt, '退款回滚', 'salary', row.id) } catch {}
+          try { await accountStore.updateBalance(ex.account_id, -amt, '退款回滚', 'salary', row.id) } catch (rollbackErr) { console.error('[refundExpensesForSalary] 余额回滚失败，需手动核对账户:', rollbackErr) }
           throw delErr
         }
       } catch (e) {
@@ -1668,7 +1668,7 @@ async function undoDelete() {
           .eq('id', rf.expense_id)
         if (restoreErr) {
           // 支出恢复失败：把刚扣的钱退回去
-          try { await accountStore.updateBalance(rf.account_id, Number(rf.amount), '撤销回滚', 'salary', null) } catch {}
+          try { await accountStore.updateBalance(rf.account_id, Number(rf.amount), '撤销回滚', 'salary', null) } catch (rollbackErr) { console.error('[undoDelete] 余额回滚失败，需手动核对账户:', rollbackErr) }
           throw restoreErr
         }
         reReducedCount++
