@@ -306,11 +306,28 @@
               </label>
             </div>
           </div>
-          <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-blue-400 transition"
-               @click="$refs.importFileInput?.click()"
-               @dragover.prevent @drop.prevent="handleImportDrop">
+          <div class="rounded-lg p-6 text-center transition relative overflow-hidden"
+               :class="parseProgress ? 'border-2 border-blue-400 bg-gradient-to-br from-blue-50 to-indigo-50' : 'border-2 border-dashed border-gray-300 cursor-pointer hover:border-blue-400'"
+               @click="parseProgress ? null : $refs.importFileInput?.click()"
+               @dragover.prevent @drop.prevent="parseProgress ? null : handleImportDrop($event)">
             <input ref="importFileInput" type="file" accept=".xlsx,.xls" class="hidden" @change="handleImportFile" />
-            <div v-if="!importParsed">
+            <!-- 解析中状态 -->
+            <div v-if="parseProgress">
+              <div class="absolute top-0 left-0 right-0 h-1 bg-blue-100 overflow-hidden">
+                <div class="ecom-parse-bar h-full w-1/3 bg-blue-500 rounded-full"></div>
+              </div>
+              <div class="flex flex-col items-center justify-center gap-3 py-2">
+                <div class="relative w-10 h-10">
+                  <div class="absolute inset-0 rounded-full border-4 border-blue-200"></div>
+                  <div class="absolute inset-0 rounded-full border-4 border-blue-600 border-t-transparent animate-spin"></div>
+                </div>
+                <div>
+                  <div class="text-sm text-blue-700 font-semibold">{{ parseProgress }}</div>
+                  <div class="text-xs text-blue-400 mt-1">后台线程解析中,页面可继续操作</div>
+                </div>
+              </div>
+            </div>
+            <div v-else-if="!importParsed">
               <div class="text-3xl mb-2">📂</div>
               <div class="text-sm text-gray-600">点击选择 Excel 文件，或拖拽到此处</div>
               <div class="text-xs text-gray-400 mt-1">支持 .xlsx / .xls</div>
@@ -354,9 +371,9 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue'
-import { loadXLSX } from '../lib/xlsxLoader'
 import { supabase } from '../lib/supabase'
-import { parseEcommerceExcel, importEcommerceOrders } from '../lib/ecommerceOrderImporter'
+import { importEcommerceOrders } from '../lib/ecommerceOrderImporter'
+import { parseEcommerceExcelOffMain } from '../lib/excelWorkerClient'
 import { formatMoney, PLATFORM_LABELS, toast } from '../lib/utils'
 import { useAuthStore } from '../stores/auth'
 import { logOperation } from '../utils/operationLogger'
@@ -418,6 +435,7 @@ const importSkipped = ref(0)
 const importing = ref(false)
 const importProgress = ref(null)
 const importResult = ref(null)
+const parseProgress = ref('')  // 解析阶段进度文案 (Worker 运行时显示)
 
 const importPlatformOptions = [
   { key: 'auto', label: '自动识别(根据Sheet名称)' },
@@ -503,27 +521,60 @@ async function loadStats() {
   const now = new Date()
   const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
   try {
-    // 本月订单 & 销售额
-    const { data: monthOrders } = await supabase
+    // 本月订单数：count-only（不传输数据）
+    const countP = supabase
       .from('orders')
-      .select('amount, payment_amount')
+      .select('id', { count: 'exact', head: true })
       .not('platform_type', 'is', null)
       .is('deleted_at', null)
       .gte('created_at', monthStart)
 
-    stats.monthOrders = (monthOrders || []).length
-    stats.monthSales = (monthOrders || []).reduce((s, o) => s + (Number(o.payment_amount || o.amount) || 0), 0)
+    // 本月销售额：只拉 payment_amount 单列，分页聚合（避免 1000 默认截断 & 减小数据量）
+    const salesP = (async () => {
+      let total = 0
+      const PAGE = 1000
+      for (let offset = 0; ; offset += PAGE) {
+        const { data, error } = await supabase
+          .from('orders')
+          .select('payment_amount, amount')
+          .not('platform_type', 'is', null)
+          .is('deleted_at', null)
+          .gte('created_at', monthStart)
+          .range(offset, offset + PAGE - 1)
+        if (error) throw error
+        if (!data || data.length === 0) break
+        for (const o of data) total += Number(o.payment_amount || o.amount) || 0
+        if (data.length < PAGE) break
+      }
+      return total
+    })()
 
-    // 本月退款
-    const { data: monthRefunds } = await supabase
-      .from('refunds')
-      .select('refund_amount, orders!inner(platform_type)')
-      .gte('created_at', monthStart)
-      .is('deleted_at', null)
-      .eq('status', 'completed')
+    // 本月退款：同样分页聚合（只需 refund_amount + 关联平台）
+    const refundP = (async () => {
+      let total = 0
+      const PAGE = 1000
+      for (let offset = 0; ; offset += PAGE) {
+        const { data, error } = await supabase
+          .from('refunds')
+          .select('refund_amount, orders!inner(platform_type)')
+          .gte('created_at', monthStart)
+          .is('deleted_at', null)
+          .eq('status', 'completed')
+          .range(offset, offset + PAGE - 1)
+        if (error) throw error
+        if (!data || data.length === 0) break
+        for (const r of data) {
+          if (r.orders?.platform_type) total += Number(r.refund_amount) || 0
+        }
+        if (data.length < PAGE) break
+      }
+      return total
+    })()
 
-    const ecomRefunds = (monthRefunds || []).filter(r => r.orders?.platform_type)
-    stats.monthRefund = ecomRefunds.reduce((s, r) => s + (Number(r.refund_amount) || 0), 0)
+    const [countRes, salesSum, refundSum] = await Promise.all([countP, salesP, refundP])
+    stats.monthOrders = countRes.count || 0
+    stats.monthSales = salesSum
+    stats.monthRefund = refundSum
   } catch (e) {
     console.error('加载统计失败:', e)
   }
@@ -679,17 +730,17 @@ async function processImportFile(file) {
   importResult.value = null
   importProgress.value = null
 
+  parseProgress.value = '读取文件...'
   try {
-    const data = await file.arrayBuffer()
-    const XLSX = await loadXLSX()
-    const workbook = XLSX.read(data, { type: 'array' })
-
     const options = {
       autoDetect: importPlatform.value === 'auto',
       forcePlatform: importPlatform.value === 'auto' ? null : importPlatform.value,
     }
 
-    const parsed = parseEcommerceExcel(workbook, options)
+    const parsed = await parseEcommerceExcelOffMain(file, options, ({ phase, sheets }) => {
+      if (phase === 'reading') parseProgress.value = '解析 Excel 结构...'
+      else if (phase === 'parsing') parseProgress.value = `处理 ${sheets} 个 sheet...`
+    })
     importParsed.value = parsed
     importSalesCount.value = parsed.salesOrders.length
     importAfterSalesCount.value = parsed.afterSalesOrders.length
@@ -700,6 +751,8 @@ async function processImportFile(file) {
     importEffectiveCount.value = effectiveOrders.length
   } catch (e) {
     toast('文件解析失败: ' + e.message, 'error')
+  } finally {
+    parseProgress.value = ''
   }
 }
 
@@ -756,3 +809,13 @@ onMounted(() => {
   }
 })
 </script>
+
+<style scoped>
+@keyframes ecom-parse-slide {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+.ecom-parse-bar {
+  animation: ecom-parse-slide 1.4s ease-in-out infinite;
+}
+</style>

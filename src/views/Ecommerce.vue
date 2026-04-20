@@ -457,9 +457,9 @@
 <script setup>
 import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { loadXLSX } from '../lib/xlsxLoader'
 import { supabase } from '../lib/supabase'
-import { parseEcommerceExcel, importEcommerceOrders } from '../lib/ecommerceOrderImporter'
+import { importEcommerceOrders } from '../lib/ecommerceOrderImporter'
+import { parseEcommerceExcelOffMain } from '../lib/excelWorkerClient'
 import { useAuthStore } from '../stores/auth'
 import { useAccountStore } from '../stores/accounts'
 import { PLATFORM_FEE_RATES, PLATFORM_LABELS, calcWithdrawFees } from '../lib/platformFees'
@@ -1051,16 +1051,12 @@ async function processImportFile(file) {
   importProgress.value = null
 
   try {
-    const data = await file.arrayBuffer()
-    const XLSX = await loadXLSX()
-    const workbook = XLSX.read(data, { type: 'array' })
-
     const options = {
       autoDetect: importPlatform.value === 'auto',
       forcePlatform: importPlatform.value === 'auto' ? null : importPlatform.value,
     }
 
-    const parsed = parseEcommerceExcel(workbook, options)
+    const parsed = await parseEcommerceExcelOffMain(file, options)
     importParsed.value = parsed
     importSalesCount.value = parsed.salesOrders.length
     importAfterSalesCount.value = parsed.afterSalesOrders.length

@@ -70,10 +70,22 @@
                 @change="handleEcomFileSelect"
               />
             </label>
-            <div v-else class="border-2 border-dashed border-blue-300 rounded-lg p-8 text-center bg-blue-50/50">
-              <div class="text-3xl mb-2 animate-pulse">📊</div>
-              <div class="text-sm text-blue-600 font-medium">正在解析文件...</div>
-              <div class="text-xs text-blue-400 mt-1">大文件可能需要几十秒，请耐心等待</div>
+            <div v-else class="border-2 border-blue-400 rounded-lg p-8 bg-gradient-to-br from-blue-50 to-indigo-50 relative overflow-hidden">
+              <!-- 顶部流动进度条(indeterminate 模式) -->
+              <div class="absolute top-0 left-0 right-0 h-1 bg-blue-100 overflow-hidden">
+                <div class="ecom-indeterminate-bar h-full w-1/3 bg-blue-500 rounded-full"></div>
+              </div>
+              <div class="flex flex-col items-center justify-center gap-3">
+                <!-- 旋转圆环 -->
+                <div class="relative w-12 h-12">
+                  <div class="absolute inset-0 rounded-full border-4 border-blue-200"></div>
+                  <div class="absolute inset-0 rounded-full border-4 border-blue-600 border-t-transparent animate-spin"></div>
+                </div>
+                <div class="text-center">
+                  <div class="text-base text-blue-700 font-semibold">{{ ecomImportProgress || '正在解析文件...' }}</div>
+                  <div class="text-xs text-blue-400 mt-1">后台线程解析中,页面可继续操作,请耐心等待</div>
+                </div>
+              </div>
             </div>
 
             <div v-if="ecomImportError" class="text-red-500 text-sm bg-red-50 rounded-lg px-3 py-2">
@@ -306,3 +318,13 @@ const {
 
 defineExpose({ openEcommerceImportModal })
 </script>
+
+<style scoped>
+@keyframes ecom-indeterminate {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+.ecom-indeterminate-bar {
+  animation: ecom-indeterminate 1.4s ease-in-out infinite;
+}
+</style>

@@ -1,8 +1,8 @@
 import { ref, computed } from 'vue'
 import { supabase } from '../lib/supabase'
-import { parseEcommerceExcel, importEcommerceOrders, platformTypeName } from '../lib/ecommerceOrderImporter'
+import { importEcommerceOrders, platformTypeName } from '../lib/ecommerceOrderImporter'
 import { useAccountStore } from '../stores/accounts'
-import { loadXLSX } from '../lib/xlsxLoader'
+import { parseEcommerceExcelOffMain } from '../lib/excelWorkerClient'
 
 export function useEcommerceImport({ loadOrders, loadStats, loadTodayOrdersData }) {
   const accountStore = useAccountStore()
@@ -96,20 +96,20 @@ export function useEcommerceImport({ loadOrders, loadStats, loadTodayOrdersData 
   async function processEcomImportFile(file) {
     ecomImportError.value = ''
     ecomImporting.value = true
+    ecomImportProgress.value = '读取文件...'
 
     try {
-      // 解析 Excel(懒加载 xlsx 420KB)
-      const data = new Uint8Array(await file.arrayBuffer())
-      const XLSX = await loadXLSX()
-      const workbook = XLSX.read(data, { type: 'array' })
-      const sheetNames = workbook.SheetNames
-
+      // 在 Web Worker 里解析，避免大文件卡主线程
       const forcePlatform = ecomPlatformMode.value === 'auto' ? null : ecomPlatformMode.value
 
-      const { salesOrders, afterSalesOrders, skipped, errors } = parseEcommerceExcel(workbook, {
-        autoDetect: ecomPlatformMode.value === 'auto',
-        forcePlatform,
-      })
+      const { salesOrders, afterSalesOrders, skipped, errors } = await parseEcommerceExcelOffMain(
+        file,
+        { autoDetect: ecomPlatformMode.value === 'auto', forcePlatform },
+        ({ phase, sheets }) => {
+          if (phase === 'reading') ecomImportProgress.value = '解析 Excel 结构...'
+          else if (phase === 'parsing') ecomImportProgress.value = `处理 ${sheets} 个 sheet...`
+        },
+      )
 
       ecomSalesOrders.value = salesOrders
       ecomAfterSalesOrders.value = afterSalesOrders
