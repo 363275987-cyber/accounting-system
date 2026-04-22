@@ -458,12 +458,13 @@
 import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { supabase } from '../lib/supabase'
-import { importEcommerceOrders } from '../lib/ecommerceOrderImporter'
+import { analyzeEcommerceOrderOffset, importEcommerceOrders } from '../lib/ecommerceOrderImporter'
 import { parseEcommerceExcelOffMain } from '../lib/excelWorkerClient'
 import { useAuthStore } from '../stores/auth'
 import { useAccountStore } from '../stores/accounts'
 import { PLATFORM_FEE_RATES, PLATFORM_LABELS, calcWithdrawFees } from '../lib/platformFees'
 import { performStoreWithdrawal } from '../lib/storeWithdrawal'
+import { createStoreDepositWithFallback, revertStoreDepositWithFallback, revertStoreWithdrawalWithFallback } from '../lib/financeTransactions'
 import { logOperation } from '../utils/operationLogger'
 
 const route = useRoute()
@@ -520,25 +521,15 @@ async function doDeposit() {
   if (amt <= 0) { toast('请填入大于 0 的金额', 'warning'); return }
   depositing.value = true
   try {
-    const { data: { session } } = await supabase.auth.getSession()
-    const userId = session?.user?.id
     const isoDate = new Date(f.depositDate + 'T00:00:00+08:00').toISOString()
-    const { error } = await supabase.from('store_deposits').insert({
-      account_id: f.storeId,
+    const result = await createStoreDepositWithFallback({
+      storeId: f.storeId,
       amount: amt,
-      deposit_date: isoDate,
-      note: f.note || null,
-      recorded_by: userId,
-      status: 'completed',
+      depositDate: isoDate,
+      note: f.note || '',
     })
-    if (error) throw error
-    // 同步店铺 balance
-    const acc = accountStore.accounts.find(a => a.id === f.storeId)
-    const oldBal = Number(acc?.balance || 0)
-    const newBal = oldBal + amt
-    const { error: e2 } = await supabase.from('accounts').update({ balance: newBal }).eq('id', f.storeId)
-    if (e2) throw e2
-    if (acc) acc.balance = newBal
+    const oldBal = Number(result?.store_old_balance || 0)
+    const newBal = Number(result?.store_new_balance || oldBal + amt)
     try {
       await logOperation({
         action: 'store_deposit',
@@ -583,8 +574,7 @@ async function revertWithdrawal(w) {
   const storeName = w.from_store?.short_name || '店铺'
   if (!confirm(`撤销这笔提现？\n${storeName} → ¥${Number(w.actual_arrival).toFixed(2)}\n店铺将加回 ¥${Number(w.amount).toFixed(2)}，目标账户扣回 ¥${Number(w.actual_arrival).toFixed(2)}，手续费支出一并撤销。`)) return
   try {
-    const { error } = await supabase.rpc('revert_withdrawal', { p_id: w.id })
-    if (error) throw error
+    await revertStoreWithdrawalWithFallback(w.id, `[老板撤销] ${storeName} 提现撤回`)
     toast('提现已撤销', 'success')
     // 刷新账户余额和提现列表
     accountStore._forceRefresh = true
@@ -601,8 +591,7 @@ async function revertWithdrawalById(withdrawalId, amount) {
   const storeName = storeDetail.value.storeName || '店铺'
   if (!confirm(`撤销这笔提现？\n${storeName} 将加回 ¥${Number(amount).toFixed(2)}，目标账户同步扣回，手续费一并撤销。`)) return
   try {
-    const { error } = await supabase.rpc('revert_withdrawal', { p_id: withdrawalId })
-    if (error) throw error
+    await revertStoreWithdrawalWithFallback(withdrawalId, `[老板撤销] ${storeName} 提现撤回`)
     toast('提现已撤销', 'success')
     accountStore._forceRefresh = true
     await accountStore.fetchAccounts()
@@ -619,8 +608,7 @@ async function revertWithdrawalById(withdrawalId, amount) {
 async function revertDeposit(depositId, amount, storeName) {
   if (!confirm(`撤销这笔入账？${storeName} -¥${Number(amount).toFixed(2)}`)) return
   try {
-    const { error } = await supabase.rpc('revert_store_deposit', { p_id: depositId })
-    if (error) throw error
+    await revertStoreDepositWithFallback(depositId, `[老板撤销] ${storeName} 入账撤回`)
     toast('入账已撤销', 'success')
     accountStore._forceRefresh = true
     await accountStore.fetchAccounts()
@@ -804,8 +792,9 @@ async function openStoreDetail(store) {
     const { data: fees } = await supabase
       .from('expenses')
       .select('id, amount, note, payee, created_at')
-      .eq('category', '电商手续费')
+      .eq('category', 'platform_fee')
       .eq('payee', store.short_name)
+      .ilike('note', '%提现%')
       .is('deleted_at', null)
       .order('created_at', { ascending: false })
       .limit(200)
@@ -1062,9 +1051,7 @@ async function processImportFile(file) {
     importAfterSalesCount.value = parsed.afterSalesOrders.length
     importSkipped.value = parsed.skipped
 
-    // Calculate effective count (sales not matched by after-sales)
-    const afterSalesOrderNos = new Set(parsed.afterSalesOrders.map(a => a.external_order_no))
-    const effectiveOrders = parsed.salesOrders.filter(s => !afterSalesOrderNos.has(s.external_order_no))
+    const { effectiveOrders } = analyzeEcommerceOrderOffset(parsed.salesOrders, parsed.afterSalesOrders)
     importEffectiveCount.value = effectiveOrders.length
   } catch (e) {
     toast('文件解析失败: ' + e.message, 'error')
@@ -1082,13 +1069,24 @@ async function doImport() {
       afterSalesOrders: importParsed.value.afterSalesOrders,
       supabase,
       onProgress: (p) => {
-        const total = (importParsed.value.salesOrders.length || 1) + (importParsed.value.afterSalesOrders.length || 0)
-        const current = p.type === 'aftersales'
-          ? (importParsed.value.salesOrders.length + p.current)
-          : p.current
+        let percent = 0
+        let message = p.message || '导入处理中...'
+
+        if (p.type === 'prepare') {
+          percent = p.total ? Math.min(15, Math.round((p.current / p.total) * 15)) : 5
+        } else if (p.type === 'sales') {
+          percent = p.total ? 15 + Math.round((p.current / p.total) * 70) : 50
+        } else if (p.type === 'aftersales') {
+          percent = p.total ? 85 + Math.round((p.current / p.total) * 10) : 90
+        } else if (p.type === 'balance') {
+          percent = p.total ? 95 + Math.round((p.current / p.total) * 5) : 97
+        } else if (p.type === 'done') {
+          percent = 100
+        }
+
         importProgress.value = {
-          message: p.type === 'sales' ? `导入销售订单 ${p.current}/${p.total}` : `处理售后 ${p.current}/${p.total}`,
-          percent: Math.round((current / total) * 100),
+          message,
+          percent: Math.min(100, percent),
         }
       },
     })
@@ -1262,10 +1260,10 @@ async function loadMonthlyWithdrawn() {
     const endISO = `${ym}-${String(endDate.getDate()).padStart(2, '0')}T23:59:59`
     const { data, error } = await supabase
       .from('withdrawals')
-      .select('actual_arrival, amount, store_name, created_at')
+      .select('actual_arrival, amount, store_name, withdrawn_at, created_at, status')
+      .eq('status', 'completed')
       .is('deleted_at', null)
-      .gte('created_at', startISO)
-      .lte('created_at', endISO)
+      .or(`and(withdrawn_at.gte.${startISO},withdrawn_at.lte.${endISO}),and(withdrawn_at.is.null,created_at.gte.${startISO},created_at.lte.${endISO})`)
     if (error) {
       console.warn('月度提现查询失败:', error.message)
       monthlyWithdrawnData.value = []

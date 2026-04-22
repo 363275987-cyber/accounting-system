@@ -195,7 +195,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
-import { supabase } from '../lib/supabase'
+import { supabase, withTimeout } from '../lib/supabase'
 import { useAuthStore } from '../stores/auth'
 import { formatMoney, toast } from '../lib/utils'
 import Skeleton from '../components/Skeleton.vue'
@@ -259,6 +259,108 @@ function getDefaultPeriod() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
 }
 
+function buildMonthRange(monthStr) {
+  const [year, month] = monthStr.split('-').map(Number)
+  const start = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0))
+  const end = new Date(Date.UTC(year, month, 1, 0, 0, 0))
+  return { start: start.toISOString(), end: end.toISOString() }
+}
+
+async function loadTargetsFlexible(monthStr) {
+  try {
+    const { data, error } = await withTimeout(
+      supabase.from('sales_targets').select('*').limit(500),
+      10000,
+      '加载销售目标'
+    )
+    if (error) throw error
+    const list = data || []
+    return list
+      .filter(row => {
+        const period = row.period_value || row.period || row.month || row.target_month || ''
+        const periodType = row.period_type || row.type || row.target_type || 'monthly'
+        return String(period) === monthStr && String(periodType) === 'monthly'
+      })
+      .map(t => ({
+        ...t,
+        user_id: t.user_id || t.profile_id || t.owner_id,
+        user_name: t.user_name || t.name || '未命名',
+        target_amount: Number(t.target_amount || t.amount || 0),
+        target_orders: Number(t.target_orders || t.orders || 0),
+        actual_amount: Number(t.actual_amount || 0),
+        actual_orders: Number(t.actual_orders || 0),
+      }))
+  } catch (e) {
+    console.error('[Performance] flexible target load error:', e)
+    return []
+  }
+}
+
+async function loadPerformanceFallback(monthStr) {
+  const { start, end } = buildMonthRange(monthStr)
+  const { data: orders, error } = await withTimeout(
+    supabase
+      .from('orders')
+      .select('id, amount, sales_id, creator_id, status, created_at, order_source, service_number_code')
+      .is('deleted_at', null)
+      .gte('created_at', start)
+      .lt('created_at', end),
+    15000,
+    '按订单聚合业绩'
+  )
+  if (error) throw error
+
+  const validOrders = (orders || []).filter(o => ['completed', 'partially_refunded', 'paid'].includes(o.status))
+  const userIds = [...new Set(validOrders.map(o => o.sales_id || o.creator_id).filter(Boolean))]
+
+  let profileMap = {}
+  if (userIds.length > 0) {
+    const { data: profiles, error: profileError } = await withTimeout(
+      supabase.from('profiles').select('id, name, role').in('id', userIds),
+      10000,
+      '加载业绩人员'
+    )
+    if (profileError) throw profileError
+    profileMap = Object.fromEntries((profiles || []).map(p => [p.id, p]))
+  }
+
+  const sourceLabelMap = {
+    sales_guided: '销售引导',
+    organic: '自然进店',
+    cs_service: '客服服务',
+    shared: '平分单',
+  }
+
+  const grouped = new Map()
+  for (const order of validOrders) {
+    const userId = order.sales_id || order.creator_id || 'unassigned'
+    const profile = profileMap[userId]
+    const current = grouped.get(userId) || {
+      user_id: userId === 'unassigned' ? null : userId,
+      user_name: profile?.name || '未分配',
+      user_role: profile?.role || '',
+      total_orders: 0,
+      total_amount: 0,
+      avg_order_amount: 0,
+      channels_used: '',
+      target_amount: 0,
+      completion_rate: 0,
+      _channels: new Set(),
+    }
+    current.total_orders += 1
+    current.total_amount += Number(order.amount || 0)
+    const label = sourceLabelMap[order.order_source] || order.service_number_code || order.order_source || '未标记'
+    current._channels.add(label)
+    grouped.set(userId, current)
+  }
+
+  return [...grouped.values()].map(item => ({
+    ...item,
+    avg_order_amount: item.total_orders > 0 ? item.total_amount / item.total_orders : 0,
+    channels_used: [...item._channels].join('、'),
+  }))
+}
+
 async function loadData() {
   loading.value = true
   loadError.value = ''
@@ -270,37 +372,34 @@ async function loadData() {
     const [y, m] = filters.periodValue.split('-')
     const monthStr = `${y}-${m}`
 
-    // 并行拉取业绩数据和目标表（之前串行且目标后加载，导致 completion_rate 一直按空目标算 → 全是 0%）
-    const [perfResult, targetResult] = await Promise.all([
-      supabase.rpc('get_performance_data', { p_period: monthStr }),
-      supabase.from('sales_targets').select('*').eq('period_type', 'monthly').eq('period_value', monthStr),
+    const [perfResult, targetData] = await Promise.all([
+      withTimeout(
+        supabase.rpc('get_performance_data', { p_period: monthStr }),
+        12000,
+        '加载业绩 RPC'
+      ),
+      loadTargetsFlexible(monthStr),
     ])
 
-    const { data: targetData, error: targetError } = targetResult
-    if (targetError) {
-      console.error('[Performance] sales_targets error:', targetError)
-      // 业绩目标表不是强依赖，失败只记不阻塞
-      loadError.value = `业绩目标表加载失败：${targetError.message || targetError.code}`
-      targets.value = []
-    } else {
-      targets.value = (targetData || []).map(t => ({
-        ...t,
-        completion_rate: t.target_amount > 0 ? (t.actual_amount || 0) / t.target_amount : 0,
-      }))
-    }
+    targets.value = targetData.map(t => ({
+      ...t,
+      completion_rate: t.target_amount > 0 ? (t.actual_amount || 0) / t.target_amount : 0,
+    }))
 
     // 先把 targets.value 赋完值，再计算 perf 的 completion_rate（依赖 getTargetAmount）
     const { data: perfData, error: perfError } = perfResult
     if (perfError) {
-      // 之前这里只 console.error 后继续，导致"没数据"但表象像加载失败
-      // 现在把具体错误告诉用户，常见：RPC 未部署 / 无权限 / 网络断
       console.error('[Performance] get_performance_data RPC error:', perfError)
-      // 业绩数据是主要依赖，优先用它的错误信息覆盖目标表的错误
-      loadError.value = `业绩数据加载失败：${perfError.message || perfError.code || '未知错误'}`
-      performanceData.value = []
+      const fallbackData = await loadPerformanceFallback(monthStr)
+      performanceData.value = fallbackData.map(p => ({
+        ...p,
+        completion_rate: p.user_id ? (getTargetAmount(p.user_id) > 0 ? (p.total_amount || 0) / getTargetAmount(p.user_id) : 0) : 0,
+      }))
+      loadError.value = `业绩 RPC 已回退为前端聚合：${perfError.message || perfError.code || '未知错误'}`
     } else {
       performanceData.value = (perfData || []).map(p => ({
         ...p,
+        user_role: p.user_role || p.role || '',
         completion_rate: p.user_id ? (getTargetAmount(p.user_id) > 0 ? (p.total_amount || 0) / getTargetAmount(p.user_id) : 0) : 0,
       }))
     }

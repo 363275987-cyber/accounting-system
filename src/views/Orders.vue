@@ -1234,6 +1234,7 @@ import { parseOrderText, parsedToForm } from '../lib/orderParser'
 import { parseExcelFile, autoMatchColumns, downloadTemplate, mapRowsToOrders, IMPORT_FIELDS } from '../lib/excelImporter'
 import { parseJstExcel, parseDoudianExcel, detectExcelFormat, getFormatLabel, autoMatchJstColumns, autoMatchDoudianColumns, mapJstRowsToOrders, mapDoudianRowsToOrders, matchProduct } from '../lib/excelOrderImporter'
 import { platformTypeName } from '../lib/ecommerceOrderImporter'
+import { processRefundWithFallback } from '../lib/financeTransactions'
 import { randomPick, randomPhone, randomName, randomAddress, randomAmount, PRODUCT_CATEGORIES_LIST, PRODUCT_NAMES_BY_CATEGORY } from '../lib/testDataHelper'
 import { usePermission } from '../composables/usePermission'
 import { useOrderList } from '../composables/useOrderList'
@@ -1857,34 +1858,7 @@ async function approveRefundById(refundId) {
   if (!check) throw new Error('退款记录不存在')
   if (check.status !== 'pending') throw new Error('退款已处理，当前状态：' + check.status)
 
-  // 尝试调用 RPC；若因函数重载歧义失败，则手动处理
-  const { error } = await supabase.rpc('process_refund', { p_refund_id: refundId })
-  if (error && error.code === 'PGRST203') {
-    // 手动审批：更新退款状态 + 扣账户余额 + 更新订单状态
-    const { data: refund } = await supabase.from('refunds').select('*').eq('id', refundId).single()
-    if (!refund) throw new Error('退款记录不存在')
-    // 1. 更新退款状态
-    const { error: e1 } = await supabase.from('refunds').update({ status: 'completed' }).eq('id', refundId)
-    if (e1) throw e1
-    // 2. 扣除账户余额
-    if (refund.refund_from_account_id) {
-      const { data: acc } = await supabase.from('accounts').select('balance').eq('id', refund.refund_from_account_id).single()
-      if (acc) {
-        await supabase.from('accounts').update({ balance: Number(acc.balance) - Number(refund.refund_amount) }).eq('id', refund.refund_from_account_id)
-      }
-    }
-    // 3. 更新订单状态
-    if (refund.order_id) {
-      const { data: allRefunds } = await supabase.from('refunds').select('refund_amount').eq('order_id', refund.order_id).eq('status', 'completed').is('deleted_at', null)
-      const totalRefunded = (allRefunds || []).reduce((s, r) => s + Number(r.refund_amount), 0)
-      const { data: order } = await supabase.from('orders').select('amount').eq('id', refund.order_id).single()
-      const orderAmount = Number(order?.amount || 0)
-      const newStatus = totalRefunded >= orderAmount ? 'refunded' : 'partially_refunded'
-      await supabase.from('orders').update({ status: newStatus }).eq('id', refund.order_id)
-    }
-  } else if (error) {
-    throw error
-  }
+  await processRefundWithFallback(refundId)
 }
 
 async function handleApproveRefund(refund) {

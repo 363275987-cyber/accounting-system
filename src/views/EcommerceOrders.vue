@@ -44,6 +44,11 @@
       </div>
     </div>
 
+    <div v-if="loadError" class="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3 mb-4 flex items-center justify-between gap-3">
+      <span>{{ loadError }}</span>
+      <button @click="loadOrders" class="px-3 py-1.5 rounded-lg bg-white border border-red-200 text-red-600 hover:bg-red-100 cursor-pointer">重试</button>
+    </div>
+
     <!-- 筛选区 -->
     <div class="bg-white rounded-xl border border-gray-100 p-3 md:p-4 mb-4 flex gap-2 md:gap-3 items-center flex-wrap">
       <input v-model="filters.keyword" @keyup.enter="loadOrders" placeholder="搜索订单号/店铺/SKU..."
@@ -371,8 +376,8 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue'
-import { supabase } from '../lib/supabase'
-import { importEcommerceOrders } from '../lib/ecommerceOrderImporter'
+import { supabase, withTimeout } from '../lib/supabase'
+import { analyzeEcommerceOrderOffset, importEcommerceOrders } from '../lib/ecommerceOrderImporter'
 import { parseEcommerceExcelOffMain } from '../lib/excelWorkerClient'
 import { formatMoney, PLATFORM_LABELS, toast } from '../lib/utils'
 import { useAuthStore } from '../stores/auth'
@@ -398,6 +403,7 @@ const STATUS_MAP = {
 
 // ========== 状态 ==========
 const loading = ref(false)
+const loadError = ref('')
 const orders = ref([])
 const selectedOrders = ref([])
 const pagination = reactive({ total: 0, page: 1, pageSize: 20 })
@@ -471,6 +477,7 @@ function platformBadgeClass(platform) {
 // ========== 数据加载 ==========
 async function loadOrders() {
   loading.value = true
+  loadError.value = ''
   selectedOrders.value = []
   try {
     let query = supabase
@@ -490,12 +497,15 @@ async function loadOrders() {
     if (filters.dateFrom) query = query.gte('created_at', filters.dateFrom)
     if (filters.dateTo) query = query.lte('created_at', dayEnd(filters.dateTo))
 
-    const { data, error, count } = await query
+    const { data, error, count } = await withTimeout(query, 15000, '加载电商订单列表')
     if (error) throw error
     orders.value = data || []
     pagination.total = count || 0
   } catch (e) {
     console.error('加载电商订单失败:', e)
+    orders.value = []
+    pagination.total = 0
+    loadError.value = `电商订单加载失败：${e?.message || e?.code || '未知错误'}`
     toast('加载电商订单失败：' + (e?.message || e?.code || '未知错误'), 'error')
   } finally {
     loading.value = false
@@ -504,13 +514,17 @@ async function loadOrders() {
 
 async function loadStoreList() {
   try {
-    const { data } = await supabase
-      .from('orders')
-      .select('platform_store')
-      .not('platform_type', 'is', null)
-      .not('platform_store', 'is', null)
-      .is('deleted_at', null)
-      .limit(500)
+    const { data } = await withTimeout(
+      supabase
+        .from('orders')
+        .select('platform_store')
+        .not('platform_type', 'is', null)
+        .not('platform_store', 'is', null)
+        .is('deleted_at', null)
+        .limit(500),
+      10000,
+      '加载电商店铺列表'
+    )
     storeList.value = [...new Set((data || []).map(d => d.platform_store).filter(Boolean))].sort()
   } catch (e) {
     console.error('加载店铺列表失败:', e)
@@ -571,7 +585,11 @@ async function loadStats() {
       return total
     })()
 
-    const [countRes, salesSum, refundSum] = await Promise.all([countP, salesP, refundP])
+    const [countRes, salesSum, refundSum] = await Promise.all([
+      withTimeout(countP, 10000, '加载电商订单数'),
+      withTimeout(salesP, 15000, '加载电商销售额'),
+      withTimeout(refundP, 15000, '加载电商退款额'),
+    ])
     stats.monthOrders = countRes.count || 0
     stats.monthSales = salesSum
     stats.monthRefund = refundSum
@@ -611,12 +629,16 @@ function openDetail(order) {
 
 async function loadDetailRefunds(orderId) {
   try {
-    const { data } = await supabase
-      .from('refunds')
-      .select('id, refund_no, refund_amount, reason, status, created_at')
-      .eq('order_id', orderId)
-      .is('deleted_at', null)
-      .order('created_at', { ascending: false })
+    const { data } = await withTimeout(
+      supabase
+        .from('refunds')
+        .select('id, refund_no, refund_amount, reason, status, created_at')
+        .eq('order_id', orderId)
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false }),
+      10000,
+      '加载订单退款详情'
+    )
     detailRefunds.value = data || []
   } catch (e) {
     detailRefunds.value = []
@@ -746,8 +768,7 @@ async function processImportFile(file) {
     importAfterSalesCount.value = parsed.afterSalesOrders.length
     importSkipped.value = parsed.skipped
 
-    const afterSalesOrderNos = new Set(parsed.afterSalesOrders.map(a => a.external_order_no))
-    const effectiveOrders = parsed.salesOrders.filter(s => !afterSalesOrderNos.has(s.external_order_no))
+    const { effectiveOrders } = analyzeEcommerceOrderOffset(parsed.salesOrders, parsed.afterSalesOrders)
     importEffectiveCount.value = effectiveOrders.length
   } catch (e) {
     toast('文件解析失败: ' + e.message, 'error')
@@ -767,13 +788,24 @@ async function doImport() {
       afterSalesOrders: importParsed.value.afterSalesOrders,
       supabase,
       onProgress: (p) => {
-        const total = (importParsed.value.salesOrders.length || 1) + (importParsed.value.afterSalesOrders.length || 0)
-        const current = p.type === 'aftersales'
-          ? (importParsed.value.salesOrders.length + p.current)
-          : p.current
+        let percent = 0
+        let message = p.message || '导入处理中...'
+
+        if (p.type === 'prepare') {
+          percent = p.total ? Math.min(15, Math.round((p.current / p.total) * 15)) : 5
+        } else if (p.type === 'sales') {
+          percent = p.total ? 15 + Math.round((p.current / p.total) * 70) : 50
+        } else if (p.type === 'aftersales') {
+          percent = p.total ? 85 + Math.round((p.current / p.total) * 10) : 90
+        } else if (p.type === 'balance') {
+          percent = p.total ? 95 + Math.round((p.current / p.total) * 5) : 97
+        } else if (p.type === 'done') {
+          percent = 100
+        }
+
         importProgress.value = {
-          message: p.type === 'sales' ? `导入销售订单 ${p.current}/${p.total}` : `处理售后 ${p.current}/${p.total}`,
-          percent: Math.round((current / total) * 100),
+          message,
+          percent: Math.min(100, percent),
         }
       },
     })
@@ -797,17 +829,24 @@ function closeImport() {
 }
 
 // ========== 初始化 ==========
+function initializeOrdersPage() {
+  loadOrders()
+  loadStoreList()
+  loadStats()
+}
+
 onMounted(() => {
-  if (auth.isLoggedIn) {
-    loadOrders()
-    loadStoreList()
-    loadStats()
-  } else {
-    const unwatch = watch(() => auth.isLoggedIn, (val) => {
-      if (val) { loadOrders(); loadStoreList(); loadStats(); unwatch() }
-    })
-  }
+  initializeOrdersPage()
 })
+
+watch(
+  () => auth.user,
+  (userId) => {
+    if (!userId) return
+    initializeOrdersPage()
+  },
+  { immediate: true }
+)
 </script>
 
 <style scoped>

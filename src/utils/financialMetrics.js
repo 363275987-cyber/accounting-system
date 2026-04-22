@@ -110,6 +110,12 @@ export function normalizeCategory(cat) {
   return CHINESE_TO_KEY[cat] || 'other'
 }
 
+// 提现手续费已经体现在 withdrawals 的净额里，不能再作为通用费用重复计入报表
+export function isWithdrawalFeeExpense(expense) {
+  return normalizeCategory(expense?.category) === 'platform_fee' &&
+    /提现/.test(expense?.note || '')
+}
+
 // ── 数据加载器（供 Reports.vue 各 tab 复用，集中维护避免漂移） ──
 
 // 其他收入查询（容错：表不存在则返回空数组）
@@ -204,10 +210,10 @@ export async function loadWithdrawals(supabase, startISO, endISO) {
   try {
     const { data, error } = await supabase
       .from('withdrawals')
-      .select('amount, actual_arrival, created_at, account_id')
+      .select('amount, actual_arrival, withdrawn_at, created_at, account_id, status')
+      .eq('status', 'completed')
       .is('deleted_at', null)
-      .gte('created_at', startISO)
-      .lte('created_at', endISO)
+      .or(`and(withdrawn_at.gte.${startISO},withdrawn_at.lte.${endISO}),and(withdrawn_at.is.null,created_at.gte.${startISO},created_at.lte.${endISO})`)
     if (error) throw error
     const accountIds = [...new Set((data || []).map(w => w.account_id).filter(Boolean))]
     let storeMap = {}
@@ -295,7 +301,7 @@ export async function computeIncomeStatement(supabase, startISO, endISO) {
   // 5. 费用按分类
   const { data: expenseRows, error: expErr } = await supabase
     .from('expenses')
-    .select('amount, category')
+    .select('amount, category, note')
     .eq('status', 'paid')
     .is('deleted_at', null)
     .gte('created_at', startISO)
@@ -305,6 +311,7 @@ export async function computeIncomeStatement(supabase, startISO, endISO) {
   const groupedExpenses = { cogs: {}, labor: {}, operating: {}, financial: {}, admin: {}, investing: {}, other: {} }
   const groupTotals = { cogs: 0, labor: 0, operating: 0, financial: 0, admin: 0, investing: 0, other: 0 }
   for (const e of (expenseRows || [])) {
+    if (isWithdrawalFeeExpense(e)) continue
     const cat = normalizeCategory(e.category)
     const group = REPORT_GROUP[cat] || 'operating'
     const amt = num(e.amount)
@@ -431,7 +438,7 @@ export async function computeOverviewProfit(supabase, startISO, endISO) {
       .lte('created_at', endISO),
     supabase
       .from('expenses')
-      .select('amount')
+      .select('amount, category, note')
       .eq('status', 'paid')
       .is('deleted_at', null)
       .gte('created_at', startISO)
@@ -455,7 +462,9 @@ export async function computeOverviewProfit(supabase, startISO, endISO) {
 
   const transferFees = await loadTransferFees(supabase, startISO, endISO)
 
-  const expenseSum = (expRes.data || []).reduce((s, e) => s + num(e.amount), 0)
+  const expenseSum = (expRes.data || [])
+    .filter((e) => !isWithdrawalFeeExpense(e))
+    .reduce((s, e) => s + num(e.amount), 0)
 
   const totalIncome = privateIncome + ecommerceIncome + otherIncome
   const totalExpense = expenseSum + salaryExpense + transferFees

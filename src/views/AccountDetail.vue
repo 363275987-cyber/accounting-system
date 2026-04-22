@@ -40,7 +40,7 @@
       <input v-model="dateFrom" type="date" class="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500">
       <span class="text-gray-300">~</span>
       <input v-model="dateTo" type="date" class="px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-500">
-      <button @click="loadRecords" class="px-3 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm hover:bg-gray-200 transition cursor-pointer">筛选</button>
+      <button @click="loadRecords" :disabled="loading" class="px-3 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm hover:bg-gray-200 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">{{ loading ? '加载中…' : '筛选' }}</button>
       <span class="text-sm text-gray-500 ml-auto">共 {{ records.length }} 条记录</span>
     </div>
 
@@ -81,7 +81,7 @@ import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { supabase } from '../lib/supabase'
 import { formatMoney, toast, formatDate, PLATFORM_LABELS } from '../lib/utils'
-import { dayEnd } from '../utils/dateRange'
+import { loadAccountLedgerRecords } from '../lib/accountFlows'
 import Icon from '../components/icons/Icons.vue'
 
 const route = useRoute()
@@ -119,91 +119,16 @@ async function loadAccount() {
 
 async function loadRecords() {
   loading.value = true
-  const items = []
-
-  // Orders where this account received money
-  let q = supabase
-    .from('orders')
-    .select('id, amount, customer_name, order_no, created_at')
-    .eq('account_id', accountId)
-    .is('deleted_at', null)
-    .order('created_at', { ascending: false })
-  if (dateFrom.value) q = q.gte('created_at', dateFrom.value)
-  if (dateTo.value) q = q.lte('created_at', dayEnd(dateTo.value))
-  const { data: orders } = await q
-  if (orders) {
-    for (const o of orders) {
-      items.push({
-        id: 'order-' + o.id,
-        created_at: o.created_at,
-        typeLabel: '收入',
-        typeClass: 'bg-green-50 text-green-700',
-        amount: o.amount,
-        detail: `${o.customer_name || ''} · 订单${o.order_no || o.id.slice(0, 8)}`,
-      })
-    }
+  try {
+    records.value = await loadAccountLedgerRecords({
+      accountId,
+      dateFrom: dateFrom.value,
+      dateTo: dateTo.value,
+    })
+  } catch {
+    toast('流水加载失败，请重试', 'error')
+  } finally {
+    loading.value = false
   }
-
-  // Expenses paid from this account
-  q = supabase
-    .from('expenses')
-    .select('id, amount, payee, note, created_at')
-    .eq('account_id', accountId)
-    .is('deleted_at', null)
-    .order('created_at', { ascending: false })
-  if (dateFrom.value) q = q.gte('created_at', dateFrom.value)
-  if (dateTo.value) q = q.lte('created_at', dayEnd(dateTo.value))
-  const { data: expenses } = await q
-  if (expenses) {
-    for (const e of expenses) {
-      items.push({
-        id: 'expense-' + e.id,
-        created_at: e.created_at,
-        typeLabel: '支出',
-        typeClass: 'bg-red-50 text-red-700',
-        amount: -e.amount,
-        detail: `${e.payee}${e.note ? ' · ' + e.note : ''}`,
-      })
-    }
-  }
-
-  // Transfers: this account as from or to
-  q = supabase
-    .from('account_transfers')
-    .select('id, amount, fee, from_account_id, to_account_id, from_account:from_account_id(code), to_account:to_account_id(code), created_at')
-    .is('deleted_at', null)
-    .order('created_at', { ascending: false })
-  if (dateFrom.value) q = q.gte('created_at', dateFrom.value)
-  if (dateTo.value) q = q.lte('created_at', dayEnd(dateTo.value))
-  const { data: transfers } = await q
-  if (transfers) {
-    for (const t of transfers) {
-      if (t.from_account_id === accountId) {
-        items.push({
-          id: 'transfer-out-' + t.id,
-          created_at: t.created_at,
-          typeLabel: '转出',
-          typeClass: 'bg-orange-50 text-orange-700',
-          amount: -(t.amount + (t.fee || 0)),
-          detail: `转账至 ${t.to_account?.code || '—'}`,
-        })
-      }
-      if (t.to_account_id === accountId) {
-        items.push({
-          id: 'transfer-in-' + t.id,
-          created_at: t.created_at,
-          typeLabel: '转入',
-          typeClass: 'bg-blue-50 text-blue-700',
-          amount: t.amount,
-          detail: `从 ${t.from_account?.code || '—'} 转入`,
-        })
-      }
-    }
-  }
-
-  // Sort by time desc
-  items.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-  records.value = items
-  loading.value = false
 }
 </script>

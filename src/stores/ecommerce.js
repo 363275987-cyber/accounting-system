@@ -1,5 +1,17 @@
 import { defineStore } from 'pinia'
 import { supabase, withTimeout } from '../lib/supabase'
+import { createStoreWithdrawalWithFallback } from '../lib/financeTransactions'
+
+function sumWithdrawalFee(feeDetail) {
+  if (!feeDetail) return 0
+  if (Array.isArray(feeDetail)) {
+    return feeDetail.reduce((sum, item) => sum + Number(item?.amount || 0), 0)
+  }
+  return Number(feeDetail.technical_fee || 0) +
+    Number(feeDetail.payment_fee || 0) +
+    Number(feeDetail.withdraw_fee || 0) +
+    Number(feeDetail.other_fee || 0)
+}
 
 export const useEcommerceStore = defineStore('ecommerce', {
   state: () => ({
@@ -111,8 +123,9 @@ export const useEcommerceStore = defineStore('ecommerce', {
         let query = supabase
           .from('withdrawals')
           .select('*, from_store:accounts!withdrawals_account_id_fkey(id, short_name, ecommerce_platform), to_account:accounts!withdrawals_to_account_id_fkey(id, short_name)')
+          .eq('status', 'completed')
           .is('deleted_at', null)
-          .order('created_at', { ascending: false })
+          .order('withdrawn_at', { ascending: false })
           .limit(100)
 
         if (accountId) {
@@ -130,20 +143,14 @@ export const useEcommerceStore = defineStore('ecommerce', {
     // 执行提现
     async executeWithdrawal(accountId, toAccountId, amount, feeDetail, remark) {
       try {
-        const { data, error } = await withTimeout(
-          supabase.rpc('execute_withdrawal', {
-            p_account_id: accountId,
-            p_to_account_id: toAccountId,
-            p_amount: amount,
-            p_fee_detail: feeDetail,
-            p_remark: remark,
-          }),
-          15000,
-          '执行提现'
-        )
-
-        if (error) throw error
-        return data
+        return await createStoreWithdrawalWithFallback({
+          storeId: accountId,
+          toAccountId,
+          amount,
+          feeAmount: sumWithdrawalFee(feeDetail),
+          feeRemark: '',
+          remark,
+        })
       } catch (e) {
         console.error('提现失败:', e)
         throw e

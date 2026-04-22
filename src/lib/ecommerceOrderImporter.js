@@ -4,6 +4,122 @@
  */
 
 import { PLATFORM_LABELS } from './utils'
+import { applyAccountBalanceDelta } from './accountBalance'
+
+function normalizeText(value) {
+  return String(value ?? '').trim()
+}
+
+function normalizeHeader(value) {
+  return normalizeText(value)
+    .replace(/\r?\n/g, '')
+    .replace(/\s+/g, '')
+}
+
+function getCell(row, idx) {
+  if (idx == null || idx < 0) return ''
+  return normalizeText(row[idx])
+}
+
+function getNumber(row, idx) {
+  const value = getCell(row, idx)
+  if (!value) return 0
+  const normalized = value
+    .replace(/[￥¥]/g, '')
+    .replace(/[,，\s]/g, '')
+  const n = parseFloat(normalized)
+  return isNaN(n) ? 0 : n
+}
+
+function findHeaderIndex(headerMap, candidates = []) {
+  for (const candidate of candidates) {
+    const idx = headerMap.get(normalizeHeader(candidate))
+    if (idx != null) return idx
+  }
+  return -1
+}
+
+function buildHeaderMap(headerRow = []) {
+  const map = new Map()
+  headerRow.forEach((cell, idx) => {
+    const key = normalizeHeader(cell)
+    if (!key || map.has(key)) return
+    map.set(key, idx)
+  })
+  return map
+}
+
+function detectSheetKind(sheetName, headerMap) {
+  const name = normalizeText(sheetName)
+  const isSummaryByName = /汇总|总结/.test(name)
+  if (isSummaryByName) return 'ignore'
+
+  const hasAfterSalesHeaders =
+    headerMap.has(normalizeHeader('售后单号')) &&
+    (headerMap.has(normalizeHeader('退款金额')) ||
+      headerMap.has(normalizeHeader('退款金额（元）')) ||
+      headerMap.has(normalizeHeader('退商品金额')) ||
+      headerMap.has(normalizeHeader('退商品金额（元）')))
+  if (hasAfterSalesHeaders) return 'aftersales'
+
+  const hasSalesHeaders =
+    (
+      headerMap.has(normalizeHeader('订单号')) ||
+      headerMap.has(normalizeHeader('子订单编号'))
+    ) &&
+    (
+      headerMap.has(normalizeHeader('订单状态')) ||
+      headerMap.has(normalizeHeader('订单实际支付金额')) ||
+      headerMap.has(normalizeHeader('实付款')) ||
+      headerMap.has(normalizeHeader('商品金额'))
+    )
+  if (hasSalesHeaders) return 'sales'
+
+  return 'ignore'
+}
+
+function inferStoreName(sheetName) {
+  const name = normalizeText(sheetName)
+  return name
+    .replace(/-(销售订单明细|售后订单|售后|汇总数据|总结)$/u, '')
+    .trim()
+}
+
+function buildInternalOrderNo(order, idx) {
+  const platform = normalizeText(order?.platform_type || 'ec').toLowerCase()
+  const externalNo = normalizeText(order?.external_order_no)
+  const externalSuffix = externalNo ? externalNo.slice(-8) : 'noext'
+  const timePart = Date.now().toString(36)
+  const idxPart = Number(idx || 0).toString(36)
+  const randPart = Math.random().toString(36).slice(2, 8)
+  return `EC-${platform}-${externalSuffix}-${timePart}-${idxPart}-${randPart}`
+}
+
+function isExcelSerialString(value) {
+  const str = normalizeText(value)
+  if (!/^\d+(?:\.\d+)?$/.test(str)) return false
+  const num = Number(str)
+  // Excel 日期序列通常落在这个范围，避免把长订单号误判成日期
+  return Number.isFinite(num) && num >= 20000 && num <= 60000
+}
+
+function isPostShipmentRefund(refund) {
+  const shipmentStatus = normalizeText(refund?.shipment_status)
+  const refundType = normalizeText(refund?.refund_type)
+
+  if (refundType.includes('未发货')) return false
+  if (refundType.includes('已发货') || refundType.includes('退货')) return true
+
+  if (!shipmentStatus) return false
+  if (shipmentStatus.includes('未发货') || shipmentStatus.includes('待发货')) return false
+
+  return (
+    shipmentStatus.includes('已发货') ||
+    shipmentStatus.includes('已签收') ||
+    shipmentStatus.includes('已收货') ||
+    shipmentStatus.includes('已完成')
+  )
+}
 
 // ============ 平台识别 ============
 
@@ -99,6 +215,29 @@ function parseDouyinSalesRow(row, rowIdx) {
   }
 }
 
+function parseDouyinSalesRowByHeader(row, rowIdx, headerMap, sheetName) {
+  const status = getCell(row, findHeaderIndex(headerMap, ['订单状态']))
+  if (status === '已关闭' || status === '同意退款，退款成功') return null
+
+  const paymentAmount = getNumber(row, findHeaderIndex(headerMap, ['商品金额']))
+  if (paymentAmount <= 0) return null
+
+  return {
+    _rowIdx: rowIdx,
+    _selected: true,
+    _type: 'sales',
+    platform_type: 'douyin',
+    external_order_no: getCell(row, findHeaderIndex(headerMap, ['子订单编号', '订单号'])),
+    platform_store: getCell(row, findHeaderIndex(headerMap, ['店铺'])) || inferStoreName(sheetName),
+    sku_code: getCell(row, findHeaderIndex(headerMap, ['商家编码'])),
+    quantity: getNumber(row, findHeaderIndex(headerMap, ['商品数量'])),
+    payment_amount: paymentAmount,
+    status,
+    order_time: getCell(row, findHeaderIndex(headerMap, ['支付完成时间', '订单提交时间'])),
+    _rawRow: row,
+  }
+}
+
 /**
  * 解析快手销售订单
  * 列映射：
@@ -140,6 +279,29 @@ function parseKuaishouSalesRow(row, rowIdx) {
     payment_amount: paymentAmount,
     status: status,
     order_time: orderTime,
+    _rawRow: row,
+  }
+}
+
+function parseKuaishouSalesRowByHeader(row, rowIdx, headerMap, sheetName) {
+  const status = getCell(row, findHeaderIndex(headerMap, ['订单状态']))
+  if (status === '交易关闭') return null
+
+  const paymentAmount = getNumber(row, findHeaderIndex(headerMap, ['实付款']))
+  if (paymentAmount <= 0) return null
+
+  return {
+    _rowIdx: rowIdx,
+    _selected: true,
+    _type: 'sales',
+    platform_type: 'kuaishou',
+    external_order_no: getCell(row, findHeaderIndex(headerMap, ['订单号'])),
+    platform_store: getCell(row, findHeaderIndex(headerMap, ['店铺'])) || inferStoreName(sheetName),
+    sku_code: getCell(row, findHeaderIndex(headerMap, ['SKU编码'])),
+    quantity: getNumber(row, findHeaderIndex(headerMap, ['成交数量'])),
+    payment_amount: paymentAmount,
+    status,
+    order_time: getCell(row, findHeaderIndex(headerMap, ['订单支付时间', '订单创建时间'])),
     _rawRow: row,
   }
 }
@@ -186,6 +348,29 @@ function parseShipinhaoSalesRow(row, rowIdx) {
   }
 }
 
+function parseShipinhaoSalesRowByHeader(row, rowIdx, headerMap, sheetName) {
+  const status = getCell(row, findHeaderIndex(headerMap, ['订单状态']))
+  if (status === '已取消') return null
+
+  const paymentAmount = getNumber(row, findHeaderIndex(headerMap, ['订单实际支付金额']))
+  if (paymentAmount <= 0) return null
+
+  return {
+    _rowIdx: rowIdx,
+    _selected: true,
+    _type: 'sales',
+    platform_type: 'shipinhao',
+    external_order_no: getCell(row, findHeaderIndex(headerMap, ['订单号'])),
+    platform_store: getCell(row, findHeaderIndex(headerMap, ['店铺'])) || inferStoreName(sheetName),
+    sku_code: getCell(row, findHeaderIndex(headerMap, ['SKU编码(自定义)', 'sku编码（自定义）'])),
+    quantity: getNumber(row, findHeaderIndex(headerMap, ['商品数量'])),
+    payment_amount: paymentAmount,
+    status,
+    order_time: getCell(row, findHeaderIndex(headerMap, ['订单下单时间', '支付时间'])),
+    _rawRow: row,
+  }
+}
+
 // ============ 售后订单解析 ============
 
 /**
@@ -223,6 +408,29 @@ function parseDouyinAfterSalesRow(row, rowIdx) {
     platform_store: get(0),      // A列 - 店铺
     refund_amount: refundAmount, // L列 - 退商品金额
     status: status,
+    _rawRow: row,
+  }
+}
+
+function parseDouyinAfterSalesRowByHeader(row, rowIdx, headerMap, sheetName) {
+  const status = getCell(row, findHeaderIndex(headerMap, ['售后状态']))
+  if (status !== '退款成功' && status !== '同意退款，退款成功') return null
+
+  const refundAmount = getNumber(row, findHeaderIndex(headerMap, ['退商品金额（元）', '退商品金额']))
+  if (refundAmount <= 0) return null
+
+  return {
+    _rowIdx: rowIdx,
+    _selected: true,
+    _type: 'aftersales',
+    platform_type: 'douyin',
+    refund_no: getCell(row, findHeaderIndex(headerMap, ['售后单号'])),
+    external_order_no: getCell(row, findHeaderIndex(headerMap, ['订单号'])),
+    platform_store: getCell(row, findHeaderIndex(headerMap, ['店铺'])) || inferStoreName(sheetName),
+    refund_amount: refundAmount,
+    shipment_status: getCell(row, findHeaderIndex(headerMap, ['商品发货状态', '发货物流状态'])),
+    refund_type: getCell(row, findHeaderIndex(headerMap, ['售后类型'])),
+    status,
     _rawRow: row,
   }
 }
@@ -266,6 +474,29 @@ function parseKuaishouAfterSalesRow(row, rowIdx) {
   }
 }
 
+function parseKuaishouAfterSalesRowByHeader(row, rowIdx, headerMap, sheetName) {
+  const status = getCell(row, findHeaderIndex(headerMap, ['售后状态']))
+  if (status !== '售后成功') return null
+
+  const refundAmount = getNumber(row, findHeaderIndex(headerMap, ['退款金额']))
+  if (refundAmount <= 0) return null
+
+  return {
+    _rowIdx: rowIdx,
+    _selected: true,
+    _type: 'aftersales',
+    platform_type: 'kuaishou',
+    refund_no: getCell(row, findHeaderIndex(headerMap, ['售后单号'])),
+    external_order_no: getCell(row, findHeaderIndex(headerMap, ['订单编号', '订单号'])),
+    platform_store: getCell(row, findHeaderIndex(headerMap, ['店铺'])) || inferStoreName(sheetName),
+    refund_amount: refundAmount,
+    shipment_status: getCell(row, findHeaderIndex(headerMap, ['订单状态', '发货状态'])),
+    refund_type: getCell(row, findHeaderIndex(headerMap, ['售后类型'])),
+    status,
+    _rawRow: row,
+  }
+}
+
 /**
  * 解析视频号售后订单
  * 列映射：
@@ -305,6 +536,29 @@ function parseShipinhaoAfterSalesRow(row, rowIdx) {
   }
 }
 
+function parseShipinhaoAfterSalesRowByHeader(row, rowIdx, headerMap, sheetName) {
+  const status = getCell(row, findHeaderIndex(headerMap, ['退款状态', '售后状态']))
+  if (status !== '退款成功') return null
+
+  const refundAmount = getNumber(row, findHeaderIndex(headerMap, ['退款金额']))
+  if (refundAmount <= 0) return null
+
+  return {
+    _rowIdx: rowIdx,
+    _selected: true,
+    _type: 'aftersales',
+    platform_type: 'shipinhao',
+    refund_no: getCell(row, findHeaderIndex(headerMap, ['售后单号'])),
+    external_order_no: getCell(row, findHeaderIndex(headerMap, ['订单编号', '订单号'])),
+    platform_store: getCell(row, findHeaderIndex(headerMap, ['店铺'])) || inferStoreName(sheetName),
+    refund_amount: refundAmount,
+    shipment_status: getCell(row, findHeaderIndex(headerMap, ['发货状态', '发货物流状态'])),
+    refund_type: getCell(row, findHeaderIndex(headerMap, ['退款类型', '售后类型'])),
+    status,
+    _rawRow: row,
+  }
+}
+
 // ============ 主解析入口 ============
 
 /**
@@ -332,6 +586,11 @@ export function parseEcommerceExcel(workbook, options = {}) {
     const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
     if (jsonData.length < 2) continue
 
+    const headerRow = jsonData[0] || []
+    const headerMap = buildHeaderMap(headerRow)
+    const sheetKind = detectSheetKind(sheetName, headerMap)
+    if (sheetKind === 'ignore') continue
+
     // 跳过表头行
     const rows = jsonData.slice(1).filter(row =>
       row.some(cell => cell !== '' && cell !== null && cell !== undefined)
@@ -350,7 +609,7 @@ export function parseEcommerceExcel(workbook, options = {}) {
       continue
     }
 
-    const isAfterSales = isAfterSalesSheet(sheetName)
+    const isAfterSales = sheetKind === 'aftersales'
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i]
@@ -360,9 +619,9 @@ export function parseEcommerceExcel(workbook, options = {}) {
         if (isAfterSales) {
           // 售后订单
           let parsed = null
-          if (platform === 'douyin') parsed = parseDouyinAfterSalesRow(row, rowIdx)
-          else if (platform === 'kuaishou') parsed = parseKuaishouAfterSalesRow(row, rowIdx)
-          else if (platform === 'shipinhao') parsed = parseShipinhaoAfterSalesRow(row, rowIdx)
+          if (platform === 'douyin') parsed = parseDouyinAfterSalesRowByHeader(row, rowIdx, headerMap, sheetName)
+          else if (platform === 'kuaishou') parsed = parseKuaishouAfterSalesRowByHeader(row, rowIdx, headerMap, sheetName)
+          else if (platform === 'shipinhao') parsed = parseShipinhaoAfterSalesRowByHeader(row, rowIdx, headerMap, sheetName)
 
           if (!parsed) { skipped++; continue }
 
@@ -377,9 +636,9 @@ export function parseEcommerceExcel(workbook, options = {}) {
         } else {
           // 销售订单
           let parsed = null
-          if (platform === 'douyin') parsed = parseDouyinSalesRow(row, rowIdx)
-          else if (platform === 'kuaishou') parsed = parseKuaishouSalesRow(row, rowIdx)
-          else if (platform === 'shipinhao') parsed = parseShipinhaoSalesRow(row, rowIdx)
+          if (platform === 'douyin') parsed = parseDouyinSalesRowByHeader(row, rowIdx, headerMap, sheetName)
+          else if (platform === 'kuaishou') parsed = parseKuaishouSalesRowByHeader(row, rowIdx, headerMap, sheetName)
+          else if (platform === 'shipinhao') parsed = parseShipinhaoSalesRowByHeader(row, rowIdx, headerMap, sheetName)
 
           if (!parsed) { skipped++; continue }
 
@@ -405,6 +664,102 @@ export function parseEcommerceExcel(workbook, options = {}) {
   return { salesOrders, afterSalesOrders, skipped, errors }
 }
 
+function buildAfterSalesIndexes(afterSalesOrders = []) {
+  const afterSalesExact = new Map()   // platform:orderNo -> { totalRefund, records[], matched }
+  const afterSalesPrefix = new Map()  // platform:parentOrderNo -> same entry
+
+  for (const refund of afterSalesOrders) {
+    const exactKey = `${refund.platform_type}:${refund.external_order_no}`
+    if (!afterSalesExact.has(exactKey)) {
+      afterSalesExact.set(exactKey, { totalRefund: 0, records: [], matched: false })
+    }
+    const entry = afterSalesExact.get(exactKey)
+    entry.totalRefund += Number(refund.refund_amount || 0)
+    entry.records.push(refund)
+
+    const prefixKey = `${refund.platform_type}:${refund.external_order_no}`
+    if (!afterSalesPrefix.has(prefixKey)) {
+      afterSalesPrefix.set(prefixKey, entry)
+    }
+  }
+
+  return { afterSalesExact, afterSalesPrefix }
+}
+
+function matchRefundInfo(order, afterSalesExact, afterSalesPrefix) {
+  const exactKey = `${order.platform_type}:${order.external_order_no}`
+  let refundInfo = afterSalesExact.get(exactKey)
+
+  if (!refundInfo) {
+    for (const [prefixKey, info] of afterSalesPrefix) {
+      const platform = prefixKey.split(':')[0]
+      const parentNo = prefixKey.substring(prefixKey.indexOf(':') + 1)
+      if (order.platform_type === platform && order.external_order_no && order.external_order_no.startsWith(parentNo)) {
+        refundInfo = info
+        break
+      }
+    }
+  }
+
+  return refundInfo
+}
+
+export function analyzeEcommerceOrderOffset(salesOrders = [], afterSalesOrders = []) {
+  const { afterSalesExact, afterSalesPrefix } = buildAfterSalesIndexes(afterSalesOrders)
+  const effectiveOrders = []
+  const fullyRefundedOrders = []
+
+  for (const order of salesOrders) {
+    const refundInfo = matchRefundInfo(order, afterSalesExact, afterSalesPrefix)
+
+    if (!refundInfo) {
+      effectiveOrders.push({ ...order, _refundAmount: 0 })
+      continue
+    }
+
+    refundInfo.matched = true
+    const orderAmt = Number(order.payment_amount || 0)
+
+    if (refundInfo.totalRefund >= orderAmt) {
+      fullyRefundedOrders.push(order)
+      continue
+    }
+
+    effectiveOrders.push({ ...order, _refundAmount: refundInfo.totalRefund })
+  }
+
+  const unmatchedRefunds = []
+  let totalRefundAmount = 0
+
+  for (const order of fullyRefundedOrders) {
+    totalRefundAmount += Number(order.payment_amount || 0)
+  }
+
+  for (const [_, info] of afterSalesExact) {
+    if (!info.matched) {
+      unmatchedRefunds.push(...info.records)
+      totalRefundAmount += info.totalRefund
+    }
+  }
+
+  for (const order of effectiveOrders) {
+    totalRefundAmount += Number(order._refundAmount || 0)
+  }
+
+  const netSalesAmount = effectiveOrders.reduce(
+    (sum, order) => sum + Number(order.payment_amount || 0) - Number(order._refundAmount || 0),
+    0,
+  )
+
+  return {
+    effectiveOrders,
+    fullyRefundedOrders,
+    unmatchedRefunds,
+    totalRefundAmount,
+    netSalesAmount,
+  }
+}
+
 // ============ 数据库操作 ============
 
 /**
@@ -421,99 +776,91 @@ export function parseEcommerceExcel(workbook, options = {}) {
  * @param {Array} params.afterSalesOrders - 售后订单列表
  * @param {Function} params.supabase - supabase client
  * @param {Function} params.onProgress - 进度回调
+ * @param {boolean} params.persistRefundRecords - 是否写入发货后退款记录，默认 true
  * @returns {{ success, duplicate, skippedRefunded, failures, netSalesAmount, totalRefundAmount }}
  */
 // 让出主线程一瞬间，避免长时间同步阻塞导致浏览器"无响应"
 const yieldToMainThread = () => new Promise(r => setTimeout(r, 0))
 
-export async function importEcommerceOrders({ salesOrders, afterSalesOrders, supabase: sb, onProgress }) {
+export async function importEcommerceOrders({
+  salesOrders,
+  afterSalesOrders,
+  supabase: sb,
+  onProgress,
+  persistRefundRecords = true,
+}) {
   const result = { success: 0, duplicate: 0, skippedRefunded: 0, failures: [], netSalesAmount: 0, totalRefundAmount: 0 }
   const BATCH = 100
+
+  async function insertSalesChunk(chunk, batchIdx) {
+    const label = `批${batchIdx + 1}`
+    try {
+      const { data: inserted, error } = await sb
+        .from('orders')
+        .insert(chunk)
+        .select('id')
+
+      if (!error) {
+        result.success += (inserted || chunk).length
+        return
+      }
+
+      // 唯一键冲突时逐条回退，避免把整批都误算成“重复”
+      if (error.code === '23505') {
+        for (const row of chunk) {
+          try {
+            const { data: single, error: singleError } = await sb
+              .from('orders')
+              .insert(row)
+              .select('id')
+              .single()
+
+            if (!singleError && single) {
+              result.success++
+            } else if (singleError?.code === '23505') {
+              result.duplicate++
+            } else if (singleError) {
+              result.failures.push({ message: `${label} 单条插入失败(${row.external_order_no || row.order_no}): ${singleError.message}` })
+            }
+          } catch (singleException) {
+            result.failures.push({ message: `${label} 单条插入异常(${row.external_order_no || row.order_no}): ${singleException.message}` })
+          }
+        }
+        return
+      }
+
+      result.failures.push({ message: `批量插入失败(${label}): ${error.message}` })
+    } catch (e) {
+      result.failures.push({ message: `批量插入异常(${label}): ${e.message}` })
+    }
+  }
 
   onProgress?.({ type: 'prepare', current: 0, total: 1, message: '准备中：对冲退款...' })
 
   // ========== 第一步：客户端对冲（内存中完成） ==========
-
-  // 构建售后索引（支持精确匹配和前缀匹配）
   // 抖音：销售用子订单号(DY20260401000_001)，售后用父订单号(DY20260401000)
   // 快手/视频号：两者通常一致
-  const afterSalesExact = new Map()   // platform:orderNo -> { totalRefund, records[] }
-  const afterSalesPrefix = new Map()  // platform:parentOrderNo -> { totalRefund, records[] }
-
-  for (const refund of afterSalesOrders) {
-    const exactKey = `${refund.platform_type}:${refund.external_order_no}`
-    if (!afterSalesExact.has(exactKey)) {
-      afterSalesExact.set(exactKey, { totalRefund: 0, records: [], matched: false })
-    }
-    const entry = afterSalesExact.get(exactKey)
-    entry.totalRefund += Number(refund.refund_amount || 0)
-    entry.records.push(refund)
-
-    // 同时建前缀索引（售后的 external_order_no 作为前缀来匹配销售的子订单号）
-    const prefixKey = `${refund.platform_type}:${refund.external_order_no}`
-    if (!afterSalesPrefix.has(prefixKey)) {
-      afterSalesPrefix.set(prefixKey, afterSalesExact.get(exactKey))
-    }
-  }
-
-  // 对冲：把被全额退款的销售订单过滤掉，只保留有效订单
-  const effectiveOrders = [] // 没被退/部分退 -> 要导入
-  const fullyRefundedOrders = [] // 被全额退 -> 不导入，但记录退款金额
 
   let _loopCounter = 0
-  for (const order of salesOrders) {
+  for (let idx = 0; idx < salesOrders.length; idx++) {
     // 每 500 条让一次主线程，防止长文件 parse+match 冻结页面
     if (++_loopCounter % 500 === 0) {
       onProgress?.({ type: 'prepare', current: _loopCounter, total: salesOrders.length,
         message: `对冲匹配中 ${_loopCounter}/${salesOrders.length}...` })
       await yieldToMainThread()
     }
-    const exactKey = `${order.platform_type}:${order.external_order_no}`
-
-    // 先精确匹配
-    let refundInfo = afterSalesExact.get(exactKey)
-
-    // 再前缀匹配：销售子订单号(DY20260401000_001)的前缀是售后父订单号(DY20260401000)
-    if (!refundInfo) {
-      for (const [prefixKey, info] of afterSalesPrefix) {
-        const [platform, parentNo] = [prefixKey.split(':')[0], prefixKey.substring(prefixKey.indexOf(':') + 1)]
-        if (order.platform_type === platform && order.external_order_no && order.external_order_no.startsWith(parentNo)) {
-          refundInfo = info
-          break
-        }
-      }
-    }
-
-    if (!refundInfo) {
-      // 没有售后，直接导入
-      effectiveOrders.push({ ...order, _refundAmount: 0 })
-    } else {
-      refundInfo.matched = true
-      const orderAmt = Number(order.payment_amount || 0)
-      if (refundInfo.totalRefund >= orderAmt) {
-        // 全额退款，跳过导入
-        fullyRefundedOrders.push(order)
-        result.skippedRefunded++
-        result.totalRefundAmount += orderAmt
-      } else {
-        // 部分退款，仍导入（记录退款金额用于标记）
-        effectiveOrders.push({ ...order, _refundAmount: refundInfo.totalRefund })
-        result.totalRefundAmount += refundInfo.totalRefund
-      }
-    }
   }
 
-  // 剩余未匹配的售后（售后表有但销售表没有对应订单）
-  const unmatchedRefunds = []
-  for (const [key, info] of afterSalesExact) {
-    if (!info.matched) {
-      unmatchedRefunds.push(...info.records)
-      result.totalRefundAmount += info.totalRefund
-    }
-  }
-
-  // 计算净销售额
-  result.netSalesAmount = effectiveOrders.reduce((s, o) => s + Number(o.payment_amount || 0) - Number(o._refundAmount || 0), 0)
+  const {
+    effectiveOrders,
+    fullyRefundedOrders,
+    unmatchedRefunds,
+    totalRefundAmount,
+    netSalesAmount,
+  } = analyzeEcommerceOrderOffset(salesOrders, afterSalesOrders)
+  result.skippedRefunded = fullyRefundedOrders.length
+  result.totalRefundAmount = totalRefundAmount
+  result.netSalesAmount = netSalesAmount
 
   onProgress?.({ type: 'prepare', current: 1, total: 1,
     message: `对冲完成：${salesOrders.length} 笔销售 - ${fullyRefundedOrders.length} 笔全退 = ${effectiveOrders.length} 笔有效订单` })
@@ -610,7 +957,9 @@ export async function importEcommerceOrders({ salesOrders, afterSalesOrders, sup
     const netAmount = Number(order.payment_amount || 0) - Number(order._refundAmount || 0)
 
     const payload = {
-      order_no: order.external_order_no || `EC-${Date.now()}-${idx}`,
+      // `orders.order_no` 在库里是全局唯一，不能直接复用平台单号，
+      // 否则会与已软删除的历史订单发生冲突。
+      order_no: buildInternalOrderNo(order, idx),
       customer_name: '电商客户',
       customer_phone: '',
       customer_address: '',
@@ -648,19 +997,7 @@ export async function importEcommerceOrders({ salesOrders, afterSalesOrders, sup
     const start = batchIdx * BATCH
     const chunk = payloads.slice(start, start + BATCH)
     try {
-      const { data: inserted, error } = await sb
-        .from('orders')
-        .insert(chunk)
-        .select('id')
-      if (error) {
-        // 因为前面已经 dedup 过，这里走到通常是并发或约束异常
-        if (error.code === '23505') result.duplicate += chunk.length
-        else result.failures.push({ message: `批量插入失败(批${batchIdx + 1}): ${error.message}` })
-      } else {
-        result.success += (inserted || chunk).length
-      }
-    } catch (e) {
-      result.failures.push({ message: `批量插入异常(批${batchIdx + 1}): ${e.message}` })
+      await insertSalesChunk(chunk, batchIdx)
     } finally {
       _batchDone++
       onProgress?.({ type: 'sales', current: _batchDone * BATCH, total: payloads.length,
@@ -674,15 +1011,26 @@ export async function importEcommerceOrders({ salesOrders, afterSalesOrders, sup
     await yieldToMainThread()
   }
 
-  // ========== 第四步：处理未匹配的售后（批量化） ==========
-  if (unmatchedRefunds.length > 0) {
-    onProgress?.({ type: 'aftersales', current: 0, total: unmatchedRefunds.length,
-      message: `处理 ${unmatchedRefunds.length} 条未匹配售后...` })
+  if (!persistRefundRecords) {
+    onProgress?.({
+      type: 'done',
+      current: 1,
+      total: 1,
+      message: `导入完成：${result.success} 笔有效订单，退款仅用于对冲未入库`,
+    })
+    return result
+  }
+
+  // ========== 第四步：仅处理发货后的售后退款 ==========
+  const shippedRefunds = unmatchedRefunds.filter(isPostShipmentRefund)
+  if (shippedRefunds.length > 0) {
+    onProgress?.({ type: 'aftersales', current: 0, total: shippedRefunds.length,
+      message: `处理 ${shippedRefunds.length} 条发货后退款...` })
 
     // 4a. 预加载已有退款号（去重）
     const existingRefundNos = new Set()
     try {
-      const uniqueRefundNos = [...new Set(unmatchedRefunds.map(r => r.refund_no).filter(Boolean))]
+      const uniqueRefundNos = [...new Set(shippedRefunds.map(r => r.refund_no).filter(Boolean))]
       for (let i = 0; i < uniqueRefundNos.length; i += 500) {
         const chunk = uniqueRefundNos.slice(i, i + 500)
         const { data: existing } = await sb
@@ -698,7 +1046,7 @@ export async function importEcommerceOrders({ salesOrders, afterSalesOrders, sup
 
     // 4b. 过滤掉已存在的退款号
     const toProcess = []
-    for (const r of unmatchedRefunds) {
+    for (const r of shippedRefunds) {
       if (r.refund_no && existingRefundNos.has(r.refund_no)) {
         result.duplicate++
         continue
@@ -769,59 +1117,7 @@ export async function importEcommerceOrders({ salesOrders, afterSalesOrders, sup
       if (k % (FUZZY_CONC * 5) === 0) await yieldToMainThread()
     }
 
-    // 4f. 批量创建占位订单（一次 insert 全部）
-    if (stillUnmatched.length > 0) {
-      onProgress?.({ type: 'aftersales', current: 0, total: stillUnmatched.length, message: `创建 ${stillUnmatched.length} 个占位订单...` })
-      const phPayloads = []
-      for (let idx = 0; idx < stillUnmatched.length; idx++) {
-        const r = stillUnmatched[idx]
-        const accountId = await getAccountId(r.platform_type, r.platform_store)
-        phPayloads.push({
-          order_no: `REFUND-${r.refund_no || `${Date.now()}-${idx}`}`,
-          customer_name: '售后退款（无原始订单）',
-          customer_phone: '', customer_address: '', product_name: '',
-          product_category: 'other',
-          amount: r.refund_amount,
-          status: 'refunded',
-          order_source: 'cs_service',
-          external_order_no: r.external_order_no || '',
-          platform_type: r.platform_type,
-          platform_store: r.platform_store || '',
-          account_code: r.platform_store || '',
-          payment_amount: r.refund_amount,
-          ...(accountId ? { account_id: accountId } : {}),
-        })
-      }
-      // 分批并发插入（concurrency=4，每批 100）
-      const PH_BATCH = 100, PH_CONC = 4
-      const phBatches = Math.ceil(phPayloads.length / PH_BATCH)
-      const runPh = async (bi) => {
-        const start = bi * PH_BATCH
-        const chunk = phPayloads.slice(start, start + PH_BATCH)
-        const refs = stillUnmatched.slice(start, start + PH_BATCH)
-        try {
-          const { data: placeholders, error } = await sb.from('orders').insert(chunk).select('id, account_id')
-          if (error) {
-            result.failures.push({ message: `批量占位订单失败: ${error.message}` })
-            return
-          }
-          for (let i = 0; i < refs.length; i++) {
-            const ph = placeholders?.[i]
-            if (ph) matchedRefunds.push({ refund: refs[i], orderRow: { id: ph.id, account_id: ph.account_id } })
-          }
-        } catch (e) {
-          result.failures.push({ message: `批量占位订单异常: ${e.message}` })
-        }
-      }
-      for (let k = 0; k < phBatches; k += PH_CONC) {
-        const group = []
-        for (let g = k; g < Math.min(k + PH_CONC, phBatches); g++) group.push(runPh(g))
-        await Promise.all(group)
-        await yieldToMainThread()
-      }
-    }
-
-    // 4g. 批量插入 refunds 记录（concurrency=4，每批 100）
+    // 4f. 批量插入 refunds 记录（只记录已匹配的发货后退款）
     if (matchedRefunds.length > 0) {
       onProgress?.({ type: 'aftersales', current: 0, total: matchedRefunds.length, message: `批量写入 ${matchedRefunds.length} 条退款...` })
       const REF_BATCH = 100, REF_CONC = 4
@@ -867,12 +1163,34 @@ export async function importEcommerceOrders({ salesOrders, afterSalesOrders, sup
         await yieldToMainThread()
       }
 
-      // 4h. 批量更新订单状态为 refunded（in 批量）
-      const orderIds = [...new Set(matchedRefunds.map(m => m.orderRow.id))]
-      for (let i = 0; i < orderIds.length; i += 500) {
-        const chunk = orderIds.slice(i, i + 500)
+      // 4g. 根据累计退款额刷新订单状态
+      const affectedOrderIds = [...new Set(matchedRefunds.map(m => m.orderRow.id).filter(Boolean))]
+      const orderMetaMap = new Map()
+      for (const { orderRow } of matchedRefunds) {
+        if (orderRow?.id && !orderMetaMap.has(orderRow.id)) orderMetaMap.set(orderRow.id, orderRow)
+      }
+      for (let i = 0; i < affectedOrderIds.length; i += 200) {
+        const chunk = affectedOrderIds.slice(i, i + 200)
         try {
-          await sb.from('orders').update({ status: 'refunded' }).in('id', chunk)
+          const { data: allRefunds } = await sb.from('refunds')
+            .select('order_id, refund_amount')
+            .in('order_id', chunk)
+            .eq('status', 'completed')
+            .is('deleted_at', null)
+
+          const totals = new Map()
+          for (const row of (allRefunds || [])) {
+            totals.set(row.order_id, (totals.get(row.order_id) || 0) + Number(row.refund_amount || 0))
+          }
+
+          for (const orderId of chunk) {
+            const orderRow = orderMetaMap.get(orderId)
+            if (!orderRow) continue
+            const refunded = totals.get(orderId) || 0
+            const orderAmount = Number(orderRow.payment_amount || 0)
+            const nextStatus = refunded >= orderAmount ? 'refunded' : 'partially_refunded'
+            await sb.from('orders').update({ status: nextStatus }).eq('id', orderId)
+          }
         } catch (e) { console.warn('批量更新订单状态失败:', e) }
       }
     }
@@ -900,12 +1218,13 @@ export async function importEcommerceOrders({ salesOrders, afterSalesOrders, sup
   const runBal = async ([accountId, delta]) => {
     try {
       const acc = accRowMap.get(accountId)
-      // ⚠️ 电商店铺 balance_method='manual' 不自动累加余额(和 orders.js 的行为保持一致)
-      if (acc && !(acc.category === 'ecommerce' && acc.balance_method === 'manual')) {
-        await sb.from('accounts')
-          .update({ balance: Number(acc.balance) + delta })
-          .eq('id', accountId)
-      }
+      await applyAccountBalanceDelta({
+        accountId,
+        delta,
+        reason: '电商订单导入入账',
+        refType: 'ecommerce_import',
+        skipManualEcommerceIncome: !!acc,
+      })
     } catch (e) {
       console.warn('余额更新失败:', accountId, e)
     } finally {
@@ -989,6 +1308,10 @@ function parseOrderTime(dateStr) {
     return isNaN(d.getTime()) ? null : d.toISOString()
   }
   const str = String(dateStr).trim()
+  if (isExcelSerialString(str)) {
+    const d = new Date((Number(str) - 25569) * 86400 * 1000)
+    return isNaN(d.getTime()) ? null : d.toISOString()
+  }
   const d = new Date(str)
   if (!isNaN(d.getTime())) return d.toISOString()
   // 尝试常见格式: 2026-01-01 12:00:00, 2026/1/1 12:00

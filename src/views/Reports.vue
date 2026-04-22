@@ -753,9 +753,17 @@ import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/auth'
 import { loadXLSX } from '../lib/xlsxLoader'
 import Icon from '../components/icons/Icons.vue'
-// BUG-4 修复：所有"账面净利润"统一从 financialMetrics.computeIncomeStatement 取
-// loadIncome 和 loadEquity 都调用此函数，确保跨 tab 数字一致
-import { computeIncomeStatement } from '../utils/financialMetrics'
+// BUG-4 修复：所有关键财务口径统一从 financialMetrics 取
+// loadOverview 走现金口径，loadIncome / loadEquity 走账面利润口径。
+import {
+  computeIncomeStatement,
+  computeOverviewProfit,
+  isWithdrawalFeeExpense,
+  loadOtherIncome as sharedLoadOtherIncome,
+  loadSalariesCash as sharedLoadSalariesCash,
+  loadTransferFees as sharedLoadTransferFees,
+  loadWithdrawals as sharedLoadWithdrawals,
+} from '../utils/financialMetrics'
 
 const auth = useAuthStore()
 
@@ -809,18 +817,6 @@ const EXPENSE_LABELS = {
   financial_fee: '转账手续费', interest: '利息支出', platform_fee: '平台费用',
   travel: '差旅费用', meal: '餐费', tax: '税费', insurance: '保险',
   equipment: '设备采购', refund: '退款', other: '其他',
-}
-
-const REPORT_GROUP = {
-  livestream_cost: 'cogs',
-  salary: 'labor', social_insurance: 'labor', commission: 'labor', bonus: 'labor', penalty: 'labor',
-  rent: 'operating', water_electric: 'operating', shipping: 'operating', marketing: 'operating',
-  packaging: 'operating', office: 'operating', maintenance: 'operating', storage: 'operating',
-  material: 'operating', daily: 'operating',
-  financial_fee: 'financial', interest: 'financial', platform_fee: 'financial',
-  travel: 'admin', meal: 'admin', tax: 'admin', insurance: 'admin',
-  equipment: 'investing',
-  refund: 'other', other: 'other',
 }
 
 // 中文类别→英文key 反查（覆盖 expense_categories 表所有值）
@@ -886,19 +882,7 @@ function normalizeCategory(cat) {
 
 // 其他收入查询（容错：表不存在则返回空数组）
 async function loadOtherIncome(startISO, endISO) {
-  try {
-    const { data, error } = await supabase
-      .from('other_income')
-      .select('amount, category, created_at')
-      .is('deleted_at', null)
-      .gte('created_at', startISO)
-      .lte('created_at', endISO)
-    if (error) { console.warn('other_income query error (table may not exist):', error.message); return [] }
-    return data || []
-  } catch (e) {
-    console.warn('other_income fallback to empty:', e.message)
-    return []
-  }
+  return sharedLoadOtherIncome(supabase, startISO, endISO)
 }
 
 // ── 公共：加载员工工资数据(现金口径，按 pay_date 过滤) ──
@@ -910,40 +894,12 @@ async function loadOtherIncome(startISO, endISO) {
 // 之前这里按 created_at 过滤是错的：salaries 上传时间和实际发薪日完全不相关，
 // 导致 8 月发的 7 月工资会被算到 8 月的现金流里。
 async function loadSalaries(startISO, endISO) {
-  try {
-    const startDate = (startISO || '').slice(0, 10)
-    const endDate = (endISO || '').slice(0, 10)
-    const { data, error } = await supabase
-      .from('salaries')
-      .select('actual_amount, employee_name, pay_date')
-      .is('deleted_at', null)
-      .not('pay_date', 'is', null)
-      .gte('pay_date', startDate)
-      .lte('pay_date', endDate)
-    if (error) { console.warn('salaries query error:', error.message); return [] }
-    return data || []
-  } catch (e) {
-    console.warn('salaries fallback to empty:', e.message)
-    return []
-  }
+  return sharedLoadSalariesCash(supabase, startISO, endISO)
 }
 
 // ── 公共：加载转账手续费 ──
 async function loadTransferFees(startISO, endISO) {
-  try {
-    const { data, error } = await supabase
-      .from('account_transfers')
-      .select('fee')
-      .is('deleted_at', null)
-      .gt('fee', 0)
-      .gte('transfer_date', startISO)
-      .lte('transfer_date', endISO)
-    if (error) { console.warn('transfer fees query error:', error.message); return 0 }
-    return (data || []).reduce((s, t) => s + num(t.fee), 0)
-  } catch (e) {
-    console.warn('transfer fees fallback to 0:', e.message)
-    return 0
-  }
+  return sharedLoadTransferFees(supabase, startISO, endISO)
 }
 
 const ECOMMERCE_LABELS = {
@@ -1062,32 +1018,7 @@ function orderAmt(o) {
 
 // ── 公共：加载电商提现数据 ──
 async function loadWithdrawals(startISO, endISO) {
-  try {
-    const { data, error } = await supabase
-      .from('withdrawals')
-      .select('amount, actual_arrival, created_at, account_id')
-      .is('deleted_at', null)
-      .gte('created_at', startISO)
-      .lte('created_at', endISO)
-    if (error) throw error
-    // 补充店铺名称
-    const accountIds = [...new Set((data || []).map(w => w.account_id).filter(Boolean))]
-    let storeMap = {}
-    if (accountIds.length > 0) {
-      const { data: stores } = await supabase
-        .from('accounts')
-        .select('id, short_name, ecommerce_platform')
-        .in('id', accountIds)
-      for (const s of (stores || [])) storeMap[s.id] = s
-    }
-    return (data || []).map(w => ({
-      ...w,
-      from_store: storeMap[w.account_id] || null,
-    }))
-  } catch (e) {
-    console.warn('withdrawals query error:', e.message || e)
-    return []
-  }
+  return sharedLoadWithdrawals(supabase, startISO, endISO)
 }
 
 // ── Tab 1: 收支概览 ──
@@ -1095,8 +1026,15 @@ async function loadOverview() {
   const startISO = startDate.value + 'T00:00:00'
   const endISO = endDate.value + 'T23:59:59'
 
+  let overview
+  try {
+    overview = await computeOverviewProfit(supabase, startISO, endISO)
+  } catch (e) {
+    console.error('computeOverviewProfit error:', e)
+    return
+  }
+
   const [ordRes, expRes, withdrawals, otherIncomeRows, salaryRows, transferFeesTotal] = await Promise.all([
-    // 私域订单收入
     supabase
       .from('orders')
       .select('amount, payment_amount, created_at')
@@ -1105,26 +1043,24 @@ async function loadOverview() {
       .is('platform_type', null)
       .gte('created_at', startISO)
       .lte('created_at', endISO),
-    // 支出
     supabase
       .from('expenses')
-      .select('amount, paid_at, created_at')
+      .select('amount, paid_at, created_at, category, note')
       .eq('status', 'paid')
       .is('deleted_at', null)
       .gte('created_at', startISO)
       .lte('created_at', endISO),
-    // 电商提现
     loadWithdrawals(startISO, endISO),
-    // 其他收入
     loadOtherIncome(startISO, endISO),
-    // 员工工资
     loadSalaries(startISO, endISO),
-    // 转账手续费
     loadTransferFees(startISO, endISO),
   ])
 
-  if (ordRes.error) { console.error('orders error:', ordRes.error); return }
-  if (expRes.error) { console.error('expenses error:', expRes.error); return }
+  if (ordRes.error || expRes.error) {
+    console.error('orders error:', ordRes.error)
+    console.error('expenses error:', expRes.error)
+    return
+  }
 
   // Group by date
   const privateByDate = {}
@@ -1138,11 +1074,12 @@ async function loadOverview() {
   }
 
   for (const w of withdrawals) {
-    const d = w.created_at ? w.created_at.substring(0, 10) : null
+    const d = (w.withdrawn_at || w.created_at || '').substring(0, 10)
     if (d) ecomByDate[d] = (ecomByDate[d] || 0) + num(w.actual_arrival)
   }
 
   for (const e of (expRes.data || [])) {
+    if (isWithdrawalFeeExpense(e)) continue
     const d = (e.paid_at || e.created_at || '').substring(0, 10)
     if (d) expenseByDate[d] = (expenseByDate[d] || 0) + num(e.amount)
   }
@@ -1152,12 +1089,18 @@ async function loadOverview() {
     if (d) otherIncomeByDate[d] = (otherIncomeByDate[d] || 0) + num(oi.amount)
   }
 
+  const salaryExpense = salaryRows.reduce((sum, row) => sum + num(row.actual_amount), 0)
+  if (salaryExpense > 0) {
+    const salaryDate = endDate.value
+    expenseByDate[salaryDate] = (expenseByDate[salaryDate] || 0) + salaryExpense
+  }
+  if (transferFeesTotal > 0) {
+    const feeDate = endDate.value
+    expenseByDate[feeDate] = (expenseByDate[feeDate] || 0) + transferFeesTotal
+  }
+
   const allDates = dateRange(startDate.value, endDate.value)
   const daily = []
-  let totalPrivate = 0
-  let totalEcom = 0
-  let totalOtherIncome = 0
-  let totalExpense = 0
 
   for (const date of allDates) {
     const prv = privateByDate[date] || 0
@@ -1166,22 +1109,27 @@ async function loadOverview() {
     const exp = expenseByDate[date] || 0
     if (prv === 0 && ecm === 0 && oth === 0 && exp === 0) continue
     const inc = prv + ecm + oth
-    totalPrivate += prv
-    totalEcom += ecm
-    totalOtherIncome += oth
-    totalExpense += exp
-    daily.push({ date, privateIncome: prv, ecommerceIncome: ecm, otherIncome: oth, income: inc, expense: exp, profit: inc - exp })
+    daily.push({
+      date,
+      privateIncome: prv,
+      ecommerceIncome: ecm,
+      otherIncome: oth,
+      income: inc,
+      expense: exp,
+      profit: inc - exp,
+    })
   }
 
-  // 加上工资和转账手续费
-  const salaryExpense = salaryRows.reduce((s, r) => s + num(r.actual_amount), 0)
-  totalExpense += salaryExpense + transferFeesTotal
-
-  const totalIncome = totalPrivate + totalEcom + totalOtherIncome
-  const netProfit = totalIncome - totalExpense
-  const profitRate = totalIncome > 0 ? ((netProfit / totalIncome) * 100).toFixed(1) : '0.0'
-
-  overviewData.value = { totalIncome, privateIncome: totalPrivate, ecommerceIncome: totalEcom, otherIncome: totalOtherIncome, totalExpense, netProfit, profitRate, daily }
+  overviewData.value = {
+    totalIncome: overview.totalIncome,
+    privateIncome: overview.privateIncome,
+    ecommerceIncome: overview.ecommerceIncome,
+    otherIncome: overview.otherIncome,
+    totalExpense: overview.totalExpense,
+    netProfit: overview.profit,
+    profitRate: overview.profitRate,
+    daily,
+  }
 }
 
 // ── Tab 2: 利润表 ──
@@ -1425,7 +1373,7 @@ async function loadCashflow() {
     // 全部支出
     supabase
       .from('expenses')
-      .select('amount, category')
+      .select('amount, category, note')
       .eq('status', 'paid')
       .is('deleted_at', null)
       .gte('created_at', startISO)
@@ -1466,6 +1414,7 @@ async function loadCashflow() {
   let equipmentExpense = 0
   const catMap = {}
   for (const e of (expRes.data || [])) {
+    if (isWithdrawalFeeExpense(e)) continue
     const amt = num(e.amount)
     const cat = normalizeCategory(e.category)
     if (cat === 'equipment') {

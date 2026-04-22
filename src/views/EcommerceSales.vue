@@ -20,6 +20,10 @@
       </div>
     </div>
 
+    <div v-if="loadError" class="bg-red-50 border border-red-200 rounded-2xl px-4 py-3 text-sm text-red-700">
+      {{ loadError }}
+    </div>
+
     <!-- 平台Tab + 店铺筛选 -->
     <div class="flex flex-col sm:flex-row sm:items-center gap-3">
       <div class="flex gap-1.5">
@@ -60,7 +64,7 @@
     <div class="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
       <div class="text-xs text-gray-500 mb-3"><Icon name="shopping-bag" class="inline w-4 h-4 -mt-0.5 mr-1" /> 待结算资金</div>
       <div v-if="pendingByStore.length" class="space-y-0">
-        <div v-for="(item, idx) in pendingByStore" :key="item.name"
+        <div v-for="item in pendingByStore" :key="item.name"
           :class="[
             'flex items-center justify-between py-2 px-1 text-sm rounded-lg',
             storeFilter && storeFilter === item.name ? 'bg-green-50 font-medium' : ''
@@ -135,7 +139,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, defineAsyncComponent } from 'vue'
-import { supabase } from '../lib/supabase'
+import { supabase, withTimeout } from '../lib/supabase'
 import { useAuthStore } from '../stores/auth'
 import { PLATFORM_LABELS } from '../lib/utils'
 import Icon from '../components/icons/Icons.vue'
@@ -165,6 +169,7 @@ const rangeEnd = ref('')
 const activeRange = ref('')
 const customStart = ref('')
 const customEnd = ref('')
+const loadError = ref('')
 
 // PLATFORM_LABELS 已从 utils.js 统一导入
 
@@ -214,12 +219,6 @@ const rangeLabel = computed(() => {
 
 // 数据
 const storeList = computed(() => [...new Set(dailyData.value.map(d => d.store_name))])
-
-// 获取平台对应的key（从店铺名前缀推断或直接从数据取）
-const platformForStore = (storeName) => {
-  const found = dailyData.value.find(d => d.store_name === storeName && d.ecommerce_platform)
-  return found?.ecommerce_platform || 'other'
-}
 
 const filteredData = computed(() => {
   let data = dailyData.value
@@ -336,94 +335,70 @@ function platformLabel(key) {
 // 加载数据
 async function loadData() {
   if (!rangeStart.value) return
+  loadError.value = ''
 
-  // 查询电商订单（platform_type 非空）
-  const { data: ordersRaw } = await supabase
-    .from('orders')
-    .select('id, amount, payment_amount, account_id, status, platform_type, platform_store, created_at')
-    .is('deleted_at', null)
-    .not('platform_type', 'is', null)
-    .gte('created_at', rangeStart.value + 'T00:00:00')
-    .lte('created_at', rangeEnd.value + 'T23:59:59')
-  const orders = ordersRaw || []
+  try {
+    const [dailyRes, accountRes] = await Promise.all([
+      withTimeout(
+        supabase
+          .from('v_ecommerce_daily')
+          .select('*')
+          .gte('order_date', rangeStart.value)
+          .lte('order_date', rangeEnd.value)
+          .order('order_date', { ascending: false }),
+        15000,
+        '加载电商日统计'
+      ),
+      withTimeout(
+        supabase
+          .from('accounts')
+          .select('id, short_name, ecommerce_platform, balance, status')
+          .not('ecommerce_platform', 'is', null),
+        10000,
+        '加载电商账户'
+      ),
+    ])
 
-  // 获取这些订单的已完成退款
-  const orderIds = orders.map(o => o.id)
-  let refundsMap = {}
-  if (orderIds.length > 0) {
-    // 分批查询退款（避免超出 URL 长度限制）
-    const batchSize = 200
-    for (let i = 0; i < orderIds.length; i += batchSize) {
-      const batch = orderIds.slice(i, i + batchSize)
-      const { data: refundsRaw } = await supabase
-        .from('refunds')
-        .select('order_id, refund_amount')
-        .is('deleted_at', null)
-        .in('order_id', batch)
-        .eq('status', 'completed')
-      if (refundsRaw) {
-        refundsRaw.forEach(r => {
-          refundsMap[r.order_id] = (refundsMap[r.order_id] || 0) + Number(r.refund_amount || 0)
-        })
-      }
-    }
+    if (dailyRes.error) throw dailyRes.error
+    if (accountRes.error) throw accountRes.error
+
+    dailyData.value = (dailyRes.data || []).map((row) => ({
+      ...row,
+      order_count: Number(row.order_count || 0),
+      effective_count: Number(row.effective_count || row.order_count || 0),
+      sales_amount: Number(row.sales_amount || 0),
+      refund_amount: Number(row.refund_amount || 0),
+      net_income: Number(row.net_income || 0),
+    }))
+
+    accountData.value = (accountRes.data || []).filter((account) => account.status === 'active')
+  } catch (e) {
+    console.error('[EcommerceSales] loadData error:', e)
+    dailyData.value = []
+    accountData.value = []
+    loadError.value = `电商销量加载失败：${e?.message || '未知错误'}`
   }
+}
 
-  // 加载账户信息用于 store_name 映射
-  const { data: accData } = await supabase
-    .from('accounts')
-    .select('id, short_name, ecommerce_platform, balance, status')
-    .not('ecommerce_platform', 'is', null)
-  const accountsAll = accData || []
-  const accountMap = {}
-  accountsAll.forEach(a => { accountMap[a.id] = a })
-
-  // 客户端按 日期 + account_id + platform_type 聚合
-  const aggMap = {}
-  orders.forEach(o => {
-    const orderDate = o.created_at ? o.created_at.split('T')[0] : ''
-    if (!orderDate) return
-    const key = `${orderDate}|${o.account_id || ''}|${o.platform_type}`
-    if (!aggMap[key]) {
-      const acc = accountMap[o.account_id] || {}
-      aggMap[key] = {
-        order_date: orderDate,
-        account_id: o.account_id,
-        store_name: o.platform_store || acc.short_name || '未知',
-        ecommerce_platform: o.platform_type,
-        order_count: 0,
-        effective_count: 0,
-        sales_amount: 0,
-        refund_amount: 0,
-        net_income: 0,
-      }
-    }
-    const row = aggMap[key]
-    const amt = Number(o.payment_amount || o.amount || 0)
-    const refAmt = refundsMap[o.id] || 0
-    row.order_count += 1
-    row.sales_amount += amt
-    row.refund_amount += refAmt
-    row.net_income += amt - refAmt
-    // 有效单：未被完全退款的订单
-    if (refAmt < amt) {
-      row.effective_count += 1
-    }
-  })
-
-  dailyData.value = Object.values(aggMap)
-
-  // 加载待结算资金（分店铺）
-  accountData.value = accountsAll.filter(a => a.status === 'active')
+function initializeRange() {
+  if (rangeStart.value && rangeEnd.value) return
+  setDateRange('7days')
 }
 
 onMounted(() => {
-  if (auth.isLoggedIn) {
-    setDateRange('7days')
-  } else {
-    const unwatch = watch(() => auth.isLoggedIn, (val) => {
-      if (val) { setDateRange('7days'); unwatch() }
-    })
-  }
+  initializeRange()
 })
+
+watch(
+  () => auth.user,
+  (userId) => {
+    if (!userId) return
+    if (!rangeStart.value || !rangeEnd.value) {
+      setDateRange('7days')
+      return
+    }
+    loadData()
+  },
+  { immediate: true }
+)
 </script>

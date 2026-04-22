@@ -365,6 +365,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from '../stores/auth'
 import { useAccountStore } from '../stores/accounts'
+import { createAccountTransferWithFallback } from '../lib/financeTransactions'
 import { formatMoney, PLATFORM_LABELS, toast, formatDate } from '../lib/utils'
 import { randomPick, randomAmount } from '../lib/testDataHelper'
 import { logOperation, getAccountBalance, formatMoneyStr } from '../utils/operationLogger'
@@ -413,6 +414,60 @@ function toggleSelectAll(e) {
     selectedIds.value = filteredTransfers.value.map(t => t.id)
   } else {
     selectedIds.value = []
+  }
+}
+
+function normalizeTransferRow(data) {
+  return {
+    ...data,
+    from_code: data.from_account?.code || '—',
+    to_code: data.to_account?.code || '—',
+    from_name: data.from_account?.short_name || data.from_account?.code || '—',
+    to_name: data.to_account?.short_name || data.to_account?.code || '—',
+    creator_name: '',
+  }
+}
+
+function resetTransferForm() {
+  showTransferModal.value = false
+  form.from_account_id = ''
+  form.to_account_id = ''
+  form.amount = null
+  form.fee = 0
+  form.note = ''
+  form.fee_detail = { technical_fee: 0, payment_fee: 0, withdraw_fee: 0, other_fee: 0 }
+  form.fee_mode = 'from_balance'
+}
+
+async function createTransferRecord({
+  fromAccountId,
+  toAccountId,
+  amount,
+  fee = 0,
+  feeMode = 'from_balance',
+  note = null,
+  transferDate = null,
+}) {
+  const data = await createAccountTransferWithFallback({
+    fromAccountId,
+    toAccountId,
+    amount,
+    fee,
+    feeMode,
+    note,
+    transferDate,
+  })
+
+  const { data: transferRow, error: fetchError } = await supabase
+    .from('account_transfers')
+    .select('*, from_account:from_account_id(code, short_name, ip_code), to_account:to_account_id(code, short_name, ip_code)')
+    .eq('id', data.transfer_id)
+    .single()
+  if (fetchError) throw fetchError
+
+  return {
+    transfer: normalizeTransferRow(transferRow),
+    balances: data,
   }
 }
 
@@ -530,7 +585,6 @@ async function generateTestData(count) {
   try {
     let accs = accountStore.getActiveAccounts()
     if (accs.length < 2) { toast('至少需要2个活跃账户', 'warning'); return }
-    const userId = (await supabase.auth.getSession()).data.session?.user?.id
     let success = 0
     for (let i = 0; i < count; i++) {
       const shuffled = [...accs].sort(() => Math.random() - 0.5)
@@ -539,31 +593,13 @@ async function generateTestData(count) {
       const amt = randomAmount(500, 10000)
       // 确保余额足够
       if (Number(fromAcc.balance) < amt) continue
-      const { data, error } = await supabase
-        .from('account_transfers')
-        .insert({
-          from_account_id: fromAcc.id,
-          to_account_id: toAcc.id,
-          amount: amt,
-          fee: 0,
-          note: `测试转账-${randomPick(['日常', '调拨', '归集', '备用'])}`,
-          transfer_date: new Date().toISOString(),
-        })
-        .select('*, from_account:from_account_id(code, short_name), to_account:to_account_id(code, short_name)')
-        .single()
-      if (error) throw error
-      transfers.value.unshift({
-        ...data,
-        from_code: data.from_account?.code || '—',
-        to_code: data.to_account?.code || '—',
-        from_name: data.from_account?.short_name || data.from_account?.code || '—',
-        to_name: data.to_account?.short_name || data.to_account?.code || '—',
-        creator_name: '',
+      const { transfer } = await createTransferRecord({
+        fromAccountId: fromAcc.id,
+        toAccountId: toAcc.id,
+        amount: amt,
+        note: `测试转账-${randomPick(['日常', '调拨', '归集', '备用'])}`,
       })
-      // 更新余额
-      const { useAccountStore } = await import('../stores/accounts')
-      await useAccountStore().updateBalance(fromAcc.id, -amt)
-      await useAccountStore().updateBalance(toAcc.id, amt)
+      transfers.value.unshift(transfer)
       // 操作日志
       try {
         const { logOperation, getAccountBalance } = await import('../utils/operationLogger')
@@ -602,12 +638,7 @@ onMounted(async () => {
       .order('created_at', { ascending: false })
     if (error) throw error
     transfers.value = (data || []).map(t => ({
-      ...t,
-      from_code: t.from_account?.code || '—',
-      to_code: t.to_account?.code || '—',
-      from_name: t.from_account?.short_name || t.from_account?.code || '—',
-      to_name: t.to_account?.short_name || t.to_account?.code || '—',
-      creator_name: '',
+      ...normalizeTransferRow(t),
     }))
   } catch (e) {
     console.error('Failed to load transfers:', e)
@@ -627,7 +658,7 @@ async function handleTransfer() {
   // 余额校验：转出金额 + 手续费不能超过账户余额
   const fromAccount = accounts.value.find(a => a.id === form.from_account_id)
   const fee = effectiveFee.value
-  const totalDebit = Number(form.amount) + fee
+  const totalDebit = Number(form.amount) + (form.fee_mode === 'from_balance' ? fee : 0)
   if (fromAccount && Number(fromAccount.balance) < totalDebit) {
     toast(`余额不足！账户 ${fromAccount.code} 余额 ¥${Number(fromAccount.balance).toFixed(2)}，需要 ¥${totalDebit.toFixed(2)}`, 'warning')
     return
@@ -646,64 +677,28 @@ async function handleTransfer() {
     const fromAccBefore = await getAccountBalance(form.from_account_id)
     const toAccBefore = await getAccountBalance(form.to_account_id)
 
-    // 1. 先插入转账记录（保证有据可查）
-    const { data, error } = await supabase
-      .from('account_transfers')
-      .insert({
-        from_account_id: form.from_account_id,
-        to_account_id: form.to_account_id,
-        amount: Number(form.amount),
-        fee: fee,
-        note: transferNote || null,
-        transfer_date: new Date().toISOString(),
-      })
-      .select('*, from_account:from_account_id(code, short_name), to_account:to_account_id(code, short_name)')
-      .single()
-
-    if (error) throw error
-
-    // 2. 记录插入成功后，更新账户余额
-    let transferResult = null
-    try {
-      const { useAccountStore } = await import('../stores/accounts')
-      const accStore = useAccountStore()
-      // 转出账户扣款（金额 + 外扣手续费）
-      const totalDebit = fee > 0 && form.fee_mode === 'from_balance'
-        ? Number(form.amount) + fee
-        : Number(form.amount)
-      await accStore.updateBalance(form.from_account_id, -totalDebit)
-      // 转入账户加款（金额 - 内扣手续费）
-      const actualCredit = fee > 0 && form.fee_mode === 'deduct'
-        ? Number(form.amount) - fee
-        : Number(form.amount)
-      await accStore.updateBalance(form.to_account_id, actualCredit)
-    } catch (balErr) {
-      // 余额更新失败，删除刚插入的记录保持一致性
-      console.error('余额更新失败，回滚转账记录:', balErr)
-      await supabase.from('account_transfers').delete().eq('id', data.id)
-      throw new Error('余额更新失败，转账已回滚：' + (balErr.message || balErr))
-    }
-
-    transfers.value.unshift({
-      ...data,
-      from_code: data.from_account?.code || '—',
-      to_code: data.to_account?.code || '—',
-      from_name: data.from_account?.short_name || data.from_account?.code || '—',
-      to_name: data.to_account?.short_name || data.to_account?.code || '—',
-      creator_name: '',
+    const { transfer, balances } = await createTransferRecord({
+      fromAccountId: form.from_account_id,
+      toAccountId: form.to_account_id,
+      amount: Number(form.amount),
+      fee,
+      feeMode: form.fee_mode,
+      note: transferNote || null,
+      transferDate: new Date().toISOString(),
     })
+    transfers.value.unshift(transfer)
 
-    const fromName = fromAccBefore?.name || data.from_account?.short_name || data.from_account?.code || ''
-    const toName = toAccBefore?.name || data.to_account?.short_name || data.to_account?.code || ''
+    const fromName = fromAccBefore?.name || transfer.from_name || ''
+    const toName = toAccBefore?.name || transfer.to_name || ''
 
     // 操作日志（两个账户各记一条）
     try {
       const fromOld = Number(fromAccBefore?.balance ?? 0)
       const toOld = Number(toAccBefore?.balance ?? 0)
-      const totalDebitLog = fee > 0 && form.fee_mode === 'from_balance' ? Number(form.amount) + fee : Number(form.amount)
-      const actualCreditLog = fee > 0 && form.fee_mode === 'deduct' ? Number(form.amount) - fee : Number(form.amount)
-      const fromNew = fromOld - totalDebitLog
-      const toNew = toOld + actualCreditLog
+      const totalDebitLog = Number(balances.total_debit ?? (fee > 0 && form.fee_mode === 'from_balance' ? Number(form.amount) + fee : Number(form.amount)))
+      const actualCreditLog = Number(balances.actual_credit ?? (fee > 0 && form.fee_mode === 'from_amount' ? Number(form.amount) - fee : Number(form.amount)))
+      const fromNew = Number(balances.from_new_balance ?? (fromOld - totalDebitLog))
+      const toNew = Number(balances.to_new_balance ?? (toOld + actualCreditLog))
       const fromDebit = totalDebitLog
       const toCredit = actualCreditLog
 
@@ -712,7 +707,7 @@ async function handleTransfer() {
         action: 'transfer_out',
         module: '转账',
         description: `转出 ${formatMoneyStr(fromDebit)} 至 ${toName}${fee > 0 ? `，费用 ${formatMoneyStr(fee)}（${form.fee_mode === 'from_balance' ? '外扣' : '内扣'}）` : ''}，余额 ${fromOld.toFixed(2)} - ${fromDebit.toFixed(2)} → ${fromNew.toFixed(2)}`,
-        detail: { transfer_id: data.id, amount: form.amount, fee, fee_mode: form.fee_mode, from_debit: fromDebit, to_account_id: form.to_account_id, to_name: toName },
+        detail: { transfer_id: transfer.id, amount: form.amount, fee, fee_mode: form.fee_mode, from_debit: fromDebit, to_account_id: form.to_account_id, to_name: toName },
         amount: fromDebit,
         accountId: form.from_account_id,
         accountName: fromName,
@@ -722,24 +717,18 @@ async function handleTransfer() {
         action: 'transfer_in',
         module: '转账',
         description: `收到 ${fromName} 转入 ${formatMoneyStr(toCredit)}，余额 ${toOld.toFixed(2)} + ${toCredit.toFixed(2)} → ${toNew.toFixed(2)}`,
-        detail: { transfer_id: data.id, amount: form.amount, fee, fee_mode: form.fee_mode, to_credit: toCredit, from_account_id: form.from_account_id, from_name: fromName },
+        detail: { transfer_id: transfer.id, amount: form.amount, fee, fee_mode: form.fee_mode, to_credit: toCredit, from_account_id: form.from_account_id, from_name: fromName },
         amount: toCredit,
         accountId: form.to_account_id,
         accountName: toName,
       })
     } catch (e) { console.warn("[silent catch]", e?.message || e) }
 
-    // 刷新账户余额
-    const { useAccountStore: _accStore } = await import('../stores/accounts')
-    await _accStore().fetchAccounts(true)
+    accountStore.invalidateCache()
+    await accountStore.fetchAccounts()
+    accounts.value = accountStore.accounts
 
-    showTransferModal.value = false
-    form.from_account_id = ''
-    form.to_account_id = ''
-    form.amount = null
-    form.fee = 0
-    form.note = ''
-    form.fee_detail = { technical_fee: 0, payment_fee: 0, withdraw_fee: 0, other_fee: 0 }
+    resetTransferForm()
     toast('转账记录已保存', 'success')
   } catch (e) {
     console.error(e)
@@ -758,7 +747,7 @@ async function handleDeleteTransfer(t) {
     const toAccBefore = t.to_account_id ? await getAccountBalance(t.to_account_id) : null
 
     // 用批量 RPC 统一处理（含余额退回）
-    const { data, error } = await supabase.rpc('batch_delete_transfers', { p_ids: [t.id] })
+    const { error } = await supabase.rpc('batch_delete_transfers', { p_ids: [t.id] })
     if (error) throw error
 
     // 操作日志（两个账户各记一条）
@@ -795,6 +784,9 @@ async function handleDeleteTransfer(t) {
     toast('转账已删除', 'success')
     transfers.value = transfers.value.filter(x => x.id !== t.id)
     selectedIds.value = selectedIds.value.filter(id => id !== t.id)
+    accountStore.invalidateCache()
+    await accountStore.fetchAccounts()
+    accounts.value = accountStore.accounts
   } catch (e) {
     toast(e.message || '操作失败', 'error')
   }
@@ -807,17 +799,8 @@ async function handleBatchDelete() {
   try {
     const { data, error } = await supabase.rpc('batch_delete_transfers', { p_ids: selectedIds.value })
     if (error) throw error
-    // 退回余额：from_account 加回来，to_account 扣回去
-    const { useAccountStore } = await import('../stores/accounts')
     const { logOperation, getAccountBalance } = await import('../utils/operationLogger')
     for (const t of selectedTransfers) {
-      let fromBal = null, toBal = null
-      if (t.from_account_id && t.amount) {
-        try { fromBal = await useAccountStore().updateBalance(t.from_account_id, Number(t.amount)) } catch (e) { console.error('[Transfers] 转出账户余额回滚失败 — 数据可能不一致', e); toast('转出账户余额回滚失败,请手动核对账户余额', 'error') }
-      }
-      if (t.to_account_id && t.amount) {
-        try { toBal = await useAccountStore().updateBalance(t.to_account_id, -Number(t.amount)) } catch (e) { console.error('[Transfers] 转入账户余额回滚失败 — 数据可能不一致', e); toast('转入账户余额回滚失败,请手动核对账户余额', 'error') }
-      }
       try {
         const fromAcc = t.from_account_id ? await getAccountBalance(t.from_account_id) : null
         const toAcc = t.to_account_id ? await getAccountBalance(t.to_account_id) : null
@@ -825,7 +808,7 @@ async function handleBatchDelete() {
           action: 'delete_transfer',
           module: '转账',
           description: `[批量删除] 删除转账 ${t.transfer_no || ''}，金额 ${Number(t.amount || 0).toFixed(2)}，${fromAcc?.name || ''} → ${toAcc?.name || ''}`,
-          detail: { transfer_id: t.id, amount: t.amount, from_account: fromAcc?.name, to_account: toAcc?.name, from_balance_before: fromBal?.old_balance, from_balance_after: fromBal?.new_balance, to_balance_before: toBal?.old_balance, to_balance_after: toBal?.new_balance },
+          detail: { transfer_id: t.id, amount: t.amount, from_account: fromAcc?.name, to_account: toAcc?.name, fee: t.fee, fee_mode: t.fee_mode },
           amount: t.amount,
         })
       } catch (e) { console.warn("[silent catch]", e?.message || e) }
@@ -833,6 +816,9 @@ async function handleBatchDelete() {
     toast(`已删除 ${data?.deleted || 0} 条转账记录`, 'success')
     transfers.value = transfers.value.filter(x => !selectedIds.value.includes(x.id))
     selectedIds.value = []
+    accountStore.invalidateCache()
+    await accountStore.fetchAccounts()
+    accounts.value = accountStore.accounts
   } catch (e) {
     toast('批量删除失败：' + (e.message || ''), 'error')
   }
@@ -1101,44 +1087,14 @@ async function submitParsedTransfer(idx) {
   }
   submittingParsed.value = true
   try {
-    const userId = (await supabase.auth.getSession()).data.session?.user?.id
-
-    // 先通过 RPC 原子转账，成功后再插入记录
-    const { data: rpcResult, error: rpcError } = await supabase.rpc('transfer_balance', {
-      p_from: tr.from_account_id,
-      p_to: tr.to_account_id,
-      p_amount: Number(tr.amount),
-      p_fee: 0,
-      p_fee_mode: null
+    const { transfer } = await createTransferRecord({
+      fromAccountId: tr.from_account_id,
+      toAccountId: tr.to_account_id,
+      amount: Number(tr.amount),
+      note: tr.note || null,
+      transferDate: tr.transfer_date || new Date().toISOString().slice(0, 10),
     })
-    if (rpcError) throw rpcError
-
-    // RPC 成功后插入转账记录
-    const { data, error } = await supabase
-      .from('account_transfers')
-      .insert({
-        from_account_id: tr.from_account_id,
-        to_account_id: tr.to_account_id,
-        amount: Number(tr.amount),
-        fee: 0,
-        note: tr.note || null,
-        created_by: userId,
-        status: 'completed',
-        transfer_date: tr.transfer_date || new Date().toISOString().slice(0, 10),
-      })
-      .select('*, from_account:from_account_id(code, short_name), to_account:to_account_id(code, short_name)')
-      .single()
-
-    if (error) throw error
-
-    transfers.value.unshift({
-      ...data,
-      from_code: data.from_account?.code || '—',
-      to_code: data.to_account?.code || '—',
-      from_name: data.from_account?.short_name || data.from_account?.code || '—',
-      to_name: data.to_account?.short_name || data.to_account?.code || '—',
-      creator_name: '',
-    })
+    transfers.value.unshift(transfer)
 
     // 操作日志
     try {
@@ -1174,48 +1130,16 @@ async function submitAllParsedTransfers() {
   let successCount = 0
   let failCount = 0
   try {
-    const userId = (await supabase.auth.getSession()).data.session?.user?.id
     for (const tr of valid) {
       try {
-        const { data, error } = await supabase
-          .from('account_transfers')
-          .insert({
-            from_account_id: tr.from_account_id,
-            to_account_id: tr.to_account_id,
-            amount: Number(tr.amount),
-            fee: 0,
-            note: tr.note || null,
-            created_by: userId,
-            status: 'completed',
-            transfer_date: tr.transfer_date || new Date().toISOString().slice(0, 10),
-          })
-          .select('*, from_account:from_account_id(code, short_name), to_account:to_account_id(code, short_name)')
-          .single()
-
-        if (error) throw error
-
-        transfers.value.unshift({
-          ...data,
-          from_code: data.from_account?.code || '—',
-          to_code: data.to_account?.code || '—',
-          from_name: data.from_account?.short_name || data.from_account?.code || '—',
-          to_name: data.to_account?.short_name || data.to_account?.code || '—',
-          creator_name: '',
+        const { transfer } = await createTransferRecord({
+          fromAccountId: tr.from_account_id,
+          toAccountId: tr.to_account_id,
+          amount: Number(tr.amount),
+          note: tr.note || null,
+          transferDate: tr.transfer_date || new Date().toISOString().slice(0, 10),
         })
-
-        // ⚠️ 用 transfer_balance RPC 原子转账（批量内也用 RPC，防止中途失败导致不一致）
-        try {
-          const { data: rpcResult, error: rpcError } = await supabase.rpc('transfer_balance', {
-            p_from: tr.from_account_id,
-            p_to: tr.to_account_id,
-            p_amount: Number(tr.amount),
-            p_fee: 0,
-            p_fee_mode: null
-          })
-          if (rpcError) throw rpcError
-        } catch (e) {
-          console.error('❌ 批量转账余额变动失败，转出:', tr.from_account_id, '转入:', tr.to_account_id, '金额:', tr.amount, e)
-        }
+        transfers.value.unshift(transfer)
 
         // 操作日志
         try {
@@ -1242,6 +1166,9 @@ async function submitAllParsedTransfers() {
   } finally {
     submittingParsed.value = false
     parsedTransfers.value = []
+    accountStore.invalidateCache()
+    await accountStore.fetchAccounts()
+    accounts.value = accountStore.accounts
     toast(`成功提交 ${successCount} 条${failCount > 0 ? `，失败 ${failCount} 条` : ''}`, successCount > 0 ? 'success' : 'error')
   }
 }

@@ -654,6 +654,7 @@ import Icon from '../components/icons/Icons.vue'
 import { useAuthStore } from '../stores/auth'
 import { useAccountStore } from '../stores/accounts'
 import { supabase } from '../lib/supabase'
+import { applyAccountBalanceDelta } from '../lib/accountBalance'
 import { formatMoney, PLATFORM_LABELS, toast, formatDate } from '../lib/utils'
 import Skeleton from '../components/Skeleton.vue'
 import AccountTransactions from '../components/AccountTransactions.vue'
@@ -753,12 +754,12 @@ async function saveAdjustment() {
     })
     if (ie) throw ie
     // 2) 同步 balance
-    const newBal = Number(adjustForm.currentBalance) + signed
-    const { error: ue } = await supabase.from('accounts').update({ balance: newBal }).eq('id', adjustForm.accountId)
-    if (ue) throw ue
-    // 3) 本地 store 同步
-    const idx = accountStore.accounts.findIndex(a => a.id === adjustForm.accountId)
-    if (idx >= 0) accountStore.accounts[idx].balance = newBal
+    await applyAccountBalanceDelta({
+      accountId: adjustForm.accountId,
+      delta: signed,
+      reason: '手动调整余额',
+      refType: 'manual_adjustment',
+    })
     toast(`调整成功：${adjustForm.accountName} ${signed >= 0 ? '+' : ''}${signed.toFixed(2)}`, 'success')
     showAdjustModal.value = false
   } catch (e) {
@@ -1216,10 +1217,12 @@ async function batchAction(action) {
   const ids = [...selectedIds.value]
   try {
     if (action === 'freeze') {
-      await supabase.from('accounts').update({ status: 'frozen' }).in('id', ids)
+      const { error } = await supabase.from('accounts').update({ status: 'frozen' }).in('id', ids)
+      if (error) throw error
       toast(`已停用 ${ids.length} 个账户`, 'success')
     } else if (action === 'activate') {
-      await supabase.from('accounts').update({ status: 'active' }).in('id', ids)
+      const { error } = await supabase.from('accounts').update({ status: 'active' }).in('id', ids)
+      if (error) throw error
       toast(`已启用 ${ids.length} 个账户`, 'success')
     } else if (action === 'delete') {
       const withBalance = ids.filter(id => {
@@ -1230,7 +1233,8 @@ async function batchAction(action) {
         toast(`${withBalance.length} 个账户仍有余额，请先处理`, 'warning')
         return
       }
-      await supabase.from('accounts').update({ status: 'deleted' }).in('id', ids)
+      const { error } = await supabase.from('accounts').update({ status: 'deleted' }).in('id', ids)
+      if (error) throw error
       toast(`已删除 ${ids.length} 个账户`, 'success')
     }
     accountStore._forceRefresh = true

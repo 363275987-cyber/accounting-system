@@ -1,17 +1,16 @@
 // ══════════════════════════════════════════════════════════
 // 店铺提现 共享业务逻辑
-// 一次提现 = 5 步：
-//   1) 读 + 更新 店铺(源)账户余额（底线 0）
-//   2) 读 + 更新 目标账户余额
-//   3) 若手续费 > 0：写 expenses 一条（电商手续费）
-//   4) 写 withdrawals 明细
-//   5) 写双端 operation log（调用方提供 logger 即可）
+// 一次提现 = 事务优先 / 前端兼容兜底：
+//   1) 优先走数据库 RPC（单事务）
+//   2) 若线上库尚未迁移，则退回前端兼容流程
+//   3) 无论哪条路，最终都产出同一套余额结果 + 日志
 //
 // 给调用者：Ecommerce.vue / Expenses.vue 智能记账里的"店铺提现"卡片
 // 两端共用这把刀，数值/余额/手续费一致，单点修改
 // ══════════════════════════════════════════════════════════
 
 import { supabase } from './supabase'
+import { createStoreWithdrawalWithFallback } from './financeTransactions'
 import { logOperation } from '../utils/operationLogger'
 
 /**
@@ -31,6 +30,7 @@ import { logOperation } from '../utils/operationLogger'
  *   newStoreBalance: number,
  *   oldTargetBalance: number,
  *   newTargetBalance: number,
+ *   withdrawalId: string | null,
  * }>}
  */
 export async function performStoreWithdrawal({
@@ -48,87 +48,22 @@ export async function performStoreWithdrawal({
   const arriveAmount = Number(amount) || 0
   if (arriveAmount <= 0) throw new Error('到账金额必须大于 0')
   const fee = Number(feeAmount) || 0
-  const totalDeduct = arriveAmount + fee
+  const result = await createStoreWithdrawalWithFallback({
+    storeId,
+    toAccountId,
+    amount: arriveAmount,
+    feeAmount: fee,
+    feeRemark,
+    remark,
+    storeName,
+  })
 
-  // ── 1. 店铺余额扣款（底线 0）─────────────────────────
-  // 只读 balance，保持查询最小面，避免 PostgREST schema 缓存落后导致 400
-  const { data: storeAcc, error: e1 } = await supabase
-    .from('accounts')
-    .select('balance')
-    .eq('id', storeId)
-    .single()
-  if (e1) throw new Error('读取店铺余额失败: ' + (e1.message || ''))
-
-  const oldStoreBalance = Number(storeAcc.balance || 0)
-  // ⚠️ 余额不足直接拒绝，不能地板到 0 —— 否则目标账户会凭空加钱
-  if (totalDeduct > oldStoreBalance + 0.0001) {
-    throw new Error(
-      `店铺余额不足：当前 ¥${oldStoreBalance.toFixed(2)}，本次需扣 ¥${totalDeduct.toFixed(2)}`
-    )
-  }
-  const newStoreBalance = oldStoreBalance - totalDeduct
-  const { error: e2 } = await supabase
-    .from('accounts')
-    .update({ balance: newStoreBalance })
-    .eq('id', storeId)
-  if (e2) throw new Error('更新店铺余额失败: ' + (e2.message || ''))
-
-  // ── 2. 目标账户加钱 ────────────────────────────────
-  const { data: targetAcc, error: e3 } = await supabase
-    .from('accounts')
-    .select('balance')
-    .eq('id', toAccountId)
-    .single()
-  if (e3) throw new Error('读取到账账户余额失败: ' + (e3.message || ''))
-
-  const oldTargetBalance = Number(targetAcc.balance || 0)
-  const newTargetBalance = oldTargetBalance + arriveAmount
-  const { error: e4 } = await supabase
-    .from('accounts')
-    .update({ balance: newTargetBalance })
-    .eq('id', toAccountId)
-  if (e4) throw new Error('更新到账账户余额失败: ' + (e4.message || ''))
-
-  // ── 3. 手续费记支出 ────────────────────────────────
-  if (fee > 0) {
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      const userId = session?.user?.id
-      const feeNote = feeRemark || `${storeName || ''} 提现手续费`
-      const nowIso = new Date().toISOString()
-      await supabase.from('expenses').insert({
-        amount: fee,
-        category: '电商手续费',
-        payee: storeName || '提现',
-        note: feeNote,
-        status: 'paid',
-        account_id: storeId,
-        created_by: userId,
-        approver_id: userId,
-        approved_at: nowIso,
-        paid_at: nowIso,
-      })
-    } catch (feeErr) {
-      console.warn('[storeWithdrawal] 手续费支出写入失败:', feeErr)
-      // 手续费记账失败不回滚主流程（与旧逻辑保持一致）
-    }
-  }
-
-  // ── 4. withdrawals 明细 ───────────────────────────
-  try {
-    await supabase.from('withdrawals').insert({
-      account_id: storeId,
-      to_account_id: toAccountId,
-      amount: totalDeduct,
-      actual_arrival: arriveAmount,
-      fee_detail: fee > 0 ? [{ amount: fee, label: feeRemark || '手续费' }] : [],
-      store_name: storeName || '',
-      remark: remark || '',
-      status: 'completed',
-    })
-  } catch (wErr) {
-    console.warn('[storeWithdrawal] withdrawals 明细写入失败:', wErr)
-  }
+  const totalDeduct = Number(result?.total_deduct || arriveAmount + fee)
+  const oldStoreBalance = Number(result?.store_old_balance || 0)
+  const newStoreBalance = Number(result?.store_new_balance || 0)
+  const oldTargetBalance = Number(result?.to_old_balance || 0)
+  const newTargetBalance = Number(result?.to_new_balance || 0)
+  const withdrawalId = result?.withdrawal_id || null
 
   // ── 5. 操作日志（双端） ─────────────────────────────
   const remarkText = remark ? `（${remark}）` : ''
@@ -151,6 +86,7 @@ export async function performStoreWithdrawal({
         feeRemark,
         toAccount: targetLabel,
         remark,
+        withdrawalId,
       },
     })
     await logOperation({
@@ -167,9 +103,10 @@ export async function performStoreWithdrawal({
         fromStore: storeName || '',
         fromStoreId: storeId,
         remark,
+        withdrawalId,
       },
     })
-  } catch (_) {
+  } catch {
     // 日志失败不阻断主流程
   }
 
@@ -190,7 +127,7 @@ export async function performStoreWithdrawal({
         .eq('id', storeId)
       if (!dfErr) defaultTargetSaved = true
     }
-  } catch (_) {
+  } catch {
     // 记忆失败不影响主流程
   }
 
@@ -200,6 +137,7 @@ export async function performStoreWithdrawal({
     newStoreBalance,
     oldTargetBalance,
     newTargetBalance,
+    withdrawalId,
     defaultTargetSaved,
   }
 }

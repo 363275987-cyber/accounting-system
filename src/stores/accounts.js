@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { supabase, withTimeout } from '../lib/supabase'
+import { applyAccountBalanceDelta } from '../lib/accountBalance'
 
 // 账户列表缓存 TTL(毫秒)。30 秒内重入不触发网络
 const ACCOUNTS_TTL_MS = 30_000
@@ -42,6 +43,7 @@ export const useAccountStore = defineStore('accounts', {
           this._lastFetch = Date.now()
         } catch (e) {
           console.error('Failed to fetch accounts:', e)
+          throw e
         } finally {
           this.loading = false
           this._inflight = null
@@ -201,28 +203,13 @@ export const useAccountStore = defineStore('accounts', {
     // 更新账户余额（原子操作）
     // amountDelta > 0 增加，< 0 减少
     async updateBalance(accountId, amountDelta, reason = '订单余额变动', refType = 'order', refId = null) {
-      const { data, error } = await withTimeout(
-        supabase.rpc('increment_balance', {
-          p_account_id: accountId,
-          p_delta: amountDelta,
-          p_reason: reason,
-          p_ref_type: refType,
-          p_ref_id: refId,
-        }),
-        10000,
-        '更新账户余额'
-      )
-      if (error) throw error
-      // data 现在是 {old_balance, new_balance}
-      const newBal = data?.new_balance ?? (typeof data === 'number' ? data : null)
-      if (newBal == null) {
-        // RPC 没返回新余额，直接从库里拉一次兜底，避免本地缓存错位
-        await this.refreshBalance(accountId)
-      } else {
-        const idx = this.accounts.findIndex(a => a.id === accountId)
-        if (idx >= 0) this.accounts[idx].balance = Number(newBal)
-      }
-      return data
+      return applyAccountBalanceDelta({
+        accountId,
+        delta: amountDelta,
+        reason,
+        refType,
+        refId,
+      })
     },
 
     // 从 Supabase 重新加载余额（同步真实数据）

@@ -333,7 +333,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue'
-import { supabase } from '../lib/supabase'
+import { supabase, withTimeout } from '../lib/supabase'
 import { toast } from '../lib/utils'
 import { usePermission } from '../composables/usePermission'
 import { useAuthStore } from '../stores/auth'
@@ -427,14 +427,127 @@ function deriveStatus(c) {
   return 'churned'
 }
 
+function normalizeCustomer(raw = {}) {
+  const lastOrderDate = raw.last_order_date || raw.last_order_at || null
+  const firstOrderDate = raw.first_order_date || raw.first_order_at || null
+  const orderCount = Number(raw.order_count ?? raw.total_orders ?? 0)
+  const totalAmount = Number(raw.total_amount || 0)
+  return {
+    ...raw,
+    id: raw.id || `phone:${raw.phone || crypto.randomUUID()}`,
+    phone: raw.phone || '',
+    name: raw.name || '',
+    address: raw.address || '',
+    tags: Array.isArray(raw.tags) ? raw.tags : [],
+    order_count: orderCount,
+    total_orders: orderCount,
+    total_amount: totalAmount,
+    first_order_date: firstOrderDate,
+    last_order_date: lastOrderDate,
+    last_order_at: lastOrderDate,
+    source: raw.source || raw.order_source || null,
+  }
+}
+
+function buildCustomersFromOrders(orders = []) {
+  const customerMap = new Map()
+  for (const order of orders) {
+    const phone = String(order.customer_phone || '').trim()
+    if (!phone || !/^[0-9]{11}$/.test(phone)) continue
+    if (!['completed', 'partially_refunded', 'paid'].includes(order.status)) continue
+
+    const existing = customerMap.get(phone) || {
+      id: `phone:${phone}`,
+      phone,
+      name: '',
+      address: '',
+      tags: [],
+      note: null,
+      source: null,
+      order_count: 0,
+      total_amount: 0,
+      first_order_date: order.created_at,
+      last_order_date: order.created_at,
+      created_at: order.created_at,
+      updated_at: order.created_at,
+    }
+
+    existing.order_count += 1
+    existing.total_amount += Number(order.amount || 0)
+
+    if (!existing.name || new Date(order.created_at) >= new Date(existing.last_order_date)) {
+      existing.name = order.customer_name || existing.name
+      existing.address = order.customer_address || existing.address
+      existing.source = order.order_source || existing.source
+      existing.updated_at = order.created_at
+    }
+
+    if (!existing.first_order_date || new Date(order.created_at) < new Date(existing.first_order_date)) {
+      existing.first_order_date = order.created_at
+      existing.created_at = order.created_at
+    }
+    if (!existing.last_order_date || new Date(order.created_at) > new Date(existing.last_order_date)) {
+      existing.last_order_date = order.created_at
+    }
+
+    customerMap.set(phone, existing)
+  }
+
+  return [...customerMap.values()]
+    .map(normalizeCustomer)
+    .sort((a, b) => {
+      const ta = a.last_order_date ? new Date(a.last_order_date).getTime() : 0
+      const tb = b.last_order_date ? new Date(b.last_order_date).getTime() : 0
+      return tb - ta
+    })
+}
+
+async function fetchCustomersFromTable() {
+  const { data, error } = await withTimeout(
+    supabase
+      .from('customers')
+      .select('*')
+      .is('deleted_at', null)
+      .order('last_order_date', { ascending: false, nullsFirst: false })
+      .limit(500),
+    10000,
+    '加载客户表'
+  )
+  if (error) throw error
+  return (data || []).map(normalizeCustomer)
+}
+
+async function fetchCustomersFromOrders() {
+  const { data, error } = await withTimeout(
+    supabase
+      .from('orders')
+      .select('id, customer_phone, customer_name, customer_address, amount, status, created_at, order_source')
+      .not('customer_phone', 'is', null)
+      .neq('customer_phone', '')
+      .in('status', ['completed', 'partially_refunded', 'paid'])
+      .order('created_at', { ascending: false }),
+    15000,
+    '按订单聚合客户'
+  )
+  if (error) throw error
+  return buildCustomersFromOrders(data || [])
+}
+
+async function getCustomerDataset() {
+  try {
+    const tableList = await fetchCustomersFromTable()
+    if (tableList.length > 0) return { list: tableList, source: 'customers' }
+  } catch (e) {
+    console.error('[Customers] fetchCustomersFromTable error:', e)
+  }
+
+  const orderList = await fetchCustomersFromOrders()
+  return { list: orderList, source: 'orders' }
+}
+
 async function loadSummary() {
   try {
-    const { data, error } = await supabase
-      .from('customers')
-      .select('id, created_at, last_order_date, total_amount, tags')
-      .is('deleted_at', null)
-    if (error) throw error
-    const list = data || []
+    const { list } = await getCustomerDataset()
     const now = new Date()
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 86400000)
@@ -459,13 +572,11 @@ async function loadTodayNewCustomers() {
     }
     const dayEnd = new Date(dayStart)
     dayEnd.setDate(dayEnd.getDate() + 1)
-    const { count } = await supabase
-      .from('customers')
-      .select('id', { count: 'exact', head: true })
-      .is('deleted_at', null)
-      .gte('created_at', dayStart.toISOString())
-      .lte('created_at', dayEnd.toISOString())
-    todayNewCustomers.value = count || 0
+    const { list } = await getCustomerDataset()
+    todayNewCustomers.value = list.filter(c => {
+      const created = c.created_at ? new Date(c.created_at) : null
+      return created && created >= dayStart && created <= dayEnd
+    }).length
   } catch (e) {
     console.error('加载今日新增客户失败:', e)
   }
@@ -474,31 +585,28 @@ async function loadTodayNewCustomers() {
 async function loadData() {
   loading.value = true
   try {
-    let query = supabase
-      .from('customers')
-      .select('*')
-      .is('deleted_at', null)
-      .order('last_order_date', { ascending: false, nullsFirst: false })
-      .limit(200)
+    const { list: dataset, source } = await getCustomerDataset()
+    let list = dataset
     const search = searchText.value.trim()
     if (search) {
-      query = query.or(`phone.ilike.%${search}%,name.ilike.%${search}%`)
+      const kw = search.toLowerCase()
+      list = list.filter(c =>
+        (c.phone || '').includes(search) ||
+        (c.name || '').toLowerCase().includes(kw)
+      )
     }
-    if (currentTag.value) {
-      query = query.contains('tags', [currentTag.value])
+    if (currentTag.value && source === 'customers') {
+      list = list.filter(c => Array.isArray(c.tags) && c.tags.includes(currentTag.value))
     }
-    const { data, error } = await query
-    if (error) throw error
-    let list = (data || []).map(c => ({
-      ...c,
+    list = list.map(c => ({
+      ...normalizeCustomer(c),
       status: deriveStatus(c),
-      total_orders: c.order_count,
     }))
     // 客户端过滤 status
     if (currentStatus.value) {
       list = list.filter(c => c.status === currentStatus.value)
     }
-    customers.value = list
+    customers.value = list.slice(0, 200)
     // Collect all unique tags
     const tagSet = new Set()
     list.forEach(c => {
@@ -576,19 +684,28 @@ async function openDetail(id) {
   showTagInput.value = false
   newDetailTag.value = ''
   try {
-    // 1) 客户基础信息
-    const { data: cust, error: ce } = await supabase
-      .from('customers')
-      .select('*')
-      .eq('id', id)
-      .maybeSingle()
-    if (ce) throw ce
+    // 1) 客户基础信息（customers 表不可见时回退到当前列表）
+    let cust = null
+    const isSyntheticId = String(id).startsWith('phone:')
+    if (!isSyntheticId) {
+      const { data, error } = await supabase
+        .from('customers')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle()
+      if (error) console.error('[Customers] openDetail fetch customer error:', error)
+      cust = data
+    }
+    if (!cust) {
+      cust = customers.value.find(c => c.id === id) || customers.value.find(c => c.phone === String(id).replace(/^phone:/, ''))
+    }
     if (!cust) { toast('未找到客户', 'error'); return }
+    cust = normalizeCustomer(cust)
 
     // 2) 按 phone 拉订单
     let orders = []
     if (cust.phone) {
-      const { data: ords, error: oe } = await supabase
+      let { data: ords, error: oe } = await supabase
         .from('orders')
         .select('id, order_no, product_name, amount, status, order_source, created_at')
         .eq('customer_phone', cust.phone)
@@ -597,6 +714,18 @@ async function openDetail(id) {
         .limit(200)
       if (oe) throw oe
       orders = ords || []
+
+      // 某些历史客户订单已被软删除，列表兜底来自历史单时需要继续可追溯
+      if (orders.length === 0) {
+        const { data: archivedOrders, error: archivedError } = await supabase
+          .from('orders')
+          .select('id, order_no, product_name, amount, status, order_source, created_at')
+          .eq('customer_phone', cust.phone)
+          .order('created_at', { ascending: false })
+          .limit(200)
+        if (archivedError) throw archivedError
+        orders = archivedOrders || []
+      }
     }
 
     // 3) 按订单 id 拉退款
