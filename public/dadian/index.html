@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>台球打点</title>
+<style>
+  :root {
+    --bg: #101418; --card: #1a2027; --text: #e8edf2; --dim: #8a97a5;
+    --gaoguang: #2e9e5b; --gaoxiao: #d9822b; --jinju: #3b82d0; --zhengyi: #c94f4f;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, "PingFang SC", sans-serif;
+    height: 100dvh; display: flex; flex-direction: column; overflow: hidden;
+  }
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px; font-size: 14px; color: var(--dim); flex: none;
+  }
+  #who { color: var(--text); font-weight: 600; }
+  #pend { color: #e88989; display: none; }
+  #score {
+    flex: none; display: flex; align-items: stretch; gap: 8px;
+    margin: 0 10px 10px; height: 64px;
+  }
+  .side {
+    flex: 1; display: flex; align-items: center; justify-content: center; gap: 10px;
+    background: var(--card); border-radius: 14px; user-select: none; -webkit-user-select: none;
+    touch-action: manipulation;
+  }
+  .side:active { filter: brightness(1.3); }
+  .side .nm { font-size: 14px; color: var(--dim); max-width: 72px; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; }
+  .side .sc { font-size: 34px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  #sreset {
+    flex: none; width: 44px; border: none; border-radius: 14px; background: var(--card);
+    color: var(--dim); font-size: 12px;
+  }
+  #shint { text-align: center; color: #4a5665; font-size: 11px; margin: -6px 0 4px; flex: none; }
+  #btns {
+    flex: 1; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
+    gap: 10px; padding: 0 10px; min-height: 0;
+  }
+  #btns button {
+    border: none; border-radius: 16px; color: #fff; font-size: 30px; font-weight: 700;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+    touch-action: manipulation;
+  }
+  #btns button small { font-size: 13px; font-weight: 400; opacity: .75; }
+  #btns button:active { filter: brightness(1.25); transform: scale(.97); }
+  .gaoguang { background: var(--gaoguang); } .gaoxiao { background: var(--gaoxiao); }
+  .jinju { background: var(--jinju); } .zhengyi { background: var(--zhengyi); }
+  #toast {
+    position: fixed; left: 10px; right: 10px;
+    bottom: calc(64px + env(safe-area-inset-bottom));
+    padding: 10px; border-radius: 12px; background: #222b34;
+    box-shadow: 0 -4px 24px rgba(0,0,0,.5);
+    display: none; flex-direction: column; gap: 8px; z-index: 5;
+  }
+  #toast.show { display: flex; }
+  #toast .row { display: flex; align-items: center; gap: 8px; }
+  #toast .info { font-size: 14px; flex: 1; }
+  #toast .chips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+  #toast .chips::-webkit-scrollbar { display: none; }
+  .chip {
+    flex: none; border: 1px solid #2f3a45; background: #131920; color: var(--text);
+    border-radius: 999px; padding: 7px 13px; font-size: 14px;
+  }
+  .chip.on { background: #2e9e5b; border-color: #2e9e5b; color: #fff; }
+  #toast input {
+    flex: 1; min-width: 0; background: #0d1114; border: 1px solid #2a333d; border-radius: 8px;
+    color: var(--text); padding: 8px 10px; font-size: 15px;
+  }
+  #toast .save { background: #2e9e5b; }
+  #toast .undo { background: #57432e; color: #f0b26b; }
+  #toast .row button { border: none; border-radius: 8px; color: #fff; padding: 8px 12px; font-size: 14px; }
+  #listbar {
+    flex: none; display: flex; align-items: center; gap: 8px;
+    height: 48px; margin: 8px 10px calc(8px + env(safe-area-inset-bottom));
+    padding: 0 12px; background: var(--card); border-radius: 12px; font-size: 14px;
+  }
+  #listbar .latest { flex: 1; color: var(--dim); overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; }
+  #listbar .open { color: #7db3e8; }
+  #sheet {
+    position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none;
+    align-items: flex-end; z-index: 8;
+  }
+  #sheet.show { display: flex; }
+  #sheet .panel {
+    background: var(--bg); width: 100%; max-height: 70dvh; border-radius: 16px 16px 0 0;
+    display: flex; flex-direction: column; padding-bottom: env(safe-area-inset-bottom);
+  }
+  #sheet .head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px; font-weight: 600;
+  }
+  #sheet .head button {
+    border: none; background: var(--card); color: var(--text);
+    border-radius: 8px; padding: 8px 14px; font-size: 14px;
+  }
+  #list { overflow-y: auto; padding: 0 10px 12px; }
+  .item {
+    display: flex; align-items: center; gap: 8px; padding: 8px 10px; margin-top: 6px;
+    background: var(--card); border-radius: 10px; font-size: 14px;
+  }
+  .item .t { color: var(--dim); font-variant-numeric: tabular-nums; }
+  .item .c { font-weight: 600; padding: 2px 6px; border-radius: 6px; background: #10151a; }
+  .item .n { flex: 1; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .item .m { color: var(--dim); font-size: 12px; }
+  .item .del { background: none; border: none; color: #7a4a4a; font-size: 16px; padding: 4px; }
+  .c.高光 { color: #5fce8f; } .c.搞笑 { color: #eda45c; } .c.金句 { color: #7db3e8; } .c.争议 { color: #e88989; }
+  .modal {
+    position: fixed; inset: 0; background: rgba(0,0,0,.75); display: none;
+    align-items: center; justify-content: center; z-index: 10;
+  }
+  .modal.show { display: flex; }
+  .modal .box { background: var(--card); border-radius: 16px; padding: 24px; width: 78%; max-width: 320px; }
+  .modal h3 { margin-bottom: 14px; font-size: 17px; }
+  .modal input {
+    width: 100%; padding: 12px; font-size: 17px; border-radius: 10px;
+    border: 1px solid #2a333d; background: #0d1114; color: var(--text);
+  }
+  .modal button {
+    margin-top: 14px; width: 100%; padding: 12px; font-size: 16px; border: none;
+    border-radius: 10px; background: var(--gaoguang); color: #fff; font-weight: 600;
+  }
+</style>
+</head>
+<body>
+  <header>
+    <span>打点人:<span id="who">…</span></span>
+    <span id="pend">⚠️ 有未传打点</span>
+    <span id="count">今晚 0 条</span>
+  </header>
+
+  <div id="score">
+    <div class="side" id="sideA"><span class="nm">南哥</span><span class="sc">0</span></div>
+    <button id="sreset">清零</button>
+    <div class="side" id="sideB"><span class="sc">0</span><span class="nm">对手</span></div>
+  </div>
+  <div id="shint">点=+1 · 长按=−1 · 点名字改名 · 打点自动带上当时比分</div>
+
+  <div id="btns">
+    <button class="gaoguang" data-cat="高光">🎱 高光<small>好球 · 清台 · 翻袋</small></button>
+    <button class="gaoxiao" data-cat="搞笑">😂 搞笑<small>失误 · 整活 · 名场面</small></button>
+    <button class="jinju" data-cat="金句">💬 金句<small>语录 · 好话</small></button>
+    <button class="zhengyi" data-cat="争议">🔥 争议<small>判罚 · 冲突</small></button>
+  </div>
+
+  <div id="toast">
+    <div class="row">
+      <span class="info"></span>
+      <button class="undo">撤销</button>
+    </div>
+    <div class="chips" id="timechips">
+      <button class="chip on" data-back="0">刚才</button>
+      <button class="chip" data-back="60">1分钟前</button>
+      <button class="chip" data-back="120">2分钟前</button>
+      <button class="chip" data-back="180">3分钟前</button>
+    </div>
+    <div class="chips" id="notechips"></div>
+    <div class="row">
+      <input placeholder="备注(点上面的词或打字)" enterkeyhint="done">
+      <button class="save">存</button>
+    </div>
+  </div>
+
+  <div id="listbar">
+    <span class="latest" id="lblatest">还没有打点</span>
+    <span class="open">全部记录 ▴</span>
+  </div>
+
+  <div id="sheet">
+    <div class="panel">
+      <div class="head"><span id="sheetTitle">打点记录</span><button id="sheetClose">收起</button></div>
+      <div id="list"></div>
+    </div>
+  </div>
+
+  <div id="gatebox" class="modal">
+    <div class="box">
+      <h3>🎱 口令</h3>
+      <input id="gateinput" placeholder="输入口令" inputmode="numeric">
+      <button id="gatesave">进入</button>
+    </div>
+  </div>
+
+  <div id="namebox" class="modal">
+    <div class="box">
+      <h3>你是谁?(记在每条打点上)</h3>
+      <input id="nameinput" placeholder="名字,填一次就行">
+      <button id="namesave">开始打点</button>
+    </div>
+  </div>
+
+<script>
+const $ = s => document.querySelector(s);
+const CATS = ['高光', '搞笑', '金句', '争议'];
+const SB = 'https://cmswoyiuoeqzeassubvw.supabase.co/rest/v1';
+const KEY = 'sb_publishable_kyhsOoWxO8YEBczAIJsUxQ_9KUmxFV2';
+const H = { apikey: KEY, Authorization: 'Bearer ' + KEY, 'Content-Type': 'application/json' };
+const GATE = '168';
+
+let marker = localStorage.getItem('marker') || '';
+let last = null, toastTimer = null;
+
+function localIso(d) {
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+function sdate(d) {  // 营业日:凌晨6点前算前一天
+  return localIso(new Date(d.getTime() - 6 * 3600e3)).slice(0, 10);
+}
+
+// ---- 口令门 ----
+if (localStorage.getItem('pool_gate') !== 'ok') $('#gatebox').classList.add('show');
+$('#gatesave').onclick = () => {
+  if ($('#gateinput').value.trim() === GATE) {
+    localStorage.setItem('pool_gate', 'ok');
+    $('#gatebox').classList.remove('show');
+    if (!marker) showName();
+  } else {
+    $('#gateinput').value = ''; $('#gateinput').placeholder = '口令不对,再试';
+  }
+};
+
+// ---- 屏幕常亮 ----
+async function keepAwake() {
+  try { if (navigator.wakeLock) await navigator.wakeLock.request('screen'); } catch (e) {}
+}
+keepAwake();
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) { keepAwake(); flushQueue(); refresh(); loadScore(); }
+});
+
+// ---- 姓名 ----
+function showName() { $('#namebox').classList.add('show'); $('#nameinput').focus(); }
+if (!marker && localStorage.getItem('pool_gate') === 'ok') showName();
+else $('#who').textContent = marker || '…';
+$('#who').onclick = showName;
+$('#namesave').onclick = () => {
+  const v = $('#nameinput').value.trim();
+  if (!v) return;
+  marker = v; localStorage.setItem('marker', v);
+  $('#who').textContent = v; $('#namebox').classList.remove('show');
+};
+
+// ---- 比分(云端共享,RPC 原子加减) ----
+let score = { a: 0, b: 0, name_a: '南哥', name_b: '对手' };
+function renderScore() {
+  document.querySelector('#sideA .nm').textContent = score.name_a;
+  document.querySelector('#sideB .nm').textContent = score.name_b;
+  document.querySelector('#sideA .sc').textContent = score.a;
+  document.querySelector('#sideB .sc').textContent = score.b;
+}
+async function loadScore() {
+  try {
+    const r = await fetch(`${SB}/pool_score?id=eq.1`, { headers: H }).then(r => r.json());
+    if (r[0]) { score = r[0]; renderScore(); }
+  } catch (e) {}
+}
+async function bumpScore(side, delta) {
+  if (navigator.vibrate) navigator.vibrate(delta > 0 ? 30 : [30, 50, 30]);
+  try {
+    const r = await fetch(`${SB}/rpc/pool_bump_score`, { method: 'POST', headers: H,
+      body: JSON.stringify({ p_side: side, p_delta: delta, p_ts: localIso(new Date()) }) })
+      .then(r => r.json());
+    if (r && r.a !== undefined) { score.a = r.a; score.b = r.b; renderScore(); }
+  } catch (e) {}
+}
+function bindSide(el, side) {
+  let timer = null, held = false;
+  el.addEventListener('pointerdown', () => {
+    held = false;
+    timer = setTimeout(() => { held = true; bumpScore(side, -1); }, 550);
+  });
+  el.addEventListener('pointerleave', () => clearTimeout(timer));
+  el.addEventListener('pointercancel', () => clearTimeout(timer));
+  el.addEventListener('pointerup', e => {
+    clearTimeout(timer);
+    if (held) return;
+    if (e.target.classList.contains('nm')) {
+      const cur = side === 'a' ? score.name_a : score.name_b;
+      const v = prompt('改名字:', cur);
+      if (!v || !v.trim()) return;
+      if (side === 'a') score.name_a = v.trim(); else score.name_b = v.trim();
+      fetch(`${SB}/pool_score?id=eq.1`, { method: 'PATCH', headers: H,
+        body: JSON.stringify({ name_a: score.name_a, name_b: score.name_b }) });
+      renderScore();
+      return;
+    }
+    bumpScore(side, 1);
+  });
+}
+bindSide($('#sideA'), 'a');
+bindSide($('#sideB'), 'b');
+$('#sreset').onclick = async () => {
+  if (!confirm('比分清零?')) return;
+  const r = await fetch(`${SB}/rpc/pool_reset_score`, { method: 'POST', headers: H,
+    body: JSON.stringify({ p_ts: localIso(new Date()) }) }).then(r => r.json());
+  if (r && r.a !== undefined) { score.a = r.a; score.b = r.b; renderScore(); }
+};
+loadScore();
+setInterval(loadScore, 4000);
+
+// ---- 断网补传队列 ----
+function queue() { return JSON.parse(localStorage.getItem('pool_queue') || '[]'); }
+function setQueue(q) {
+  localStorage.setItem('pool_queue', JSON.stringify(q));
+  $('#pend').style.display = q.length ? '' : 'none';
+}
+async function flushQueue() {
+  let q = queue();
+  while (q.length) {
+    try {
+      const r = await fetch(`${SB}/pool_marks`, { method: 'POST', headers: H,
+        body: JSON.stringify(q[0]) });
+      if (!r.ok) break;
+      q.shift(); setQueue(q);
+    } catch (e) { break; }
+  }
+}
+setInterval(flushQueue, 8000);
+
+// ---- 列表 ----
+async function refresh() {
+  try {
+    const date = sdate(new Date());
+    const marks = await fetch(
+      `${SB}/pool_marks?session_date=eq.${date}&deleted=eq.false&order=ts.desc&limit=100`,
+      { headers: H }).then(r => r.json());
+    $('#count').textContent = `今晚 ${marks.length} 条`;
+    $('#sheetTitle').textContent = `打点记录 (${marks.length})`;
+    const m0 = marks[0];
+    $('#lblatest').textContent = m0
+      ? `最新 ${m0.ts.slice(11, 16)} ${m0.category}${m0.score ? ' ' + m0.score : ''} ${m0.note || ''}`
+      : '还没有打点';
+    $('#list').innerHTML = marks.map(m => `
+      <div class="item" data-id="${m.id}">
+        <span class="t">${m.ts.slice(11)}</span>
+        <span class="c ${m.category}" title="点击换分类">${m.category}</span>
+        ${m.score ? `<span class="t">${m.score}</span>` : ''}
+        <span class="n">${m.note || ''}</span>
+        <span class="m">${m.marker || ''}</span>
+        <button class="del">✕</button>
+      </div>`).join('');
+  } catch (e) {}
+}
+$('#listbar').onclick = () => $('#sheet').classList.add('show');
+$('#sheetClose').onclick = () => $('#sheet').classList.remove('show');
+$('#sheet').onclick = e => { if (e.target.id === 'sheet') $('#sheet').classList.remove('show'); };
+
+$('#list').onclick = async e => {
+  const item = e.target.closest('.item');
+  if (!item) return;
+  const id = item.dataset.id;
+  if (e.target.classList.contains('del')) {
+    if (confirm('删掉这条打点?')) {
+      await fetch(`${SB}/pool_marks?id=eq.${id}`, { method: 'PATCH', headers: H,
+        body: JSON.stringify({ deleted: true }) });
+      refresh();
+    }
+  } else if (e.target.classList.contains('c')) {
+    const next = CATS[(CATS.indexOf(e.target.textContent) + 1) % CATS.length];
+    await fetch(`${SB}/pool_marks?id=eq.${id}`, { method: 'PATCH', headers: H,
+      body: JSON.stringify({ category: next }) });
+    refresh();
+  }
+};
+
+// ---- 备注快捷词 ----
+async function loadChips() {
+  try {
+    const chips = await fetch(`${SB}/pool_chips?order=id`, { headers: H }).then(r => r.json());
+    $('#notechips').innerHTML = chips.map(c =>
+      `<button class="chip" data-word="${c.label}">${c.label}</button>`).join('') +
+      `<button class="chip" data-add="1">＋自定义</button>`;
+  } catch (e) {}
+}
+$('#notechips').onclick = async e => {
+  if (e.target.dataset.add) {
+    const w = prompt('新增常用词(所有人可见):');
+    if (w && w.trim()) {
+      await fetch(`${SB}/pool_chips`, { method: 'POST', headers: H,
+        body: JSON.stringify({ label: w.trim().slice(0, 8) }) });
+      loadChips();
+    }
+    return;
+  }
+  const word = e.target.dataset.word;
+  if (!word) return;
+  const inp = $('#toast input');
+  inp.value = inp.value ? inp.value + ' ' + word : word;
+  e.target.classList.add('on');
+  bump();
+};
+loadChips();
+
+// ---- 打点 ----
+document.querySelectorAll('#btns button').forEach(b => b.onclick = async () => {
+  if (navigator.vibrate) navigator.vibrate(40);
+  const now = new Date();
+  const payload = {
+    session_date: sdate(now), ts: localIso(now), category: b.dataset.cat,
+    marker, score: `${score.a}:${score.b}`, note: ''
+  };
+  let r = null;
+  try {
+    r = await fetch(`${SB}/pool_marks`, { method: 'POST',
+      headers: { ...H, Prefer: 'return=representation' },
+      body: JSON.stringify(payload) }).then(x => x.ok ? x.json() : null);
+  } catch (e) {}
+  if (!r || !r[0]) {   // 断网:本地排队,恢复后补传
+    setQueue([...queue(), payload]);
+    last = null;
+    showToast(`📴 已存本机,恢复后自动补传 (${payload.ts.slice(11)} ${b.dataset.cat})`, false);
+    return;
+  }
+  last = { id: r[0].id, ts: r[0].ts };
+  showToast(`✓ ${r[0].ts.slice(11)} ${b.dataset.cat}${payload.score ? ' · ' + payload.score : ''}`, true);
+  refresh();
+});
+
+function showToast(text, full) {
+  const t = $('#toast');
+  t.querySelector('.info').textContent = text;
+  t.querySelector('input').value = '';
+  $('#timechips').style.display = full ? '' : 'none';
+  $('#notechips').style.display = full ? '' : 'none';
+  document.querySelectorAll('#timechips .chip').forEach((c, i) => c.classList.toggle('on', i === 0));
+  document.querySelectorAll('#notechips .chip').forEach(c => c.classList.remove('on'));
+  t.classList.add('show');
+  bump();
+}
+function bump() {
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => $('#toast').classList.remove('show'), 20000);
+}
+
+// ---- 时间回拨 ----
+$('#timechips').onclick = async e => {
+  const back = e.target.dataset.back;
+  if (back === undefined || !last) return;
+  document.querySelectorAll('#timechips .chip').forEach(c => c.classList.remove('on'));
+  e.target.classList.add('on');
+  const t = new Date(new Date(last.ts).getTime() - back * 1000);
+  await fetch(`${SB}/pool_marks?id=eq.${last.id}`, { method: 'PATCH', headers: H,
+    body: JSON.stringify({ ts: localIso(t), session_date: sdate(t) }) });
+  bump(); refresh();
+};
+
+// ---- 备注保存 / 撤销 ----
+async function saveNote() {
+  const v = $('#toast input').value.trim();
+  if (v && last) await fetch(`${SB}/pool_marks?id=eq.${last.id}`, { method: 'PATCH', headers: H,
+    body: JSON.stringify({ note: v }) });
+  $('#toast').classList.remove('show');
+  refresh();
+}
+$('#toast .save').onclick = saveNote;
+$('#toast input').onkeydown = e => { if (e.key === 'Enter') saveNote(); };
+$('#toast input').oninput = bump;
+$('#toast .undo').onclick = async () => {
+  if (last) await fetch(`${SB}/pool_marks?id=eq.${last.id}`, { method: 'PATCH', headers: H,
+    body: JSON.stringify({ deleted: true }) });
+  $('#toast').classList.remove('show');
+  refresh();
+};
+
+refresh();
+flushQueue();
+setInterval(refresh, 10000);
+</script>
+</body>
+</html>
