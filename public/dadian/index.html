@@ -311,7 +311,7 @@ async function stageCtl(action, stg) {
 $('#stagepick').onclick = e => {
   const stg = parseInt(e.target.dataset.stg, 10);
   if (!stg) return;
-  if (confirm(`开始第${stg}阶段?(比分自动清零)`)) stageCtl('start', stg);
+  if (confirm(`开始第${stg}阶段?(比分继续累计)`)) stageCtl('start', stg);
 };
 $('#stagebtn').onclick = () => {
   if (confirm(`结束第${score.stage}阶段?`)) stageCtl('end');

@@ -45,3 +45,19 @@ begin
   end if;
   return r;
 end $$;
+
+-- v3: 四个阶段比分连续累计,开始新阶段不清零(清零只走手动按钮)
+create or replace function pool_stage_ctl(p_action text, p_ts text, p_stage int default null)
+returns pool_score language plpgsql security definer as $$
+declare r pool_score;
+begin
+  if p_action = 'start' then
+    update pool_score set stage = coalesce(p_stage, stage + 1), stage_active = true
+      where id = 1 returning * into r;
+    insert into pool_stage_events (ts, stage, action) values (p_ts, r.stage, 'start');
+  else
+    update pool_score set stage_active = false where id = 1 returning * into r;
+    insert into pool_stage_events (ts, stage, action) values (p_ts, r.stage, 'end');
+  end if;
+  return r;
+end $$;
