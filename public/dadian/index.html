@@ -290,12 +290,12 @@ function renderScore() {
     lb.textContent = `🟢 第${score.stage}阶段进行中`;
     lb.classList.add('live');
     pick.style.display = 'none';
-    btn.style.display = '';
+    btn.style.display = 'block';
     btn.textContent = `■ 结束第${score.stage}阶段`;
   } else {
     lb.textContent = (score.stage ? `第${score.stage}阶段已结束 · ` : '') + '选阶段开始:';
     lb.classList.remove('live');
-    pick.style.display = '';
+    pick.style.display = 'flex';
     btn.style.display = 'none';
   }
 }
