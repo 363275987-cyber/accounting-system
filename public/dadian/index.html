@@ -75,12 +75,13 @@
   }
   #btns button#qtbtn small { font-size: 11px; font-weight: 400; opacity: .8; }
   #btns button#qtbtn:active { filter: brightness(1.25); transform: translate(-50%, -50%) scale(.95); }
-  .qtrow { margin-bottom: 12px; }
-  .qtrow .lbl { font-size: 13px; color: var(--dim); margin-bottom: 6px; }
-  .qtrow .opts { display: flex; gap: 8px; flex-wrap: wrap; }
+  #qtbox .box { width: 92%; max-width: 400px; }
+  .qtrow { margin-bottom: 18px; }
+  .qtrow .lbl { font-size: 13px; color: var(--dim); margin-bottom: 8px; }
+  .qtrow .opts { display: flex; gap: 10px; }
   .qtopt {
-    border: 1px solid #2f3a45; background: #131920; color: var(--text);
-    border-radius: 10px; padding: 10px 14px; font-size: 15px;
+    flex: 1; border: 1px solid #2f3a45; background: #131920; color: var(--text);
+    border-radius: 12px; padding: 15px 0; font-size: 16px; text-align: center;
   }
   .qtopt.on { background: #0f9d8f; border-color: #0f9d8f; color: #fff; font-weight: 600; }
   #qtok { background: #0f9d8f !important; }
@@ -261,7 +262,7 @@
           <button class="qtopt" data-v="接清">接清</button>
           <button class="qtopt" data-v="一杆清">一杆清</button>
         </div></div>
-      <button id="qtok" disabled>记录清台</button>
+      <div class="dim" style="text-align:center;margin-bottom:10px">选完三项自动记录,不用再按别的</div>
       <button id="qtcancel">取消</button>
     </div>
   </div>
@@ -578,6 +579,7 @@ function showToast(text, full) {
   t.querySelector('input').value = '';
   $('#timechips').style.display = full ? '' : 'none';
   $('#notechips').style.display = full ? '' : 'none';
+  t.querySelector('.row:last-of-type').style.display = full ? '' : 'none';
   document.querySelectorAll('#timechips .chip').forEach((c, i) => c.classList.toggle('on', i === 0));
   document.querySelectorAll('#notechips .chip').forEach(c => c.classList.remove('on'));
   t.classList.add('show');
@@ -636,7 +638,9 @@ function qtRender() {
     `<button class="qtopt ${qt.side==='b'?'on':''}" data-s="b">${score.name_b}</button>`;
   document.querySelectorAll('#qtlv .qtopt').forEach(b => b.classList.toggle('on', b.dataset.v === qt.lv));
   document.querySelectorAll('#qttype .qtopt').forEach(b => b.classList.toggle('on', b.dataset.v === qt.type));
-  $('#qtok').disabled = !(qt.side && qt.lv && qt.type);
+}
+function qtMaybeDone() {
+  if (qt.side && qt.lv && qt.type) qtSave();
 }
 $('#qtbtn').onclick = () => {
   if (navigator.vibrate) navigator.vibrate(40);
@@ -644,11 +648,11 @@ $('#qtbtn').onclick = () => {
   qtRender();
   $('#qtbox').classList.add('show');
 };
-$('#qtwho').onclick = e => { if (e.target.dataset.s) { qt.side = e.target.dataset.s; qtRender(); } };
-$('#qtlv').onclick = e => { if (e.target.dataset.v) { qt.lv = e.target.dataset.v; qtRender(); } };
-$('#qttype').onclick = e => { if (e.target.dataset.v) { qt.type = e.target.dataset.v; qtRender(); } };
+$('#qtwho').onclick = e => { if (e.target.dataset.s) { qt.side = e.target.dataset.s; qtRender(); qtMaybeDone(); } };
+$('#qtlv').onclick = e => { if (e.target.dataset.v) { qt.lv = e.target.dataset.v; qtRender(); qtMaybeDone(); } };
+$('#qttype').onclick = e => { if (e.target.dataset.v) { qt.type = e.target.dataset.v; qtRender(); qtMaybeDone(); } };
 $('#qtcancel').onclick = () => $('#qtbox').classList.remove('show');
-$('#qtok').onclick = async () => {
+async function qtSave() {
   $('#qtbox').classList.remove('show');
   const now = new Date();
   const player = qt.side === 'a' ? score.name_a : score.name_b;
@@ -676,9 +680,10 @@ $('#qtok').onclick = async () => {
     return;
   }
   last = { id: r[0].id, ts: r[0].ts, qtSide: qt.side };
-  showToast(`🎯 ${r[0].ts.slice(11)} 清台 ${payload.note} · ${payload.score}`, true);
+  if (navigator.vibrate) navigator.vibrate([40, 60, 40]);
+  showToast(`🎯 ${r[0].ts.slice(11)} 清台已记 · ${payload.note} · 比分 ${payload.score}`, false);
   refresh();
-};
+}
 
 refresh();
 flushQueue();
