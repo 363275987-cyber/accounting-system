@@ -53,6 +53,10 @@
     background: #57432e; color: #f0b26b; font-weight: 600; display: none;
   }
   #stagepick { display: flex; gap: 6px; }
+  #matchend {
+    border: none; border-radius: 8px; padding: 8px 12px; font-size: 14px;
+    background: #2a3440; color: #9db8d3; font-weight: 600; display: none;
+  }
   .stgbtn {
     width: 34px; height: 34px; border: 1px solid #2f3a45; border-radius: 50%;
     background: #131920; color: var(--text); font-size: 15px; font-weight: 700;
@@ -191,6 +195,7 @@
       <button class="stgbtn" data-stg="4">④</button>
     </span>
     <button id="stagebtn">■ 结束</button>
+    <button id="matchend">🏁 收场</button>
   </div>
 
   <div id="btns">
@@ -278,6 +283,7 @@ const H = { apikey: KEY, Authorization: 'Bearer ' + KEY, 'Content-Type': 'applic
 const GATE = '168';
 
 let marker = localStorage.getItem('marker') || '';
+let marksCount = 0;
 let last = null, toastTimer = null;
 
 function localIso(d) {
@@ -341,6 +347,7 @@ function renderScore() {
     pick.style.display = 'flex';
     btn.style.display = 'none';
   }
+  $('#matchend').style.display = (!score.stage_active && score.stage > 0) ? 'block' : 'none';
 }
 async function stageCtl(action, stg) {
   try {
@@ -358,6 +365,16 @@ $('#stagepick').onclick = e => {
 };
 $('#stagebtn').onclick = () => {
   if (confirm(`结束第${score.stage}阶段?`)) stageCtl('end');
+};
+$('#matchend').onclick = async () => {
+  const fin = `${score.name_a} ${score.a} : ${score.b} ${score.name_b}`;
+  if (!confirm(`🏁 整场比赛结束并保存?\n\n终局比分 ${fin}\n今晚打点 ${marksCount} 条(已全部存云端)\n\n确认后比分和阶段归零,明晚直接开新场`)) return;
+  try {
+    const r = await fetch(`${SB}/rpc/pool_match_end`, { method: 'POST', headers: H,
+      body: JSON.stringify({ p_ts: localIso(new Date()) }) }).then(r => r.json());
+    if (r && r.stage !== undefined) { score = r; renderScore(); }
+    showToast(`🏁 已收场:终局 ${fin} · 今晚 ${marksCount} 条打点已保存`, false);
+  } catch (e) {}
 };
 async function loadScore() {
   try {
