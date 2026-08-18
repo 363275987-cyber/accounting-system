@@ -60,8 +60,28 @@
   .stgbtn:active { background: #2e9e5b; border-color: #2e9e5b; }
   #btns {
     flex: 1; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
-    gap: 10px; padding: 0 10px; min-height: 0;
+    gap: 10px; padding: 0 10px; min-height: 0; position: relative;
   }
+  #qtbtn {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: 96px; height: 96px; border-radius: 50%; border: 4px solid var(--bg);
+    background: #0f9d8f; color: #fff; font-size: 24px; font-weight: 800;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    z-index: 2; touch-action: manipulation;
+  }
+  #qtbtn small { font-size: 11px; font-weight: 400; opacity: .8; }
+  #qtbtn:active { filter: brightness(1.25); transform: translate(-50%, -50%) scale(.95); }
+  .qtrow { margin-bottom: 12px; }
+  .qtrow .lbl { font-size: 13px; color: var(--dim); margin-bottom: 6px; }
+  .qtrow .opts { display: flex; gap: 8px; flex-wrap: wrap; }
+  .qtopt {
+    border: 1px solid #2f3a45; background: #131920; color: var(--text);
+    border-radius: 10px; padding: 10px 14px; font-size: 15px;
+  }
+  .qtopt.on { background: #0f9d8f; border-color: #0f9d8f; color: #fff; font-weight: 600; }
+  #qtok { background: #0f9d8f !important; }
+  #qtok:disabled { opacity: .4; }
+  #qtcancel { background: #1f2830 !important; color: var(--dim) !important; margin-top: 8px; }
   #btns button {
     border: none; border-radius: 16px; color: #fff; font-size: 30px; font-weight: 700;
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
@@ -130,7 +150,7 @@
   .item .n { flex: 1; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .item .m { color: var(--dim); font-size: 12px; }
   .item .del { background: none; border: none; color: #7a4a4a; font-size: 16px; padding: 4px; }
-  .c.高光 { color: #5fce8f; } .c.搞笑 { color: #eda45c; } .c.金句 { color: #7db3e8; } .c.争议 { color: #e88989; }
+  .c.高光 { color: #5fce8f; } .c.搞笑 { color: #eda45c; } .c.金句 { color: #7db3e8; } .c.争议 { color: #e88989; } .c.清台 { color: #4ecdc4; }
   .modal {
     position: fixed; inset: 0; background: rgba(0,0,0,.75); display: none;
     align-items: center; justify-content: center; z-index: 10;
@@ -178,6 +198,7 @@
     <button class="gaoxiao" data-cat="搞笑">😂 搞笑<small>失误 · 整活 · 名场面</small></button>
     <button class="jinju" data-cat="金句">💬 金句<small>语录 · 好话</small></button>
     <button class="zhengyi" data-cat="争议">🔥 争议<small>判罚 · 冲突</small></button>
+    <button id="qtbtn">清台<small>一杆收</small></button>
   </div>
 
   <div id="toast">
@@ -218,6 +239,28 @@
     </div>
   </div>
 
+  <div id="qtbox" class="modal">
+    <div class="box">
+      <h3>🎯 一杆清台</h3>
+      <div class="qtrow"><div class="lbl">谁清的?(比分自动+1)</div>
+        <div class="opts" id="qtwho"></div></div>
+      <div class="qtrow"><div class="lbl">难度</div>
+        <div class="opts" id="qtlv">
+          <button class="qtopt" data-v="普通清台">普通</button>
+          <button class="qtopt" data-v="中等难度">中等</button>
+          <button class="qtopt" data-v="神仙局">🀄 神仙局</button>
+        </div></div>
+      <div class="qtrow"><div class="lbl">类型</div>
+        <div class="opts" id="qttype">
+          <button class="qtopt" data-v="炸清">炸清</button>
+          <button class="qtopt" data-v="接清">接清</button>
+          <button class="qtopt" data-v="一杆清">一杆清</button>
+        </div></div>
+      <button id="qtok" disabled>记录清台</button>
+      <button id="qtcancel">取消</button>
+    </div>
+  </div>
+
   <div id="namebox" class="modal">
     <div class="box">
       <h3>你是谁?(记在每条打点上)</h3>
@@ -228,7 +271,7 @@
 
 <script>
 const $ = s => document.querySelector(s);
-const CATS = ['高光', '搞笑', '金句', '争议'];
+const CATS = ['高光', '搞笑', '金句', '争议', '清台'];
 const SB = 'https://cmswoyiuoeqzeassubvw.supabase.co/rest/v1';
 const KEY = 'sb_publishable_kyhsOoWxO8YEBczAIJsUxQ_9KUmxFV2';
 const H = { apikey: KEY, Authorization: 'Bearer ' + KEY, 'Content-Type': 'application/json' };
@@ -528,6 +571,58 @@ $('#toast .undo').onclick = async () => {
   if (last) await fetch(`${SB}/pool_marks?id=eq.${last.id}`, { method: 'PATCH', headers: H,
     body: JSON.stringify({ deleted: true }) });
   $('#toast').classList.remove('show');
+  refresh();
+};
+
+// ---- 清台 ----
+const qt = { side: null, lv: null, type: null };
+function qtRender() {
+  $('#qtwho').innerHTML =
+    `<button class="qtopt ${qt.side==='a'?'on':''}" data-s="a">${score.name_a}</button>` +
+    `<button class="qtopt ${qt.side==='b'?'on':''}" data-s="b">${score.name_b}</button>`;
+  document.querySelectorAll('#qtlv .qtopt').forEach(b => b.classList.toggle('on', b.dataset.v === qt.lv));
+  document.querySelectorAll('#qttype .qtopt').forEach(b => b.classList.toggle('on', b.dataset.v === qt.type));
+  $('#qtok').disabled = !(qt.side && qt.lv && qt.type);
+}
+$('#qtbtn').onclick = () => {
+  if (navigator.vibrate) navigator.vibrate(40);
+  qt.side = null; qt.lv = null; qt.type = null;
+  qtRender();
+  $('#qtbox').classList.add('show');
+};
+$('#qtwho').onclick = e => { if (e.target.dataset.s) { qt.side = e.target.dataset.s; qtRender(); } };
+$('#qtlv').onclick = e => { if (e.target.dataset.v) { qt.lv = e.target.dataset.v; qtRender(); } };
+$('#qttype').onclick = e => { if (e.target.dataset.v) { qt.type = e.target.dataset.v; qtRender(); } };
+$('#qtcancel').onclick = () => $('#qtbox').classList.remove('show');
+$('#qtok').onclick = async () => {
+  $('#qtbox').classList.remove('show');
+  const now = new Date();
+  const player = qt.side === 'a' ? score.name_a : score.name_b;
+  try {
+    const r = await fetch(`${SB}/rpc/pool_bump_score`, { method: 'POST', headers: H,
+      body: JSON.stringify({ p_side: qt.side, p_delta: 1, p_ts: localIso(now) }) })
+      .then(r => r.json());
+    if (r && r.a !== undefined) { score.a = r.a; score.b = r.b; renderScore(); }
+  } catch (e) {}
+  const payload = {
+    session_date: sdate(now), ts: localIso(now), category: '清台',
+    marker, score: `${score.a}:${score.b}`, stage: score.stage || 0,
+    note: `${player}·${qt.lv}·${qt.type}`
+  };
+  let r = null;
+  try {
+    r = await fetch(`${SB}/pool_marks`, { method: 'POST',
+      headers: { ...H, Prefer: 'return=representation' },
+      body: JSON.stringify(payload) }).then(x => x.ok ? x.json() : null);
+  } catch (e) {}
+  if (!r || !r[0]) {
+    setQueue([...queue(), payload]);
+    last = null;
+    showToast(`📴 已存本机 (清台 ${payload.note})`, false);
+    return;
+  }
+  last = { id: r[0].id, ts: r[0].ts };
+  showToast(`🎯 ${r[0].ts.slice(11)} 清台 ${payload.note} · ${payload.score}`, true);
   refresh();
 };
 
