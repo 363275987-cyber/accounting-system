@@ -62,15 +62,15 @@
     flex: 1; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
     gap: 10px; padding: 0 10px; min-height: 0; position: relative;
   }
-  #qtbtn {
+  #btns button#qtbtn {
     position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
     width: 96px; height: 96px; border-radius: 50%; border: 4px solid var(--bg);
     background: #0f9d8f; color: #fff; font-size: 24px; font-weight: 800;
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
     z-index: 2; touch-action: manipulation;
   }
-  #qtbtn small { font-size: 11px; font-weight: 400; opacity: .8; }
-  #qtbtn:active { filter: brightness(1.25); transform: translate(-50%, -50%) scale(.95); }
+  #btns button#qtbtn small { font-size: 11px; font-weight: 400; opacity: .8; }
+  #btns button#qtbtn:active { filter: brightness(1.25); transform: translate(-50%, -50%) scale(.95); }
   .qtrow { margin-bottom: 12px; }
   .qtrow .lbl { font-size: 13px; color: var(--dim); margin-bottom: 6px; }
   .qtrow .opts { display: flex; gap: 8px; flex-wrap: wrap; }
