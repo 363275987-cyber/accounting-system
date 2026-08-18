@@ -236,7 +236,8 @@
 
   <div id="sheet">
     <div class="panel">
-      <div class="head"><span id="sheetTitle">打点记录</span><button id="sheetClose">收起</button></div>
+      <div class="head"><span id="sheetTitle">打点记录</span>
+        <span><button id="clearAll" style="color:#e88989;margin-right:8px">🗑 清空</button><button id="sheetClose">收起</button></span></div>
       <div id="list"></div>
     </div>
   </div>
@@ -503,6 +504,16 @@ async function refresh() {
   } catch (e) {}
 }
 $('#listbar').onclick = () => $('#sheet').classList.add('show');
+$('#clearAll').onclick = async () => {
+  if (!marksCount) return alert('今晚还没有打点');
+  if (!confirm(`清空今晚全部 ${marksCount} 条打点?\n(一般只在测试后用;清掉的不参与切片,不可恢复)`)) return;
+  try {
+    await fetch(`${SB}/pool_marks?session_date=eq.${sdate(new Date(Date.now() + clockOffset))}&deleted=eq.false`,
+      { method: 'PATCH', headers: H, body: JSON.stringify({ deleted: true }) });
+    $('#sheet').classList.remove('show');
+    refresh();
+  } catch (e) {}
+};
 $('#sheetClose').onclick = () => $('#sheet').classList.remove('show');
 $('#sheet').onclick = e => { if (e.target.id === 'sheet') $('#sheet').classList.remove('show'); };
 
