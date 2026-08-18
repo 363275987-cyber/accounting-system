@@ -42,9 +42,9 @@
   #sides.n3 .sc, #sides.n4 .sc { font-size: 24px; }
   #sides.n3 .nm, #sides.n4 .nm { font-size: 12px; max-width: 30vw; }
   .side.win { outline: 3px solid #ffd700; box-shadow: 0 0 12px rgba(255,215,0,.4); }
-  #scbtns { flex: none; display: flex; flex-direction: column; gap: 4px; width: 46px; }
+  #scbtns { flex: none; display: flex; width: 44px; }
   #scbtns button {
-    flex: 1; border: none; border-radius: 10px; background: var(--card);
+    flex: 1; border: none; border-radius: 14px; background: var(--card);
     color: var(--dim); font-size: 12px;
   }
   #score.tall { height: 116px; }
@@ -195,7 +195,7 @@
 
   <div id="score">
     <div id="sides"></div>
-    <div id="scbtns"><button id="sreset">清零</button><button id="smode">模式</button></div>
+    <div id="scbtns"><button id="sreset">清零</button></div>
   </div>
   <div id="tgline" style="display:none"></div>
   <div id="shint">点=+1 · 长按=−1 · 点名字改名 · 打点自动带上当时比分</div>
@@ -504,7 +504,7 @@ async function bumpScore(side, delta) {
 })();
 
 let pickedMode = 'duo';
-$('#smode').onclick = () => {
+function openModeBox() {
   pickedMode = score.mode || 'duo';
   document.querySelectorAll('#modepick .qtopt').forEach(b => b.classList.toggle('on', b.dataset.m === pickedMode));
   $('#targetrow').style.display = pickedMode === 'target' ? '' : 'none';
@@ -512,7 +512,15 @@ $('#smode').onclick = () => {
   $('#mStartA').value = score.a || 0;
   $('#mStartB').value = score.b || 0;
   $('#modebox').classList.add('show');
-};
+}
+(function () {
+  let t = null, held = false;
+  const el = $('#sreset');
+  el.addEventListener('pointerdown', () => { held = false; t = setTimeout(() => { held = true; openModeBox(); }, 550); });
+  el.addEventListener('pointerup', () => clearTimeout(t));
+  el.addEventListener('pointerleave', () => clearTimeout(t));
+  el.addEventListener('click', e => { if (held) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
+})();
 $('#modepick').onclick = e => {
   if (!e.target.dataset.m) return;
   pickedMode = e.target.dataset.m;
