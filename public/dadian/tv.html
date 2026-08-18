@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>现场记分牌</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; background: #000; overflow: hidden;
+    font-family: "PingFang SC", "Microsoft YaHei", sans-serif; }
+  #board {
+    height: 100%; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 1.2vh;
+  }
+  #row-names { display: flex; gap: 2vw; align-items: stretch; }
+  .tag {
+    width: 26vw; padding: 1.2vh 0; text-align: center;
+    font-size: 5.2vh; font-weight: 800; color: #fff; letter-spacing: .5vw;
+    border-radius: 1vh;
+  }
+  .tag.a { background: #1d4ed8; }
+  .tag.b { background: #8b1a2f; }
+  #row-scores { display: flex; gap: 2vw; }
+  .sc {
+    width: 26vw; text-align: center; font-size: 26vh; line-height: 1.05;
+    font-weight: 900; color: #f5a623; font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 3vh rgba(245,166,35,.35);
+  }
+  #stage { font-size: 3.6vh; color: #5fce8f; font-weight: 700; min-height: 4vh; }
+  #clock { font-size: 4.6vh; color: #cfe3ff; font-weight: 700;
+    font-variant-numeric: tabular-nums; letter-spacing: .3vw; }
+  #title { font-size: 5vh; color: #fff; font-weight: 800; letter-spacing: 1vw; }
+  #prize { font-size: 7vh; color: #ffd700; font-weight: 900; letter-spacing: .6vw; }
+  #dot { position: fixed; right: 1.5vh; top: 1.5vh; width: 1.6vh; height: 1.6vh;
+    border-radius: 50%; background: #2e9e5b; }
+  #dot.off { background: #c94f4f; }
+</style>
+</head>
+<body>
+  <div id="dot" title="同步状态"></div>
+  <div id="board">
+    <div id="row-names">
+      <div class="tag a" id="na">王孟南</div>
+      <div class="tag b" id="nb">卢岩</div>
+    </div>
+    <div id="row-scores">
+      <div class="sc" id="sa">0</div>
+      <div class="sc" id="sb">0</div>
+    </div>
+    <div id="stage"></div>
+    <div id="clock">--:--:--</div>
+    <div id="title">靓仔上课踢馆赛</div>
+    <div id="prize">冠军 5 万</div>
+  </div>
+<script>
+const KEY = 'sb_publishable_kyhsOoWxO8YEBczAIJsUxQ_9KUmxFV2';
+const SB = 'https://cmswoyiuoeqzeassubvw.supabase.co/rest/v1';
+const H = { apikey: KEY, Authorization: 'Bearer ' + KEY };
+const $ = s => document.querySelector(s);
+let clockOffset = 0;
+async function syncClock() {
+  try {
+    const t = await fetch(SB + '/rpc/pool_now', { method: 'POST', headers:
+      { ...H, 'Content-Type': 'application/json' }, body: '{}' }).then(r => r.json());
+    if (typeof t === 'string') {
+      const off = new Date(t) - new Date();
+      clockOffset = Math.abs(off) > 1500 ? off : 0;
+    }
+  } catch (e) {}
+}
+function tick() {
+  const d = new Date(Date.now() + clockOffset);
+  const p = n => String(n).padStart(2, '0');
+  $('#clock').textContent = `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}` +
+    `  ${d.getFullYear()}年${p(d.getMonth() + 1)}月${p(d.getDate())}日`;
+}
+async function poll() {
+  try {
+    const r = await fetch(SB + '/pool_score?id=eq.1', { headers: H }).then(r => r.json());
+    if (r[0]) {
+      $('#na').textContent = r[0].name_a;
+      $('#nb').textContent = r[0].name_b;
+      $('#sa').textContent = r[0].a;
+      $('#sb').textContent = r[0].b;
+      $('#stage').textContent = r[0].stage_active ? `第 ${r[0].stage} 阶段` : '';
+      $('#dot').classList.remove('off');
+    }
+  } catch (e) { $('#dot').classList.add('off'); }
+}
+async function keepAwake() {
+  try { if (navigator.wakeLock) await navigator.wakeLock.request('screen'); } catch (e) {}
+}
+document.addEventListener('visibilitychange', () => { if (!document.hidden) keepAwake(); });
+syncClock(); setInterval(syncClock, 600000);
+tick(); setInterval(tick, 250);
+poll(); setInterval(poll, 1500);
+keepAwake();
+</script>
+</body>
+</html>
