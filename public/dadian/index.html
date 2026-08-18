@@ -496,8 +496,8 @@ async function refresh() {
         <span class="t">${m.ts.slice(11)}</span>
         <span class="c ${m.category}" title="点击换分类">${m.category}</span>
         ${m.stage ? `<span class="m">S${m.stage}</span>` : ''}
-        ${m.score ? `<span class="t">${m.score}</span>` : ''}
-        <span class="n">${m.note || ''}</span>
+        <span class="t scedit" title="点击改比分">${m.score || '--'}</span>
+        <span class="n nedit" title="点击改备注">${m.note || ''}</span>
         <span class="m">${m.marker || ''}</span>
         <button class="del">✕</button>
       </div>`).join('');
@@ -527,6 +527,20 @@ $('#list').onclick = async e => {
         body: JSON.stringify({ deleted: true }) });
       refresh();
     }
+  } else if (e.target.classList.contains('scedit')) {
+    const cur = e.target.textContent === '--' ? '' : e.target.textContent;
+    const v = prompt('改这条打点的比分(格式 12:9):', cur);
+    if (v === null) return;
+    if (v.trim() && !/^\d+:\d+$/.test(v.trim())) return alert('格式要像 12:9');
+    await fetch(`${SB}/pool_marks?id=eq.${id}`, { method: 'PATCH', headers: H,
+      body: JSON.stringify({ score: v.trim() }) });
+    refresh();
+  } else if (e.target.classList.contains('nedit')) {
+    const v = prompt('改这条打点的备注:', e.target.textContent);
+    if (v === null) return;
+    await fetch(`${SB}/pool_marks?id=eq.${id}`, { method: 'PATCH', headers: H,
+      body: JSON.stringify({ note: v.trim() }) });
+    refresh();
   } else if (e.target.classList.contains('c')) {
     const next = CATS[(CATS.indexOf(e.target.textContent) + 1) % CATS.length];
     await fetch(`${SB}/pool_marks?id=eq.${id}`, { method: 'PATCH', headers: H,
