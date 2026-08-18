@@ -390,8 +390,21 @@ $('#matchend').onclick = async () => {
     showToast(`🏁 已收场:终局 ${fin} · 今晚 ${marksCount} 条打点已保存`, false);
   } catch (e) {}
 };
+let freshChecked = false;
 async function loadScore() {
   try {
+    if (!freshChecked) {
+      // 开新场自检:昨晚忘了收场,今天第一个打开页面的人自动触发归零
+      const prevStage = null;
+      const r0 = await fetch(`${SB}/rpc/pool_fresh_check`, { method: 'POST', headers: H,
+        body: JSON.stringify({ p_ts: nowIso() }) }).then(r => r.json());
+      if (r0 && r0.a !== undefined) {
+        freshChecked = true;
+        const wasStale = score.stage > 0 || score.a || score.b;
+        score = r0; renderScore();
+        return;
+      }
+    }
     const r = await fetch(`${SB}/pool_score?id=eq.1`, { headers: H }).then(r => r.json());
     if (r[0]) { score = r[0]; renderScore(); }
   } catch (e) {}
