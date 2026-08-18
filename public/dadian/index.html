@@ -286,6 +286,20 @@ let marker = localStorage.getItem('marker') || '';
 let marksCount = 0;
 let last = null, toastTimer = null;
 
+let clockOffset = 0;
+async function syncClock() {
+  try {
+    const t = await fetch(`${SB}/rpc/pool_now`, { method: 'POST', headers: H, body: '{}' })
+      .then(r => r.json());
+    if (typeof t === 'string') {
+      const off = new Date(t) - new Date();
+      clockOffset = Math.abs(off) > 1500 ? off : 0;
+    }
+  } catch (e) {}
+}
+syncClock();
+setInterval(syncClock, 600000);
+function nowIso() { return localIso(new Date(Date.now() + clockOffset)); }
 function localIso(d) {
   const p = n => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
@@ -351,7 +365,7 @@ function renderScore() {
 }
 async function stageCtl(action, stg) {
   try {
-    const body = { p_action: action, p_ts: localIso(new Date()) };
+    const body = { p_action: action, p_ts: nowIso() };
     if (stg) body.p_stage = stg;
     const r = await fetch(`${SB}/rpc/pool_stage_ctl`, { method: 'POST', headers: H,
       body: JSON.stringify(body) }).then(r => r.json());
@@ -371,7 +385,7 @@ $('#matchend').onclick = async () => {
   if (!confirm(`🏁 整场比赛结束并保存?\n\n终局比分 ${fin}\n今晚打点 ${marksCount} 条(已全部存云端)\n\n确认后比分和阶段归零,明晚直接开新场`)) return;
   try {
     const r = await fetch(`${SB}/rpc/pool_match_end`, { method: 'POST', headers: H,
-      body: JSON.stringify({ p_ts: localIso(new Date()) }) }).then(r => r.json());
+      body: JSON.stringify({ p_ts: nowIso() }) }).then(r => r.json());
     if (r && r.stage !== undefined) { score = r; renderScore(); }
     showToast(`🏁 已收场:终局 ${fin} · 今晚 ${marksCount} 条打点已保存`, false);
   } catch (e) {}
@@ -386,7 +400,7 @@ async function bumpScore(side, delta) {
   if (navigator.vibrate) navigator.vibrate(delta > 0 ? 30 : [30, 50, 30]);
   try {
     const r = await fetch(`${SB}/rpc/pool_bump_score`, { method: 'POST', headers: H,
-      body: JSON.stringify({ p_side: side, p_delta: delta, p_ts: localIso(new Date()) }) })
+      body: JSON.stringify({ p_side: side, p_delta: delta, p_ts: nowIso() }) })
       .then(r => r.json());
     if (r && r.a !== undefined) { score.a = r.a; score.b = r.b; renderScore(); }
   } catch (e) {}
@@ -420,7 +434,7 @@ bindSide($('#sideB'), 'b');
 $('#sreset').onclick = async () => {
   if (!confirm('比分清零?')) return;
   const r = await fetch(`${SB}/rpc/pool_reset_score`, { method: 'POST', headers: H,
-    body: JSON.stringify({ p_ts: localIso(new Date()) }) }).then(r => r.json());
+    body: JSON.stringify({ p_ts: nowIso() }) }).then(r => r.json());
   if (r && r.a !== undefined) { score.a = r.a; score.b = r.b; renderScore(); }
 };
 loadScore();
@@ -540,7 +554,7 @@ document.querySelectorAll('#btns button').forEach(b => b.onclick = async () => {
     showToast(`📴 已存本机,恢复后自动补传 (${payload.ts.slice(11)} ${b.dataset.cat})`, false);
     return;
   }
-  last = { id: r[0].id, ts: r[0].ts };
+  last = { id: r[0].id, ts: r[0].ts, qtSide: qt.side };
   showToast(`✓ ${r[0].ts.slice(11)} ${b.dataset.cat}${payload.score ? ' · ' + payload.score : ''}`, true);
   refresh();
 });
@@ -585,8 +599,18 @@ $('#toast .save').onclick = saveNote;
 $('#toast input').onkeydown = e => { if (e.key === 'Enter') saveNote(); };
 $('#toast input').oninput = bump;
 $('#toast .undo').onclick = async () => {
-  if (last) await fetch(`${SB}/pool_marks?id=eq.${last.id}`, { method: 'PATCH', headers: H,
-    body: JSON.stringify({ deleted: true }) });
+  if (last) {
+    await fetch(`${SB}/pool_marks?id=eq.${last.id}`, { method: 'PATCH', headers: H,
+      body: JSON.stringify({ deleted: true }) });
+    if (last.qtSide) {
+      try {
+        const r = await fetch(`${SB}/rpc/pool_bump_score`, { method: 'POST', headers: H,
+          body: JSON.stringify({ p_side: last.qtSide, p_delta: -1, p_ts: nowIso() }) })
+          .then(x => x.json());
+        if (r && r.a !== undefined) { score.a = r.a; score.b = r.b; renderScore(); }
+      } catch (e) {}
+    }
+  }
   $('#toast').classList.remove('show');
   refresh();
 };
@@ -638,7 +662,7 @@ $('#qtok').onclick = async () => {
     showToast(`📴 已存本机 (清台 ${payload.note})`, false);
     return;
   }
-  last = { id: r[0].id, ts: r[0].ts };
+  last = { id: r[0].id, ts: r[0].ts, qtSide: qt.side };
   showToast(`🎯 ${r[0].ts.slice(11)} 清台 ${payload.note} · ${payload.score}`, true);
   refresh();
 };
