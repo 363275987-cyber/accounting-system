@@ -36,10 +36,19 @@
   .side .nm { font-size: 14px; color: var(--dim); max-width: 72px; overflow: hidden;
     text-overflow: ellipsis; white-space: nowrap; }
   .side .sc { font-size: 34px; font-weight: 800; font-variant-numeric: tabular-nums; }
-  #sreset {
-    flex: none; width: 44px; border: none; border-radius: 14px; background: var(--card);
+  #sides { flex: 1; display: flex; gap: 6px; flex-wrap: wrap; min-width: 0; }
+  #sides .side { flex: 1 1 30%; min-width: 0; border-radius: 12px; }
+  #sides.n4 .side { flex: 1 1 40%; }
+  #sides.n3 .sc, #sides.n4 .sc { font-size: 24px; }
+  #sides.n3 .nm, #sides.n4 .nm { font-size: 12px; max-width: 30vw; }
+  .side.win { outline: 3px solid #ffd700; box-shadow: 0 0 12px rgba(255,215,0,.4); }
+  #scbtns { flex: none; display: flex; flex-direction: column; gap: 4px; width: 46px; }
+  #scbtns button {
+    flex: 1; border: none; border-radius: 10px; background: var(--card);
     color: var(--dim); font-size: 12px;
   }
+  #score.tall { height: 116px; }
+  #tgline { text-align: center; color: #f0b26b; font-size: 12px; margin: -6px 0 2px; flex: none; }
   #shint { text-align: center; color: #4a5665; font-size: 11px; margin: -6px 0 4px; flex: none; }
   #stagebar {
     flex: none; display: flex; align-items: center; gap: 10px;
@@ -185,10 +194,10 @@
   </header>
 
   <div id="score">
-    <div class="side" id="sideA"><span class="nm">南哥</span><span class="sc">0</span></div>
-    <button id="sreset">清零</button>
-    <div class="side" id="sideB"><span class="sc">0</span><span class="nm">对手</span></div>
+    <div id="sides"></div>
+    <div id="scbtns"><button id="sreset">清零</button><button id="smode">模式</button></div>
   </div>
+  <div id="tgline" style="display:none"></div>
   <div id="shint">点=+1 · 长按=−1 · 点名字改名 · 打点自动带上当时比分</div>
 
   <div id="stagebar">
@@ -272,6 +281,28 @@
     </div>
   </div>
 
+  <div id="modebox" class="modal">
+    <div class="box">
+      <h3>记分模式</h3>
+      <div class="qtrow"><div class="opts" id="modepick">
+        <button class="qtopt" data-m="duo">双人</button>
+        <button class="qtopt" data-m="target">追分</button>
+        <button class="qtopt" data-m="trio">三人</button>
+        <button class="qtopt" data-m="quad">四人</button>
+      </div></div>
+      <div class="qtrow" id="targetrow" style="display:none">
+        <div class="lbl">追分设置(先到目标分者胜;让分=起始分直接填)</div>
+        <div class="opts" style="align-items:center">
+          <input id="mTarget" placeholder="目标分" size="5" style="flex:1;padding:12px;font-size:16px;background:#0d1114;border:1px solid #2a333d;border-radius:10px;color:#e8edf2">
+          <input id="mStartA" placeholder="甲起始" size="5" style="flex:1;padding:12px;font-size:16px;background:#0d1114;border:1px solid #2a333d;border-radius:10px;color:#e8edf2">
+          <input id="mStartB" placeholder="乙起始" size="5" style="flex:1;padding:12px;font-size:16px;background:#0d1114;border:1px solid #2a333d;border-radius:10px;color:#e8edf2">
+        </div>
+      </div>
+      <button id="modesave" style="width:100%;padding:12px;font-size:16px;border:none;border-radius:10px;background:#2e9e5b;color:#fff;font-weight:600">应用</button>
+      <button id="modecancel" style="width:100%;margin-top:8px;padding:12px;font-size:15px;border:none;border-radius:10px;background:#1f2830;color:#8a97a5">取消</button>
+    </div>
+  </div>
+
   <div id="namebox" class="modal">
     <div class="box">
       <h3>你是谁?(记在每条打点上)</h3>
@@ -349,11 +380,28 @@ $('#namesave').onclick = () => {
 
 // ---- 比分(云端共享,RPC 原子加减) ----
 let score = { a: 0, b: 0, name_a: '南哥', name_b: '对手', stage: 0, stage_active: false };
+function players() {
+  const m = score.mode || 'duo';
+  const ps = [{ k: 'a', name: score.name_a || '甲', v: score.a || 0 },
+              { k: 'b', name: score.name_b || '乙', v: score.b || 0 }];
+  if (m === 'trio' || m === 'quad') ps.push({ k: 'c', name: score.name_c || '选手C', v: score.c || 0 });
+  if (m === 'quad') ps.push({ k: 'd', name: score.name_d || '选手D', v: score.d || 0 });
+  return ps;
+}
+function scoreStr() { return players().map(p => p.v).join(':'); }
 function renderScore() {
-  document.querySelector('#sideA .nm').textContent = score.name_a;
-  document.querySelector('#sideB .nm').textContent = score.name_b;
-  document.querySelector('#sideA .sc').textContent = score.a;
-  document.querySelector('#sideB .sc').textContent = score.b;
+  const ps = players();
+  const tgt = (score.mode === 'target' && score.target > 0) ? score.target : 0;
+  const sides = $('#sides');
+  sides.className = ps.length === 4 ? 'n4' : (ps.length === 3 ? 'n3' : '');
+  $('#score').classList.toggle('tall', ps.length === 4);
+  sides.innerHTML = ps.map(p => `
+    <div class="side ${tgt && p.v >= tgt ? 'win' : ''}" data-s="${p.k}">
+      <span class="nm">${p.name}</span><span class="sc">${p.v}</span>
+    </div>`).join('');
+  $('#tgline').style.display = tgt ? '' : 'none';
+  if (tgt) $('#tgline').textContent = `🎯 追分模式 · 目标 ${tgt} 分` +
+    (ps.some(p => p.v >= tgt) ? ` · ${ps.filter(p => p.v >= tgt).map(p => p.name).join('/')} 胜!` : '');
   const lb = $('#stagelabel'), btn = $('#stagebtn'), pick = $('#stagepick');
   if (score.stage_active) {
     lb.textContent = `🟢 第${score.stage}阶段进行中`;
@@ -387,7 +435,7 @@ $('#stagebtn').onclick = () => {
   if (confirm(`结束第${score.stage}阶段?`)) stageCtl('end');
 };
 $('#matchend').onclick = async () => {
-  const fin = `${score.name_a} ${score.a} : ${score.b} ${score.name_b}`;
+  const fin = players().map(p => `${p.name} ${p.v}`).join(' : ');
   if (!confirm(`🏁 整场比赛结束并保存?\n\n终局比分 ${fin}\n今晚打点 ${marksCount} 条(已全部存云端)\n\n确认后比分和阶段归零,明晚直接开新场`)) return;
   try {
     const r = await fetch(`${SB}/rpc/pool_match_end`, { method: 'POST', headers: H,
@@ -424,32 +472,67 @@ async function bumpScore(side, delta) {
     if (r && r.a !== undefined) { score.a = r.a; score.b = r.b; renderScore(); }
   } catch (e) {}
 }
-function bindSide(el, side) {
-  let timer = null, held = false;
-  el.addEventListener('pointerdown', () => {
-    held = false;
-    timer = setTimeout(() => { held = true; bumpScore(side, -1); }, 550);
+(function () {
+  const box = $('#sides');
+  let timer = null, held = false, curSide = null;
+  box.addEventListener('pointerdown', e => {
+    const el = e.target.closest('.side');
+    if (!el) return;
+    curSide = el.dataset.s; held = false;
+    timer = setTimeout(() => { held = true; bumpScore(curSide, -1); }, 550);
   });
-  el.addEventListener('pointerleave', () => clearTimeout(timer));
-  el.addEventListener('pointercancel', () => clearTimeout(timer));
-  el.addEventListener('pointerup', e => {
+  box.addEventListener('pointerleave', () => clearTimeout(timer), true);
+  box.addEventListener('pointercancel', () => clearTimeout(timer));
+  box.addEventListener('pointerup', e => {
     clearTimeout(timer);
     if (held) return;
+    const el = e.target.closest('.side');
+    if (!el) return;
+    const side = el.dataset.s;
     if (e.target.classList.contains('nm')) {
-      const cur = side === 'a' ? score.name_a : score.name_b;
-      const v = prompt('改名字:', cur);
+      const key = 'name_' + side;
+      const v = prompt('改名字:', score[key] || '');
       if (!v || !v.trim()) return;
-      if (side === 'a') score.name_a = v.trim(); else score.name_b = v.trim();
+      score[key] = v.trim();
       fetch(`${SB}/pool_score?id=eq.1`, { method: 'PATCH', headers: H,
-        body: JSON.stringify({ name_a: score.name_a, name_b: score.name_b }) });
+        body: JSON.stringify({ [key]: score[key] }) });
       renderScore();
       return;
     }
     bumpScore(side, 1);
   });
-}
-bindSide($('#sideA'), 'a');
-bindSide($('#sideB'), 'b');
+})();
+
+let pickedMode = 'duo';
+$('#smode').onclick = () => {
+  pickedMode = score.mode || 'duo';
+  document.querySelectorAll('#modepick .qtopt').forEach(b => b.classList.toggle('on', b.dataset.m === pickedMode));
+  $('#targetrow').style.display = pickedMode === 'target' ? '' : 'none';
+  $('#mTarget').value = score.target || '';
+  $('#mStartA').value = score.a || 0;
+  $('#mStartB').value = score.b || 0;
+  $('#modebox').classList.add('show');
+};
+$('#modepick').onclick = e => {
+  if (!e.target.dataset.m) return;
+  pickedMode = e.target.dataset.m;
+  document.querySelectorAll('#modepick .qtopt').forEach(b => b.classList.toggle('on', b.dataset.m === pickedMode));
+  $('#targetrow').style.display = pickedMode === 'target' ? '' : 'none';
+};
+$('#modecancel').onclick = () => $('#modebox').classList.remove('show');
+$('#modesave').onclick = async () => {
+  const body = { mode: pickedMode };
+  if (pickedMode === 'target') {
+    body.target = parseInt($('#mTarget').value, 10) || 0;
+    const sa = parseInt($('#mStartA').value, 10), sb = parseInt($('#mStartB').value, 10);
+    if (!isNaN(sa)) body.a = Math.max(0, sa);
+    if (!isNaN(sb)) body.b = Math.max(0, sb);
+  } else { body.target = 0; }
+  await fetch(`${SB}/pool_score?id=eq.1`, { method: 'PATCH', headers: H, body: JSON.stringify(body) });
+  Object.assign(score, body);
+  $('#modebox').classList.remove('show');
+  renderScore();
+};
 $('#sreset').onclick = async () => {
   if (!confirm('比分清零?')) return;
   const r = await fetch(`${SB}/rpc/pool_reset_score`, { method: 'POST', headers: H,
@@ -583,7 +666,7 @@ document.querySelectorAll('#btns button').forEach(b => b.onclick = async () => {
   const now = new Date();
   const payload = {
     session_date: sdate(now), ts: localIso(now), category: b.dataset.cat,
-    marker, score: `${score.a}:${score.b}`, stage: score.stage || 0, note: ''
+    marker, score: scoreStr(), stage: score.stage || 0, note: ''
   };
   let r = null;
   try {
@@ -662,9 +745,8 @@ $('#toast .undo').onclick = async () => {
 // ---- 清台 ----
 const qt = { side: null, lv: null, type: null };
 function qtRender() {
-  $('#qtwho').innerHTML =
-    `<button class="qtopt ${qt.side==='a'?'on':''}" data-s="a">${score.name_a}</button>` +
-    `<button class="qtopt ${qt.side==='b'?'on':''}" data-s="b">${score.name_b}</button>`;
+  $('#qtwho').innerHTML = players().map(p =>
+    `<button class="qtopt ${qt.side===p.k?'on':''}" data-s="${p.k}">${p.name}</button>`).join('');
   document.querySelectorAll('#qtlv .qtopt').forEach(b => b.classList.toggle('on', b.dataset.v === qt.lv));
   document.querySelectorAll('#qttype .qtopt').forEach(b => b.classList.toggle('on', b.dataset.v === qt.type));
 }
@@ -684,7 +766,7 @@ $('#qtcancel').onclick = () => $('#qtbox').classList.remove('show');
 async function qtSave() {
   $('#qtbox').classList.remove('show');
   const now = new Date();
-  const player = qt.side === 'a' ? score.name_a : score.name_b;
+  const player = (players().find(p => p.k === qt.side) || {}).name || '';
   try {
     const r = await fetch(`${SB}/rpc/pool_bump_score`, { method: 'POST', headers: H,
       body: JSON.stringify({ p_side: qt.side, p_delta: 1, p_ts: localIso(now) }) })
@@ -693,7 +775,7 @@ async function qtSave() {
   } catch (e) {}
   const payload = {
     session_date: sdate(now), ts: localIso(now), category: '清台',
-    marker, score: `${score.a}:${score.b}`, stage: score.stage || 0,
+    marker, score: scoreStr(), stage: score.stage || 0,
     note: `${player}·${qt.lv}·${qt.type}`
   };
   let r = null;

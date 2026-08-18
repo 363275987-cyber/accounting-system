@@ -9,20 +9,18 @@
   html, body { height: 100%; background: #000; overflow: hidden;
     font-family: "PingFang SC", "Microsoft YaHei", sans-serif; }
   #board { height: 100%; display: flex; flex-direction: column; padding: 2vh 2vw; gap: 1.5vh; }
-  #row-names { display: flex; gap: 2vw; height: 17vh; }
+  #tg { text-align: center; color: #ffd700; font-weight: 800; font-size: 4.5vh; display: none; }
+  #row-names { display: flex; gap: 2vw; height: 16vh; }
   .tag {
     flex: 1; display: flex; align-items: center; justify-content: center;
-    font-size: 10vh; font-weight: 800; color: #fff; letter-spacing: 1vw;
-    border-radius: 1.5vh; overflow: hidden; white-space: nowrap;
+    font-weight: 800; color: #fff; border-radius: 1.5vh; overflow: hidden; white-space: nowrap;
   }
-  .tag.a { background: #1d4ed8; }
-  .tag.b { background: #8b1a2f; }
   #row-scores { flex: 1; display: flex; gap: 2vw; min-height: 0; }
-  .cell { flex: 1; display: flex; align-items: center; justify-content: center; min-width: 0; }
-  .sc {
-    font-weight: 900; color: #f5a623; font-variant-numeric: tabular-nums;
-    line-height: 1; text-shadow: 0 0 3vh rgba(245,166,35,.35);
-  }
+  .cell { flex: 1; display: flex; align-items: center; justify-content: center; min-width: 0;
+    border-radius: 2vh; }
+  .cell.win { outline: .8vh solid #ffd700; box-shadow: 0 0 5vh rgba(255,215,0,.45); }
+  .sc { font-weight: 900; color: #f5a623; font-variant-numeric: tabular-nums;
+    line-height: 1; text-shadow: 0 0 3vh rgba(245,166,35,.35); }
   #dot { position: fixed; right: 1.2vh; top: 1.2vh; width: 1.6vh; height: 1.6vh;
     border-radius: 50%; background: #2e9e5b; }
   #dot.off { background: #c94f4f; }
@@ -31,46 +29,50 @@
 <body>
   <div id="dot"></div>
   <div id="board">
-    <div id="row-names">
-      <div class="tag a" id="na">王孟南</div>
-      <div class="tag b" id="nb">卢岩</div>
-    </div>
-    <div id="row-scores">
-      <div class="cell"><div class="sc" id="sa">0</div></div>
-      <div class="cell"><div class="sc" id="sb">0</div></div>
-    </div>
+    <div id="tg"></div>
+    <div id="row-names"></div>
+    <div id="row-scores"></div>
   </div>
 <script>
 const KEY = 'sb_publishable_kyhsOoWxO8YEBczAIJsUxQ_9KUmxFV2';
 const SB = 'https://cmswoyiuoeqzeassubvw.supabase.co/rest/v1';
 const H = { apikey: KEY, Authorization: 'Bearer ' + KEY };
 const $ = s => document.querySelector(s);
-function fit() {
-  // 数字随位数自适应:1-2位撑满,3位自动缩,永不溢出
-  const digits = Math.max($('#sa').textContent.length, $('#sb').textContent.length, 1);
+const COLORS = ['#1d4ed8', '#8b1a2f', '#0f766e', '#b45309'];
+let cur = null;
+function playersOf(r) {
+  const ps = [{ name: r.name_a, v: r.a }, { name: r.name_b, v: r.b }];
+  if (r.mode === 'trio' || r.mode === 'quad') ps.push({ name: r.name_c, v: r.c });
+  if (r.mode === 'quad') ps.push({ name: r.name_d, v: r.d });
+  return ps;
+}
+function render(r) {
+  const ps = playersOf(r);
+  const tgt = (r.mode === 'target' && r.target > 0) ? r.target : 0;
+  $('#tg').style.display = tgt ? 'block' : 'none';
+  if (tgt) $('#tg').textContent = `🎯 追分 · 目标 ${tgt} 分` +
+    (ps.some(p => p.v >= tgt) ? ` — ${ps.filter(p => p.v >= tgt).map(p => p.name).join('/')} 胜!` : '');
+  $('#row-names').innerHTML = ps.map((p, i) =>
+    `<div class="tag" style="background:${COLORS[i]};font-size:${ps.length > 2 ? 7 : 10}vh;letter-spacing:${ps.length > 2 ? 0.3 : 1}vw">${p.name}</div>`).join('');
+  $('#row-scores').innerHTML = ps.map(p =>
+    `<div class="cell ${tgt && p.v >= tgt ? 'win' : ''}"><div class="sc">${p.v}</div></div>`).join('');
+  const digits = Math.max(...ps.map(p => String(p.v).length), 1);
   const h = window.innerHeight, w = window.innerWidth;
-  const size = Math.min(h * 0.62, (w * 0.44) / (digits * 0.60));
+  const cellW = (w * 0.9) / ps.length;
+  const size = Math.min(h * (tgt ? 0.52 : 0.58), cellW / (digits * 0.60));
   document.querySelectorAll('.sc').forEach(e => e.style.fontSize = size + 'px');
 }
 async function poll() {
   try {
     const r = await fetch(SB + '/pool_score?id=eq.1', { headers: H }).then(r => r.json());
-    if (r[0]) {
-      $('#na').textContent = r[0].name_a;
-      $('#nb').textContent = r[0].name_b;
-      $('#sa').textContent = r[0].a;
-      $('#sb').textContent = r[0].b;
-      fit();
-      $('#dot').classList.remove('off');
-    }
+    if (r[0]) { cur = r[0]; render(cur); $('#dot').classList.remove('off'); }
   } catch (e) { $('#dot').classList.add('off'); }
 }
 async function keepAwake() {
   try { if (navigator.wakeLock) await navigator.wakeLock.request('screen'); } catch (e) {}
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) keepAwake(); });
-window.addEventListener('resize', fit);
-fit();
+window.addEventListener('resize', () => cur && render(cur));
 poll(); setInterval(poll, 1500);
 keepAwake();
 </script>
