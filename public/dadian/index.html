@@ -83,7 +83,11 @@
     flex: 1; border: 1px solid #2f3a45; background: #131920; color: var(--text);
     border-radius: 12px; padding: 15px 0; font-size: 16px; text-align: center;
   }
-  .qtopt.on { background: #0f9d8f; border-color: #0f9d8f; color: #fff; font-weight: 600; }
+  .qtopt { transition: all .12s; }
+  .qtopt.on {
+    background: #e8edf2; border-color: #e8edf2; color: #0d1114; font-weight: 700;
+    box-shadow: 0 0 0 2px rgba(232,237,242,.25);
+  }
   #qtok { background: #0f9d8f !important; }
   #qtok:disabled { opacity: .4; }
   #qtcancel { background: #1f2830 !important; color: var(--dim) !important; margin-top: 8px; }
@@ -250,19 +254,19 @@
       <h3>🎯 一杆清台</h3>
       <div class="qtrow"><div class="lbl">谁清的?(比分自动+1)</div>
         <div class="opts" id="qtwho"></div></div>
-      <div class="qtrow"><div class="lbl">难度</div>
-        <div class="opts" id="qtlv">
-          <button class="qtopt" data-v="普通清台">普通</button>
-          <button class="qtopt" data-v="中等难度">中等</button>
-          <button class="qtopt" data-v="神仙局">🀄 神仙局</button>
-        </div></div>
-      <div class="qtrow"><div class="lbl">类型</div>
+      <div class="qtrow"><div class="lbl">类型(点了就自动记录)</div>
         <div class="opts" id="qttype">
           <button class="qtopt" data-v="炸清">炸清</button>
           <button class="qtopt" data-v="接清">接清</button>
           <button class="qtopt" data-v="一杆清">一杆清</button>
         </div></div>
-      <div class="dim" style="text-align:center;margin-bottom:10px">选完三项自动记录,不用再按别的</div>
+      <div class="qtrow"><div class="lbl">难度(不点默认普通,要改先点这里)</div>
+        <div class="opts" id="qtlv">
+          <button class="qtopt" data-v="普通清台">普通</button>
+          <button class="qtopt" data-v="中等难度">中等</button>
+          <button class="qtopt" data-v="神仙局">🀄 神仙局</button>
+        </div></div>
+      <div class="dim" style="text-align:center;margin-bottom:10px">点谁 + 点类型就自动记录(难度不选=普通)</div>
       <button id="qtcancel">取消</button>
     </div>
   </div>
@@ -644,7 +648,7 @@ function qtMaybeDone() {
 }
 $('#qtbtn').onclick = () => {
   if (navigator.vibrate) navigator.vibrate(40);
-  qt.side = null; qt.lv = null; qt.type = null;
+  qt.side = null; qt.lv = '普通清台'; qt.type = null;
   qtRender();
   $('#qtbox').classList.add('show');
 };
