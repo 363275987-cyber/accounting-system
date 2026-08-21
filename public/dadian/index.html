@@ -313,6 +313,15 @@
 
 <script>
 const $ = s => document.querySelector(s);
+// 网络抖动保护:任何请求 8 秒不回就放弃,避免请求堆积把浏览器卡死
+(function () {
+  const raw = window.fetch.bind(window);
+  window.fetch = (url, opts = {}) => {
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), 8000);
+    return raw(url, { ...opts, signal: ctl.signal }).finally(() => clearTimeout(t));
+  };
+})();
 const CATS = ['高光', '搞笑', '金句', '争议', '清台'];
 const SB = 'https://cmswoyiuoeqzeassubvw.supabase.co/rest/v1';
 const KEY = 'sb_publishable_kyhsOoWxO8YEBczAIJsUxQ_9KUmxFV2';
@@ -445,7 +454,10 @@ $('#matchend').onclick = async () => {
   } catch (e) {}
 };
 let freshChecked = false;
+let loadingScore = false;
 async function loadScore() {
+  if (loadingScore) return;
+  loadingScore = true;
   try {
     if (!freshChecked) {
       // 开新场自检:昨晚忘了收场,今天第一个打开页面的人自动触发归零
@@ -461,7 +473,7 @@ async function loadScore() {
     }
     const r = await fetch(`${SB}/pool_score?id=eq.1`, { headers: H }).then(r => r.json());
     if (r[0]) { score = r[0]; renderScore(); }
-  } catch (e) {}
+  } catch (e) {} finally { loadingScore = false; }
 }
 async function bumpScore(side, delta) {
   if (navigator.vibrate) navigator.vibrate(delta > 0 ? 30 : [30, 50, 30]);
@@ -556,7 +568,13 @@ function setQueue(q) {
   localStorage.setItem('pool_queue', JSON.stringify(q));
   $('#pend').style.display = q.length ? '' : 'none';
 }
+let flushing = false;
 async function flushQueue() {
+  if (flushing) return;
+  flushing = true;
+  try { await _flushQueue(); } finally { flushing = false; }
+}
+async function _flushQueue() {
   let q = queue();
   while (q.length) {
     try {
@@ -570,7 +588,10 @@ async function flushQueue() {
 setInterval(flushQueue, 8000);
 
 // ---- 列表 ----
+let refreshing = false;
 async function refresh() {
+  if (refreshing) return;
+  refreshing = true;
   try {
     const date = sdate(new Date());
     const marks = await fetch(
@@ -592,7 +613,7 @@ async function refresh() {
         <span class="m">${m.marker || ''}</span>
         <button class="del">✕</button>
       </div>`).join('');
-  } catch (e) {}
+  } catch (e) {} finally { refreshing = false; }
 }
 $('#listbar').onclick = () => $('#sheet').classList.add('show');
 $('#clearAll').onclick = async () => {
@@ -670,7 +691,9 @@ loadChips();
 
 // ---- 打点 ----
 document.querySelectorAll('#btns button').forEach(b => b.onclick = async () => {
+  if (b.id === 'qtbtn') return;
   if (navigator.vibrate) navigator.vibrate(40);
+  showToast(`⏳ ${b.dataset.cat} 记录中…`, false);
   const now = new Date();
   const payload = {
     session_date: sdate(now), ts: localIso(now), category: b.dataset.cat,
@@ -806,7 +829,7 @@ async function qtSave() {
 
 refresh();
 flushQueue();
-setInterval(refresh, 10000);
+setInterval(refresh, 15000);
 </script>
 </body>
 </html>
