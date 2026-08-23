@@ -599,7 +599,7 @@ async function refresh() {
       `${SB}/pool_marks?session_date=eq.${date}&deleted=eq.false&order=ts.desc&limit=100`,
       { headers: H }).then(r => r.json());
     $('#count').textContent = `今晚 ${marks.length} 条`;
-    $('#sheetTitle').textContent = `打点记录 (${marks.length})`;
+    if (!viewDate) $('#sheetTitle').textContent = `打点记录 (${marks.length})`;
     const m0 = marks[0];
     $('#lblatest').textContent = m0
       ? `最新 ${m0.ts.slice(11, 16)} ${m0.category}${m0.score ? ' ' + m0.score : ''} ${m0.note || ''}`
