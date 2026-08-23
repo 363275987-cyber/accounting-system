@@ -225,6 +225,7 @@
       <span class="info"></span>
       <button class="undo">撤销</button>
     </div>
+    <div class="chips" id="whochips"></div>
     <div class="chips" id="timechips">
       <button class="chip on" data-back="0">刚才</button>
       <button class="chip" data-back="60">1分钟前</button>
@@ -616,6 +617,7 @@ function renderList(marks) {
         <span class="c ${m.category}" title="点击换分类">${m.category}</span>
         ${m.stage ? `<span class="m">S${m.stage}</span>` : ''}
         <span class="t scedit" title="点击改比分">${m.score || '--'}</span>
+        ${m.player && m.category !== '清台' ? `<span class="m">👤${m.player}</span>` : ''}
         <span class="n nedit" title="点击改备注">${m.note || ''}</span>
         <span class="m">${m.marker || ''}</span>
         <button class="del">✕</button>
@@ -748,6 +750,9 @@ function showToast(text, full) {
   t.querySelector('input').value = '';
   $('#timechips').style.display = full ? '' : 'none';
   $('#notechips').style.display = full ? '' : 'none';
+  $('#whochips').style.display = full ? '' : 'none';
+  if (full) $('#whochips').innerHTML = `<span class="chip" style="border:none;color:#8a97a5">谁的?</span>` +
+    players().map(p => `<button class="chip" data-p="${p.name}">${p.name}</button>`).join('');
   t.querySelector('.row:last-of-type').style.display = full ? '' : 'none';
   document.querySelectorAll('#timechips .chip').forEach((c, i) => c.classList.toggle('on', i === 0));
   document.querySelectorAll('#notechips .chip').forEach(c => c.classList.remove('on'));
@@ -760,6 +765,14 @@ function bump() {
 }
 
 // ---- 时间回拨 ----
+$('#whochips').onclick = async e => {
+  const p = e.target.dataset.p;
+  if (!p || !last) return;
+  document.querySelectorAll('#whochips .chip').forEach(c => c.classList.toggle('on', c === e.target));
+  await fetch(`${SB}/pool_marks?id=eq.${last.id}`, { method: 'PATCH', headers: H,
+    body: JSON.stringify({ player: p }) });
+  bump(); refresh();
+};
 $('#timechips').onclick = async e => {
   const back = e.target.dataset.back;
   if (back === undefined || !last) return;
@@ -832,7 +845,7 @@ async function qtSave() {
   } catch (e) {}
   const payload = {
     session_date: sdate(now), ts: localIso(now), category: '清台',
-    marker, score: scoreStr(), stage: score.stage || 0,
+    marker, score: scoreStr(), stage: score.stage || 0, player,
     note: `${player}·${qt.lv}·${qt.type}`
   };
   let r = null;
