@@ -253,7 +253,7 @@
     <div class="panel">
       <div class="head"><span><span id="sheetTitle">打点记录</span>
           <select id="sheetDate" style="margin-left:8px;background:#131920;color:#e8edf2;border:1px solid #2f3a45;border-radius:8px;padding:6px 8px;font-size:13px"></select></span>
-        <span><a href="list.html" style="color:#7db3e8;font-size:14px;margin-right:10px;text-decoration:none">📋 剪辑表</a><button id="clearAll" style="color:#e88989;margin-right:8px">🗑 清空</button><button id="sheetClose">收起</button></span></div>
+        <span><a href="list.html" style="color:#7db3e8;font-size:14px;margin-right:10px;text-decoration:none">📋 剪辑表</a><button id="fbOpen" style="margin-right:8px">📮 反馈</button><button id="clearAll" style="color:#e88989;margin-right:8px">🗑 清空</button><button id="sheetClose">收起</button></span></div>
       <div id="list"></div>
     </div>
   </div>
@@ -884,6 +884,60 @@ async function qtSave() {
 refresh();
 flushQueue();
 setInterval(refresh, 15000);
+</script>
+<div id="fbmask" style="position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:99;padding:16px">
+  <div style="background:#1a2027;border-radius:16px;padding:18px;width:min(520px,100%);color:#e8edf2">
+    <div style="font-size:18px;font-weight:700;margin-bottom:4px">📮 反馈问题给南哥</div>
+    <div style="color:#8a97a5;font-size:13px;margin-bottom:12px">写清楚在哪一步、点了什么、出了什么状况;手机上截图后点下面选图附上。</div>
+    <input id="fbwho" placeholder="你是谁" style="width:100%;margin-bottom:8px;padding:10px;border-radius:10px;border:1px solid #2a3542;background:#131920;color:#e8edf2;font-size:15px">
+    <textarea id="fbtext" placeholder="问题描述" style="width:100%;min-height:90px;padding:10px;border-radius:10px;border:1px solid #2a3542;background:#131920;color:#e8edf2;font-size:15px;font-family:inherit"></textarea>
+    <div id="fbdrop" style="margin-top:8px;border:1.5px dashed #3a4754;border-radius:10px;padding:12px;text-align:center;color:#8a97a5;font-size:13px">点这里选一张截图(可不选)</div>
+    <input id="fbfile" type="file" accept="image/*" style="display:none">
+    <div style="display:flex;gap:8px;justify-content:flex-end;align-items:center;margin-top:12px">
+      <span id="fbstat" style="margin-right:auto;color:#8a97a5;font-size:13px"></span>
+      <button id="fbCancel">取消</button><button id="fbSend" style="background:#2e9e5b;border-color:#2e9e5b;color:#fff;font-weight:600">发送</button>
+    </div>
+  </div>
+</div>
+<script>
+(() => {
+  let img = '';
+  const $ = s => document.querySelector(s);
+  const open = () => { $('#fbwho').value = localStorage.getItem('marker') || ''; $('#fbmask').style.display = 'flex'; $('#fbstat').textContent = ''; };
+  const close = () => { $('#fbmask').style.display = 'none'; };
+  $('#fbOpen').onclick = open; $('#fbCancel').onclick = close;
+  $('#fbmask').onclick = e => { if (e.target === $('#fbmask')) close(); };
+  $('#fbdrop').onclick = () => $('#fbfile').click();
+  $('#fbfile').onchange = () => {
+    const f = $('#fbfile').files[0]; if (!f) return;
+    const im = new Image(); const url = URL.createObjectURL(f);
+    im.onload = () => {
+      const k = Math.min(1, 1400 / Math.max(im.width, im.height));
+      const c = document.createElement('canvas'); c.width = Math.round(im.width * k); c.height = Math.round(im.height * k);
+      c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+      img = c.toDataURL('image/jpeg', .82);
+      $('#fbdrop').innerHTML = `<img src="${img}" style="max-width:100%;max-height:200px;border-radius:8px"><div style="margin-top:4px">已附上(${Math.round(img.length * .75 / 1024)} KB)</div>`;
+      URL.revokeObjectURL(url);
+    };
+    im.src = url;
+  };
+  $('#fbSend').onclick = async () => {
+    const text = $('#fbtext').value.trim();
+    if (!text && !img) { $('#fbstat').textContent = '至少写一句或附一张图'; return; }
+    $('#fbSend').disabled = true; $('#fbstat').textContent = '发送中…';
+    try {
+      const r = await fetch(`${SB}/pool_feedback`, { method: 'POST', headers: { ...H, Prefer: 'return=representation' },
+        body: JSON.stringify({ source: '打点页', who: $('#fbwho').value.trim().slice(0, 40), text: text.slice(0, 4000), image: img,
+          context: `打点页 · ${location.pathname} · ${navigator.userAgent.slice(0, 80)} · 打点人 ${localStorage.getItem('marker') || ''}` }) });
+      if (!r.ok) throw new Error(r.status);
+      const rows = await r.json();
+      $('#fbstat').textContent = `✓ 已送达,编号 #${rows[0].id}`;
+      $('#fbtext').value = ''; img = ''; $('#fbdrop').textContent = '点这里选一张截图(可不选)';
+      setTimeout(close, 1500);
+    } catch (e) { $('#fbstat').textContent = '❌ 发送失败 ' + e.message; }
+    $('#fbSend').disabled = false;
+  };
+})();
 </script>
 </body>
 </html>
