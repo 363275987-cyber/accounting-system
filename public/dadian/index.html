@@ -245,7 +245,8 @@
 
   <div id="sheet">
     <div class="panel">
-      <div class="head"><span id="sheetTitle">打点记录</span>
+      <div class="head"><span><span id="sheetTitle">打点记录</span>
+          <select id="sheetDate" style="margin-left:8px;background:#131920;color:#e8edf2;border:1px solid #2f3a45;border-radius:8px;padding:6px 8px;font-size:13px"></select></span>
         <span><a href="list.html" style="color:#7db3e8;font-size:14px;margin-right:10px;text-decoration:none">📋 剪辑表</a><button id="clearAll" style="color:#e88989;margin-right:8px">🗑 清空</button><button id="sheetClose">收起</button></span></div>
       <div id="list"></div>
     </div>
@@ -603,6 +604,12 @@ async function refresh() {
     $('#lblatest').textContent = m0
       ? `最新 ${m0.ts.slice(11, 16)} ${m0.category}${m0.score ? ' ' + m0.score : ''} ${m0.note || ''}`
       : '还没有打点';
+    todayMarks = marks;
+    if (!viewDate || viewDate === date) renderList(marks);
+  } catch (e) {} finally { refreshing = false; }
+}
+let viewDate = '', todayMarks = [];
+function renderList(marks) {
     $('#list').innerHTML = marks.map(m => `
       <div class="item" data-id="${m.id}">
         <span class="t">${m.ts.slice(11)}</span>
@@ -613,9 +620,28 @@ async function refresh() {
         <span class="m">${m.marker || ''}</span>
         <button class="del">✕</button>
       </div>`).join('');
-  } catch (e) {} finally { refreshing = false; }
 }
-$('#listbar').onclick = () => $('#sheet').classList.add('show');
+async function loadSheetDates() {
+  try {
+    const rows = await fetch(`${SB}/pool_marks?select=session_date&deleted=eq.false&order=session_date.desc&limit=5000`, { headers: H }).then(r => r.json());
+    const cnt = {};
+    rows.forEach(r => cnt[r.session_date] = (cnt[r.session_date] || 0) + 1);
+    const today = sdate(new Date(Date.now() + clockOffset));
+    if (!(today in cnt)) cnt[today] = 0;
+    const ds = Object.keys(cnt).sort().reverse();
+    $('#sheetDate').innerHTML = ds.map(d => `<option value="${d}">${d === today ? '今晚' : d}${cnt[d] ? ` (${cnt[d]})` : ''}</option>`).join('');
+    $('#sheetDate').value = viewDate || today;
+  } catch (e) {}
+}
+$('#sheetDate').onchange = async () => {
+  const today = sdate(new Date(Date.now() + clockOffset));
+  viewDate = $('#sheetDate').value;
+  if (viewDate === today) { viewDate = ''; $('#sheetTitle').textContent = `打点记录 (${todayMarks.length})`; renderList(todayMarks); return; }
+  const marks = await fetch(`${SB}/pool_marks?session_date=eq.${viewDate}&deleted=eq.false&order=ts.desc&limit=500`, { headers: H }).then(r => r.json());
+  $('#sheetTitle').textContent = `${viewDate} (${marks.length})`;
+  renderList(marks);
+};
+$('#listbar').onclick = () => { $('#sheet').classList.add('show'); loadSheetDates(); };
 $('#clearAll').onclick = async () => {
   if (!marksCount) return alert('今晚还没有打点');
   if (!confirm(`清空今晚全部 ${marksCount} 条打点?\n(一般只在测试后用;清掉的不参与切片,不可恢复)`)) return;
