@@ -62,6 +62,10 @@
     background: #57432e; color: #f0b26b; font-weight: 600; display: none;
   }
   #stagepick { display: flex; gap: 6px; }
+  #restartbtn {
+    border: none; border-radius: 8px; padding: 8px 10px; font-size: 13px;
+    background: #1f2d3a; color: #9db8d3; display: none;
+  }
   #matchend {
     border: none; border-radius: 8px; padding: 8px 12px; font-size: 14px;
     background: #2a3440; color: #9db8d3; font-weight: 600; display: none;
@@ -208,6 +212,7 @@
       <button class="stgbtn" data-stg="3">③</button>
       <button class="stgbtn" data-stg="4">④</button>
     </span>
+    <button id="restartbtn" title="断播后重新开播时点一下,作为新一段视频的对齐锚点">📡 重开</button>
     <button id="stagebtn">■ 结束</button>
     <button id="matchend">🏁 收场</button>
   </div>
@@ -420,11 +425,13 @@ function renderScore() {
     pick.style.display = 'none';
     btn.style.display = 'block';
     btn.textContent = `■ 结束第${score.stage}阶段`;
+    $('#restartbtn').style.display = 'block';
   } else {
     lb.textContent = (score.stage ? `第${score.stage}阶段已结束 · ` : '') + '选阶段开始:';
     lb.classList.remove('live');
     pick.style.display = 'flex';
     btn.style.display = 'none';
+    $('#restartbtn').style.display = 'none';
   }
   $('#matchend').style.display = (!score.stage_active && score.stage > 0) ? 'block' : 'none';
 }
@@ -441,6 +448,14 @@ $('#stagepick').onclick = e => {
   const stg = parseInt(e.target.dataset.stg, 10);
   if (!stg) return;
   if (confirm(`开始第${stg}阶段?(比分继续累计)`)) stageCtl('start', stg);
+};
+$('#restartbtn').onclick = async () => {
+  if (!confirm(`记录一次"第${score.stage}阶段 断播重开"?\n(重新开播的那一刻点,新一段录像会按这个时刻对齐)`)) return;
+  try {
+    await fetch(`${SB}/pool_stage_events`, { method: 'POST', headers: H,
+      body: JSON.stringify({ ts: nowIso(), stage: score.stage, action: 'restart' }) });
+    showToast(`📡 已记录第${score.stage}阶段重开 ${nowIso().slice(11)} — 新录像文件名加"-2"即可自动对齐`, false);
+  } catch (e) {}
 };
 $('#stagebtn').onclick = () => {
   if (confirm(`结束第${score.stage}阶段?`)) stageCtl('end');
