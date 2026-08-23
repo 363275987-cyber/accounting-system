@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>剪辑表</title>
+<style>
+  :root { --bg:#101418; --card:#1a2027; --card2:#131920; --text:#e8edf2; --dim:#8a97a5; --green:#2e9e5b; --line:#262f38; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; font-size:15px; padding:14px; max-width:1000px; margin:0 auto; }
+  h1 { font-size:20px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
+  select, button { background:var(--card); border:1px solid var(--line); color:var(--text); border-radius:8px; padding:8px 12px; font-size:14px; }
+  button.primary { background:var(--green); border-color:var(--green); color:#fff; font-weight:600; }
+  .card { background:var(--card); border-radius:12px; padding:12px; margin-top:10px; }
+  .chips { display:flex; gap:8px; flex-wrap:wrap; }
+  .chip { border:1px solid #2f3a45; background:var(--card2); color:var(--text); border-radius:999px; padding:7px 13px; font-size:14px; }
+  .chip.off { opacity:.35; text-decoration:line-through; }
+  .chip.高光 { border-color:#2e9e5b; } .chip.搞笑 { border-color:#d9822b; } .chip.金句 { border-color:#3b82d0; } .chip.争议 { border-color:#c94f4f; } .chip.清台 { border-color:#0f9d8f; }
+  .sum { color:var(--dim); font-size:13px; margin-top:8px; }
+  table { width:100%; border-collapse:collapse; margin-top:10px; font-size:14px; }
+  th, td { padding:8px 6px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+  th { color:var(--dim); font-weight:500; font-size:13px; }
+  td.t { font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .c { font-weight:600; padding:2px 7px; border-radius:6px; background:#10151a; white-space:nowrap; }
+  .c.高光 { color:#5fce8f; } .c.搞笑 { color:#eda45c; } .c.金句 { color:#7db3e8; } .c.争议 { color:#e88989; } .c.清台 { color:#4ecdc4; }
+  .dim { color:var(--dim); }
+  .wrap { overflow-x:auto; }
+  @media (max-width:600px) { body { padding:10px; } th:nth-child(7), td:nth-child(7) { display:none; } }
+</style>
+</head>
+<body>
+  <h1>📋 剪辑表
+    <select id="dateSel"></select>
+    <button class="primary" onclick="exportCsv()">⬇ 导出 CSV</button>
+    <button onclick="copyText()">复制文字</button>
+    <a href="./" class="dim" style="font-size:13px;margin-left:auto">← 打点页</a>
+  </h1>
+  <div class="card">
+    <div class="dim" style="margin-bottom:6px">点一下类型可排除/恢复(灰掉的不导出)</div>
+    <div class="chips" id="catchips"></div>
+    <div class="chips" id="whochips" style="margin-top:8px"></div>
+    <div class="sum" id="sum"></div>
+  </div>
+  <div class="card wrap">
+    <table>
+      <thead><tr><th>#</th><th>时刻</th><th>阶段</th><th>类型</th><th>比分</th><th>备注</th><th>打点人</th></tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+<script>
+const KEY = 'sb_publishable_kyhsOoWxO8YEBczAIJsUxQ_9KUmxFV2';
+const SB = 'https://cmswoyiuoeqzeassubvw.supabase.co/rest/v1';
+const H = { apikey: KEY, Authorization: 'Bearer ' + KEY };
+const $ = s => document.querySelector(s);
+const CATS = ['高光', '搞笑', '金句', '争议', '清台'];
+let marks = [], offCats = new Set(), offWho = new Set(), date = '';
+
+async function loadDates() {
+  const rows = await fetch(`${SB}/pool_marks?select=session_date&deleted=eq.false&order=session_date.desc&limit=5000`, { headers: H }).then(r => r.json());
+  const ds = [...new Set(rows.map(r => r.session_date))];
+  const counts = {};
+  rows.forEach(r => counts[r.session_date] = (counts[r.session_date] || 0) + 1);
+  $('#dateSel').innerHTML = ds.map(d => `<option value="${d}">${d} (${counts[d]}条)</option>`).join('');
+  const q = new URLSearchParams(location.search).get('date');
+  date = (q && ds.includes(q)) ? q : (ds[0] || '');
+  $('#dateSel').value = date;
+  $('#dateSel').onchange = () => { date = $('#dateSel').value; load(); };
+}
+async function load() {
+  marks = await fetch(`${SB}/pool_marks?session_date=eq.${date}&deleted=eq.false&order=ts.asc`, { headers: H }).then(r => r.json());
+  render();
+}
+function visible() {
+  return marks.filter(m => !offCats.has(m.category) && !offWho.has(m.marker || '(未填名)'));
+}
+function render() {
+  const whos = [...new Set(marks.map(m => m.marker || '(未填名)'))];
+  $('#catchips').innerHTML = CATS.map(c => {
+    const n = marks.filter(m => m.category === c).length;
+    return `<button class="chip ${c} ${offCats.has(c) ? 'off' : ''}" data-c="${c}">${c} ${n}</button>`;
+  }).join('');
+  $('#whochips').innerHTML = whos.map(w =>
+    `<button class="chip ${offWho.has(w) ? 'off' : ''}" data-w="${w}">👤 ${w} ${marks.filter(m => (m.marker || '(未填名)') === w).length}</button>`).join('');
+  const vs = visible();
+  $('#tbody').innerHTML = vs.map((m, i) => `<tr>
+    <td class="dim">${i + 1}</td>
+    <td class="t">${m.ts.slice(11, 19)}</td>
+    <td class="dim">${m.stage ? '第' + m.stage + '阶段' : ''}</td>
+    <td><span class="c ${m.category}">${m.category}</span></td>
+    <td class="t">${m.score || ''}</td>
+    <td>${m.note || ''}</td>
+    <td class="dim">${m.marker || ''}</td></tr>`).join('') || '<tr><td colspan="7" class="dim">这天没有打点</td></tr>';
+  const qt = vs.filter(m => m.category === '清台').length;
+  $('#sum').textContent = `共 ${marks.length} 条 · 当前显示 ${vs.length} 条` + (qt ? ` · 其中清台 ${qt} 局` : '');
+}
+$('#catchips').onclick = e => { const c = e.target.dataset.c; if (!c) return; offCats.has(c) ? offCats.delete(c) : offCats.add(c); render(); };
+$('#whochips').onclick = e => { const w = e.target.dataset.w; if (!w) return; offWho.has(w) ? offWho.delete(w) : offWho.add(w); render(); };
+
+function rows() {
+  return visible().map((m, i) => [i + 1, m.ts.slice(11, 19), m.stage ? '第' + m.stage + '阶段' : '', m.category, m.score || '', m.note || '', m.marker || '']);
+}
+function exportCsv() {
+  const head = ['序号', '时刻', '阶段', '类型', '比分', '备注', '打点人'];
+  const esc = v => `"${String(v).replace(/"/g, '""')}"`;
+  const csv = '﻿' + [head, ...rows()].map(r => r.map(esc).join(',')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = `剪辑表_${date}.csv`;
+  a.click();
+}
+async function copyText() {
+  const txt = `剪辑表 ${date}\n` + rows().map(r => `${r[0]}. ${r[1]} ${r[2]} [${r[3]}] ${r[4]} ${r[5]}`.replace(/\s+/g, ' ').trim()).join('\n');
+  try { await navigator.clipboard.writeText(txt); alert('已复制,可直接粘贴到微信'); }
+  catch (e) { prompt('复制下面的文字:', txt); }
+}
+loadDates().then(load);
+</script>
+</body>
+</html>
