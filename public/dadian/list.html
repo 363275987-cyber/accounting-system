@@ -43,6 +43,7 @@
     <div class="chips" id="whochips" style="margin-top:8px"></div>
     <div class="sum" id="sum"></div>
   </div>
+  <div class="card" id="qtstat" style="display:none"></div>
   <div class="card wrap">
     <table>
       <thead><tr><th>#</th><th>时刻</th><th>阶段</th><th>类型</th><th>选手</th><th>比分</th><th>备注</th><th>打点人</th></tr></thead>
@@ -74,6 +75,60 @@ async function loadDates() {
 async function load() {
   marks = await fetch(`${SB}/pool_marks?session_date=eq.${date}&deleted=eq.false&order=ts.asc`, { headers: H }).then(r => r.json());
   render();
+  loadQtStat();
+}
+// ---- 清台战报:局数按记分事件"恰好一方+1"算;选手↔比分侧按清台时刻±2分钟最近赢局投票 ----
+async function loadQtStat() {
+  const box = $('#qtstat');
+  try {
+    const d0 = new Date(date + 'T06:00:00+08:00'), d1 = new Date(+d0 + 86400e3);
+    const iso = t => t.toISOString();
+    const evs = await fetch(`${SB}/pool_score_events?ts=gte.${iso(d0)}&ts=lt.${iso(d1)}&order=ts.asc&select=ts,a,b,c,d`, { headers: H }).then(r => r.json());
+    const wins = [];
+    for (let i = 1; i < evs.length; i++) {
+      const ks = ['a', 'b', 'c', 'd'], diffs = ks.map(k => (evs[i][k] || 0) - (evs[i - 1][k] || 0));
+      const up = diffs.filter(x => x !== 0);
+      if (up.length === 1 && up[0] === 1) wins.push({ ts: evs[i].ts, side: ks[diffs.findIndex(x => x === 1)] });
+    }
+    const qts = marks.filter(m => qtInfo(m)).map(m => ({ ...m, ...qtInfo(m), t: +new Date(m.ts.replace(' ', 'T') + (m.ts.includes('+') ? '' : '+08:00')) }));
+    if (!qts.length) { box.style.display = 'none'; return; }
+    const votes = {}, sideOf = {};
+    for (const q of qts) {
+      let best = null;
+      for (const w of wins) { const dd = Math.abs(+new Date(w.ts) - q.t); if (dd < 120e3 && (!best || dd < best.dd)) best = { dd, side: w.side }; }
+      if (best) { votes[q.player] = votes[q.player] || {}; votes[q.player][best.side] = (votes[q.player][best.side] || 0) + 1; }
+    }
+    for (const p in votes) sideOf[p] = Object.entries(votes[p]).sort((x, y) => y[1] - x[1])[0][0];
+    const ps = {}, bestStreak = {};
+    let streak = 0, lastQ = null;
+    const parse = sc => (sc || '').split(':').map(Number).filter(n => !isNaN(n));
+    for (const q of qts) {
+      const st = ps[q.player] = ps[q.player] || { 清台: 0, 炸清: 0, 接清: 0, 一杆清: 0, 高难: 0 };
+      st.清台++; if (st[q.type] !== undefined) st[q.type]++;
+      if (/中等|神仙|高难/.test(q.level || '')) st.高难++;
+      let consec = false;
+      if (lastQ && lastQ.player === q.player) {
+        const s1 = parse(lastQ.score), s2 = parse(q.score);
+        if (s1.length && s1.length === s2.length) { const df = s2.map((x, i) => x - s1[i]); consec = df.every(x => x >= 0) && df.reduce((a, b) => a + b, 0) === 1; }
+        else consec = (q.t - lastQ.t) <= 360e3;
+      }
+      streak = consec ? streak + 1 : 1;
+      bestStreak[q.player] = Math.max(bestStreak[q.player] || 0, streak);
+      lastQ = q;
+    }
+    const winN = side => wins.filter(w => w.side === side).length;
+    const pct = (x, y) => y ? Math.round(x / y * 100) + '%' : '—';
+    box.style.display = '';
+    box.innerHTML = `<div style="font-weight:700;margin-bottom:6px">🎱 清台战报 <span class="dim">全晚 ${wins.length} 局(按记分事件算,改分/清零不计)</span></div>
+      <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:14px">
+      <tr class="dim" style="text-align:left"><th style="padding:4px 8px">选手</th><th>赢局</th><th>清台</th><th>清台率</th><th>炸清</th><th>接清</th><th>一杆清</th><th>中等难度+</th><th>最长连摸</th></tr>` +
+      Object.entries(ps).sort((x, y) => y[1].清台 - x[1].清台).map(([p, st]) => {
+        const w = sideOf[p] ? winN(sideOf[p]) : 0;
+        return `<tr><td style="padding:4px 8px"><b>${p}</b></td><td>${w || '—'}</td><td>${st.清台}</td><td>${pct(st.清台, w)}</td>
+          <td>${st.炸清} <span class="dim">${pct(st.炸清, st.清台)}</span></td><td>${st.接清} <span class="dim">${pct(st.接清, st.清台)}</span></td>
+          <td>${st.一杆清} <span class="dim">${pct(st.一杆清, st.清台)}</span></td><td>${st.高难}</td><td>${(bestStreak[p] || 0) > 1 ? bestStreak[p] + ' 连' : '—'}</td></tr>`;
+      }).join('') + '</table></div>';
+  } catch (e) { box.style.display = 'none'; }
 }
 function visible() {
   return marks.filter(m => {
