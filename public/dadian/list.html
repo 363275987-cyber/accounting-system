@@ -81,16 +81,18 @@ async function load() {
 async function loadQtStat() {
   const box = $('#qtstat');
   try {
-    const d0 = new Date(date + 'T06:00:00+08:00'), d1 = new Date(+d0 + 86400e3);
-    const iso = t => t.toISOString();
-    const evs = await fetch(`${SB}/pool_score_events?ts=gte.${iso(d0)}&ts=lt.${iso(d1)}&order=ts.asc&select=ts,a,b,c,d`, { headers: H }).then(r => r.json());
+    // ts 列是"不带时区的北京时间",直接用本地字符串筛营业日窗口(当天06:00~次日06:00)
+    const nd = new Date(date + 'T00:00:00'); nd.setDate(nd.getDate() + 1);
+    const p2 = n => String(n).padStart(2, '0');
+    const next = `${nd.getFullYear()}-${p2(nd.getMonth() + 1)}-${p2(nd.getDate())}`;
+    const evs = await fetch(`${SB}/pool_score_events?ts=gte.${date}T06:00:00&ts=lt.${next}T06:00:00&order=ts.asc&select=ts,a,b,c,d`, { headers: H }).then(r => r.json());
     const wins = [];
     for (let i = 1; i < evs.length; i++) {
       const ks = ['a', 'b', 'c', 'd'], diffs = ks.map(k => (evs[i][k] || 0) - (evs[i - 1][k] || 0));
       const up = diffs.filter(x => x !== 0);
       if (up.length === 1 && up[0] === 1) wins.push({ ts: evs[i].ts, side: ks[diffs.findIndex(x => x === 1)] });
     }
-    const qts = marks.filter(m => qtInfo(m)).map(m => ({ ...m, ...qtInfo(m), t: +new Date(m.ts.replace(' ', 'T') + (m.ts.includes('+') ? '' : '+08:00')) }));
+    const qts = marks.filter(m => qtInfo(m)).map(m => ({ ...m, ...qtInfo(m), t: +new Date(m.ts.replace(' ', 'T').replace(/([+Z].*)$/, '')) }));
     if (!qts.length) { box.style.display = 'none'; return; }
     const votes = {}, sideOf = {};
     for (const q of qts) {
